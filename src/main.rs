@@ -4,17 +4,17 @@ pub mod kusama {
 	use ::subxt::ext::sp_runtime::MultiAddress;
 }
 
-// use subxt::{ext::sp_runtime::{AccountId32, MultiAddress}, };
-// use parity_scale_codec::Encode as _;
-use std::str::FromStr as _;
+use parity_scale_codec::Encode as _;
+use subxt::ext::sp_core;
 use kusama::runtime_types::{
+    frame_support::traits::{preimages::Bounded::Lookup, schedule::DispatchTime},
 	kusama_runtime::{
         governance::origins::pallet_custom_origins::Origin as OpenGovOrigin,
-        RuntimeCall
+        OriginCaller,
+        RuntimeCall,
     },
     pallet_whitelist::pallet::Call as WhitelistCall,
     pallet_referenda::pallet::Call as ReferendaCall,
-    // pallet_fellowship_referenda::pallet::Call as FellowshipReferendaCall, // why doesn't this work?
     pallet_preimage::pallet::Call as PreimageCall,
 };
 
@@ -35,7 +35,7 @@ struct PossibleCallsToSubmit {
     // ```
     // preimage.note(whitelist.whitelist_call(hash(proposal)));
     // ```
-    preimage_for_whitelist_call: Option<PreimageCall>,
+    preimage_for_whitelist_call: Option<RuntimeCall>,
     // ```
     // // Without Fellowship
     // preimage.note(proposal);
@@ -43,7 +43,7 @@ struct PossibleCallsToSubmit {
     // // With Fellowship
     // preimage.note(whitelist.dispatch_whitelisted_call_with_preimage(proposal));
     // ```
-    preimage_for_public_referendum: Option<PreimageCall>,
+    preimage_for_public_referendum: Option<RuntimeCall>,
     // ```
     // fellowship_referenda.submit(
     //     proposal_origin: Fellows,
@@ -54,7 +54,7 @@ struct PossibleCallsToSubmit {
     //     enactment_moment: After(10),
     // )
     // ```
-    fellowship_referendum_submission: Option<ReferendaCall>, // need fellowship referenda call
+    fellowship_referendum_submission: Option<RuntimeCall>,
     // ```
     // referenda.submit(
     //     proposal_origin: ProposalDetails.track,
@@ -66,19 +66,64 @@ struct PossibleCallsToSubmit {
     //     enactment_moment: After(10),
     // )
     // ```
-    public_referendum_submission: Option<ReferendaCall>,
+    public_referendum_submission: Option<RuntimeCall>,
 }
 
 fn main() {
     let proposal_details = get_the_actual_proposed_action();
+    let proposal_bytes = hex::decode(proposal_details.proposal.trim_start_matches("0x")).expect("Valid proposal; qed");
+    let proposal_hash = sp_core::blake2_256(&proposal_bytes);
+    let proposal_len: u32 = (*&proposal_bytes.len()).try_into().unwrap();
 
     let calls: PossibleCallsToSubmit = match proposal_details.track {
         OpenGovOrigin::WhitelistedCaller => {
+            // First we need to whitelist this proposal. We will need:
+            //   1. To wrap the proposal hash in `whitelist.whitelist_call()` and submit this as a preimage.
+            //   2. To submit a referendum to the Fellowship Referenda pallet to dispatch this preimage.
+            let whitelist_call = RuntimeCall::Whitelist(WhitelistCall::whitelist_call {
+                call_hash: sp_core::H256(proposal_hash)
+            });
+            let whitelist_call_hash = sp_core::blake2_256(&whitelist_call.encode());
+            let whitelist_call_len: u32 = (*&whitelist_call.encode().len()).try_into().unwrap();
+            let preimage_for_whitelist_call = RuntimeCall::Preimage(PreimageCall::note_preimage {
+                bytes: whitelist_call.encode(),
+            });
+
+            let fellowship_proposal = RuntimeCall::FellowshipReferenda(ReferendaCall::submit {
+                proposal_origin: Box::new(OriginCaller::Origins(OpenGovOrigin::Fellows)),
+                proposal: Lookup {
+                    hash: sp_core::H256(whitelist_call_hash),
+                    len: whitelist_call_len,
+                },
+                enactment_moment: DispatchTime::After(10),
+            });
+
+            // Now we put together the public referendum part. This still needs separate logic
+            // because the actual proposal gets wrapped in a Whitelist call.
+            let dispatch_whitelisted_call = RuntimeCall::Whitelist(
+                WhitelistCall::dispatch_whitelisted_call_with_preimage { call: proposal_bytes }
+            );
+            let dispatch_whitelisted_call_hash =
+                sp_core::blake2_256(&dispatch_whitelisted_call.encode());
+            let dispatch_whitelisted_call_len: u32 =
+                (*&dispatch_whitelisted_call.encode().len()).try_into().unwrap();
+            
+            let preimage_for_dispatch_whitelisted_call = RuntimeCall::Preimage(
+                PreimageCall::note_preimage { bytes: dispatch_whitelisted_call.encode() }
+            );
+            let public_proposal = RuntimeCall::Referenda(ReferendaCall::submit {
+                proposal_origin: Box::new(OriginCaller::Origins(OpenGovOrigin::WhitelistedCaller)),
+                proposal: Lookup {
+                    hash: sp_core::H256(dispatch_whitelisted_call_hash),
+                    len: dispatch_whitelisted_call_len,
+                },
+                enactment_moment: DispatchTime::After(10),
+            });
             PossibleCallsToSubmit {
-                // preimage.note(whitelist.whitelist_call(hash(proposal)));
-                preimage_for_whitelist_call: None,
-                // preimage.note(whitelist.dispatch_whitelisted_call_with_preimage(proposal));
-                preimage_for_public_referendum: None,
+                // preimage.note_preimage(whitelist.whitelist_call(hash(proposal)));
+                preimage_for_whitelist_call: Some(preimage_for_whitelist_call),
+                // preimage.note_preimage(whitelist.dispatch_whitelisted_call_with_preimage(proposal));
+                preimage_for_public_referendum: Some(preimage_for_dispatch_whitelisted_call),
                 // ```
                 // fellowship_referenda.submit(
                 //     proposal_origin: Fellows,
@@ -89,7 +134,7 @@ fn main() {
                 //     enactment_moment: After(10),
                 // )
                 // ```
-                fellowship_referendum_submission: None,
+                fellowship_referendum_submission: Some(fellowship_proposal),
                 // ```
                 // referenda.submit(
                 //     proposal_origin: WhitelistedCaller,
@@ -100,15 +145,25 @@ fn main() {
                 //     enactment_moment: After(10),
                 // )
                 // ```
-                public_referendum_submission: None,
+                public_referendum_submission: Some(public_proposal),
             }
         },
         _ => {
+            let note_proposal_preimage =
+                RuntimeCall::Preimage(PreimageCall::note_preimage { bytes: proposal_bytes });
+            let public_proposal = RuntimeCall::Referenda(ReferendaCall::submit {
+                proposal_origin: Box::new(OriginCaller::Origins(proposal_details.track)),
+                proposal: Lookup {
+                    hash: sp_core::H256(proposal_hash),
+                    len: proposal_len,
+                },
+                enactment_moment: DispatchTime::After(10),
+            });
             PossibleCallsToSubmit {
                 // None
                 preimage_for_whitelist_call: None,
-                // preimage.note(proposal);
-                preimage_for_public_referendum: None,
+                // preimage.note_preimage(proposal);
+                preimage_for_public_referendum: Some(note_proposal_preimage),
                 // None
                 fellowship_referendum_submission: None,
                 // ```
@@ -121,10 +176,25 @@ fn main() {
                 //     enactment_moment: After(10),
                 // )
                 // ```
-                public_referendum_submission: None,
+                public_referendum_submission: Some(public_proposal),
             }
         },
     };
 
-    // Todo: Encode and log all necessary calls to console.
+    if let Some(c) = calls.preimage_for_whitelist_call {
+        println!("\nSubmit the preimage for the Fellowship referendum:");
+        println!("0x{}", hex::encode(c.encode()));
+    }
+    if let Some(c) = calls.fellowship_referendum_submission {
+        println!("\nOpen a Fellowship referendum to whitelist the call:");
+        println!("0x{}", hex::encode(c.encode()));
+    }
+    if let Some(c) = calls.preimage_for_public_referendum {
+        println!("\nSubmit the preimage for the public referendum:");
+        println!("0x{}", hex::encode(c.encode()));
+    }
+    if let Some(c) = calls.public_referendum_submission {
+        println!("\nOpen a public referendum to dispatch the whitelisted call:");
+        println!("0x{}", hex::encode(c.encode()));
+    }
 }
