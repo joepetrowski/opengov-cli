@@ -25,7 +25,7 @@ struct ProposalDetails {
 
 fn get_the_actual_proposed_action() -> ProposalDetails {
 	return ProposalDetails {
-		proposal: "0x630001000100a10f0204060202286bee880102957f0c9b47bc84d11116aef273e61565cf893801e7db0223aeea112e53922a4a",
+		proposal: "0x180408630001000100a10f0204060202286bee880102957f0c9b47bc84d11116aef273e61565cf893801e7db0223aeea112e53922a4a630001000100a50f0204060202286bee880102ccdfc804e0482f951ef7ad15fda0d38ead81c42e93a8276e60a45c663b8a3b91",
 		track: OpenGovOrigin::WhitelistedCaller,
 	}
 }
@@ -71,7 +71,11 @@ struct PossibleCallsToSubmit {
 
 fn main() {
 	let proposal_details = get_the_actual_proposed_action();
-	let proposal_bytes = hex::decode(proposal_details.proposal.trim_start_matches("0x")).expect("Valid proposal; qed");
+	let proposal_bytes = hex::decode(
+		proposal_details.proposal.trim_start_matches("0x")
+	).expect("Valid proposal; qed");
+	let proposal_as_runtime_call =
+		<RuntimeCall as parity_scale_codec::Decode>::decode(&mut &proposal_bytes[..]).unwrap();
 	let proposal_hash = sp_core::blake2_256(&proposal_bytes);
 	let proposal_len: u32 = (*&proposal_bytes.len()).try_into().unwrap();
 
@@ -101,7 +105,7 @@ fn main() {
 			// Now we put together the public referendum part. This still needs separate logic
 			// because the actual proposal gets wrapped in a Whitelist call.
 			let dispatch_whitelisted_call = RuntimeCall::Whitelist(
-				WhitelistCall::dispatch_whitelisted_call_with_preimage { call: proposal_bytes }
+				WhitelistCall::dispatch_whitelisted_call_with_preimage { call: Box::new(proposal_as_runtime_call) }
 			);
 			let dispatch_whitelisted_call_hash =
 				sp_core::blake2_256(&dispatch_whitelisted_call.encode());
