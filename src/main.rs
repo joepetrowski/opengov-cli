@@ -4,19 +4,18 @@ pub mod kusama {
 	use ::subxt::ext::sp_runtime::MultiAddress;
 }
 
-use parity_scale_codec::Encode as _;
-use subxt::ext::sp_core;
 use kusama::runtime_types::{
 	frame_support::traits::{preimages::Bounded::Lookup, schedule::DispatchTime},
 	kusama_runtime::{
-		governance::origins::pallet_custom_origins::Origin as OpenGovOrigin,
-		OriginCaller,
+		governance::origins::pallet_custom_origins::Origin as OpenGovOrigin, OriginCaller,
 		RuntimeCall,
 	},
-	pallet_whitelist::pallet::Call as WhitelistCall,
-	pallet_referenda::pallet::Call as ReferendaCall,
 	pallet_preimage::pallet::Call as PreimageCall,
+	pallet_referenda::pallet::Call as ReferendaCall,
+	pallet_whitelist::pallet::Call as WhitelistCall,
 };
+use parity_scale_codec::Encode as _;
+use subxt::ext::sp_core;
 
 struct ProposalDetails {
 	proposal: &'static str,
@@ -30,7 +29,7 @@ fn get_the_actual_proposed_action() -> ProposalDetails {
 		proposal: "0x180408630001000100a10f0204060202286bee880102957f0c9b47bc84d11116aef273e61565cf893801e7db0223aeea112e53922a4a630001000100a50f0204060202286bee880102ccdfc804e0482f951ef7ad15fda0d38ead81c42e93a8276e60a45c663b8a3b91",
 		// The OpenGov track that it will use.
 		track: OpenGovOrigin::WhitelistedCaller,
-	}
+	};
 }
 
 // The set of calls that some user will need to sign and submit to initiate a referendum.
@@ -74,9 +73,8 @@ struct PossibleCallsToSubmit {
 
 fn main() {
 	let proposal_details = get_the_actual_proposed_action();
-	let proposal_bytes = hex::decode(
-		proposal_details.proposal.trim_start_matches("0x")
-	).expect("Valid proposal; qed");
+	let proposal_bytes = hex::decode(proposal_details.proposal.trim_start_matches("0x"))
+		.expect("Valid proposal; qed");
 	let proposal_as_runtime_call =
 		<RuntimeCall as parity_scale_codec::Decode>::decode(&mut &proposal_bytes[..]).unwrap();
 	let proposal_hash = sp_core::blake2_256(&proposal_bytes);
@@ -85,10 +83,12 @@ fn main() {
 	let calls: PossibleCallsToSubmit = match proposal_details.track {
 		OpenGovOrigin::WhitelistedCaller => {
 			// First we need to whitelist this proposal. We will need:
-			//   1. To wrap the proposal hash in `whitelist.whitelist_call()` and submit this as a preimage.
-			//   2. To submit a referendum to the Fellowship Referenda pallet to dispatch this preimage.
+			//   1. To wrap the proposal hash in `whitelist.whitelist_call()` and submit this as a
+			//      preimage.
+			//   2. To submit a referendum to the Fellowship Referenda pallet to dispatch this
+			//      preimage.
 			let whitelist_call = RuntimeCall::Whitelist(WhitelistCall::whitelist_call {
-				call_hash: sp_core::H256(proposal_hash)
+				call_hash: sp_core::H256(proposal_hash),
 			});
 			let whitelist_call_hash = sp_core::blake2_256(&whitelist_call.encode());
 			let whitelist_call_len: u32 = (*&whitelist_call.encode().len()).try_into().unwrap();
@@ -107,17 +107,20 @@ fn main() {
 
 			// Now we put together the public referendum part. This still needs separate logic
 			// because the actual proposal gets wrapped in a Whitelist call.
-			let dispatch_whitelisted_call = RuntimeCall::Whitelist(
-				WhitelistCall::dispatch_whitelisted_call_with_preimage { call: Box::new(proposal_as_runtime_call) }
-			);
+			let dispatch_whitelisted_call =
+				RuntimeCall::Whitelist(WhitelistCall::dispatch_whitelisted_call_with_preimage {
+					call: Box::new(proposal_as_runtime_call),
+				});
 			let dispatch_whitelisted_call_hash =
 				sp_core::blake2_256(&dispatch_whitelisted_call.encode());
-			let dispatch_whitelisted_call_len: u32 =
-				(*&dispatch_whitelisted_call.encode().len()).try_into().unwrap();
-			
-			let preimage_for_dispatch_whitelisted_call = RuntimeCall::Preimage(
-				PreimageCall::note_preimage { bytes: dispatch_whitelisted_call.encode() }
-			);
+			let dispatch_whitelisted_call_len: u32 = (*&dispatch_whitelisted_call.encode().len())
+				.try_into()
+				.unwrap();
+
+			let preimage_for_dispatch_whitelisted_call =
+				RuntimeCall::Preimage(PreimageCall::note_preimage {
+					bytes: dispatch_whitelisted_call.encode(),
+				});
 			let public_proposal = RuntimeCall::Referenda(ReferendaCall::submit {
 				proposal_origin: Box::new(OriginCaller::Origins(OpenGovOrigin::WhitelistedCaller)),
 				proposal: Lookup {
@@ -154,10 +157,11 @@ fn main() {
 				// ```
 				public_referendum_submission: Some(public_proposal),
 			}
-		},
+		}
 		_ => {
-			let note_proposal_preimage =
-				RuntimeCall::Preimage(PreimageCall::note_preimage { bytes: proposal_bytes });
+			let note_proposal_preimage = RuntimeCall::Preimage(PreimageCall::note_preimage {
+				bytes: proposal_bytes,
+			});
 			let public_proposal = RuntimeCall::Referenda(ReferendaCall::submit {
 				proposal_origin: Box::new(OriginCaller::Origins(proposal_details.track)),
 				proposal: Lookup {
@@ -185,7 +189,7 @@ fn main() {
 				// ```
 				public_referendum_submission: Some(public_proposal),
 			}
-		},
+		}
 	};
 
 	if let Some(c) = calls.preimage_for_whitelist_call {
