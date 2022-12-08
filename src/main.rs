@@ -23,9 +23,12 @@ struct ProposalDetails {
 	track: OpenGovOrigin,
 }
 
+// This is the thing you need to edit to use this!
 fn get_the_actual_proposed_action() -> ProposalDetails {
 	return ProposalDetails {
+		// The encoded proposal that we want to submit.
 		proposal: "0x180408630001000100a10f0204060202286bee880102957f0c9b47bc84d11116aef273e61565cf893801e7db0223aeea112e53922a4a630001000100a50f0204060202286bee880102ccdfc804e0482f951ef7ad15fda0d38ead81c42e93a8276e60a45c663b8a3b91",
+		// The OpenGov track that it will use.
 		track: OpenGovOrigin::WhitelistedCaller,
 	}
 }
