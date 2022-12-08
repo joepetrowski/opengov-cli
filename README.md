@@ -2,7 +2,10 @@
 
 This script will construct the calls needed to submit a proposal to OpenGov on Kusama. It assumes that you construct the call elsewhere (e.g. Polkadot JS Apps UI Extrinsics tab) and then paste in the raw call data. It will return all the calls that you will need to sign and submit (also using, e.g., the Apps UI Extrinsics tab).
 
-> Note: This hardcodes the dispatch time to be `After(10)`. Will update to make it configurable.
+## Notes
+
+1. This hardcodes the dispatch time to be `After(10)`. Will update to make it configurable.
+2. This returns four calls, but they can actually be submitted in any order. But if dispatching a whitelisted call, the Fellowship referendum will have to enact (whitelisting the call) before the public one does. The preimages do not need to be submitted in order to start the referenda, but they will eventually in order to enact.
 
 ## Example
 
@@ -60,6 +63,8 @@ Let's check each of these calls and ensure they match our expectations.
 The **first one** just gives us some bytes wrapped in a `note_preimage` call:
 
 ![note-preimage](https://i.imgur.com/vfMq3MS.png)
+
+Let's of course look at those bytes:
 
 ![whitelist-call](https://i.imgur.com/VUEZcQk.png)
 
