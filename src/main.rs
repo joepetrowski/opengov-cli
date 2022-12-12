@@ -20,6 +20,13 @@ use subxt::ext::sp_core;
 struct ProposalDetails {
 	proposal: &'static str,
 	track: OpenGovOrigin,
+	output: Output,
+}
+
+#[allow(dead_code)]
+enum Output {
+	CallData,
+	AppsUiLink,
 }
 
 // This is the thing you need to edit to use this!
@@ -29,6 +36,9 @@ fn get_the_actual_proposed_action() -> ProposalDetails {
 		proposal: "0x180408630001000100a10f0204060202286bee880102957f0c9b47bc84d11116aef273e61565cf893801e7db0223aeea112e53922a4a630001000100a50f0204060202286bee880102ccdfc804e0482f951ef7ad15fda0d38ead81c42e93a8276e60a45c663b8a3b91",
 		// The OpenGov track that it will use.
 		track: OpenGovOrigin::WhitelistedCaller,
+		// Choose if you just want to see the hex-encoded `CallData`, or get a link to Polkadot JS
+		// Apps UI (`AppsUiLink`).
+		output: Output::CallData,
 	};
 }
 
@@ -194,18 +204,25 @@ fn main() {
 
 	if let Some(c) = calls.preimage_for_whitelist_call {
 		println!("\nSubmit the preimage for the Fellowship referendum:");
-		println!("0x{}", hex::encode(c.encode()));
+		print_output(&proposal_details.output, c);
 	}
 	if let Some(c) = calls.fellowship_referendum_submission {
 		println!("\nOpen a Fellowship referendum to whitelist the call:");
-		println!("0x{}", hex::encode(c.encode()));
+		print_output(&proposal_details.output, c);
 	}
 	if let Some(c) = calls.preimage_for_public_referendum {
 		println!("\nSubmit the preimage for the public referendum:");
-		println!("0x{}", hex::encode(c.encode()));
+		print_output(&proposal_details.output, c);
 	}
 	if let Some(c) = calls.public_referendum_submission {
 		println!("\nOpen a public referendum to dispatch the whitelisted call:");
-		println!("0x{}", hex::encode(c.encode()));
+		print_output(&proposal_details.output, c);
+	}
+}
+
+fn print_output(output: &Output, call: RuntimeCall) {
+	match output {
+		Output::CallData => println!("0x{}", hex::encode(call.encode())),
+		Output::AppsUiLink => println!("https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Fkusama-rpc.polkadot.io#/extrinsics/decode/0x{}", hex::encode(call.encode())),
 	}
 }
