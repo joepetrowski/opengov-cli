@@ -21,6 +21,7 @@ struct ProposalDetails {
 	proposal: &'static str,
 	track: OpenGovOrigin,
 	output: Output,
+	output_len_limit: u32,
 }
 
 #[allow(dead_code)]
@@ -33,12 +34,15 @@ enum Output {
 fn get_the_actual_proposed_action() -> ProposalDetails {
 	return ProposalDetails {
 		// The encoded proposal that we want to submit.
-		proposal: "0x180408630001000100a10f0204060202286bee880102957f0c9b47bc84d11116aef273e61565cf893801e7db0223aeea112e53922a4a630001000100a50f0204060202286bee880102ccdfc804e0482f951ef7ad15fda0d38ead81c42e93a8276e60a45c663b8a3b91",
+		proposal: "0x",
 		// The OpenGov track that it will use.
 		track: OpenGovOrigin::WhitelistedCaller,
 		// Choose if you just want to see the hex-encoded `CallData`, or get a link to Polkadot JS
 		// Apps UI (`AppsUiLink`).
-		output: Output::CallData,
+		output: Output::AppsUiLink,
+		// Limit the length of calls printed to console. Prevents massive hex dumps for proposals
+		// like runtime upgrades.
+		output_len_limit: 1_000,
 	};
 }
 
@@ -47,7 +51,7 @@ struct PossibleCallsToSubmit {
 	// ```
 	// preimage.note(whitelist.whitelist_call(hash(proposal)));
 	// ```
-	preimage_for_whitelist_call: Option<RuntimeCall>,
+	preimage_for_whitelist_call: Option<(RuntimeCall, u32)>,
 	// ```
 	// // Without Fellowship
 	// preimage.note(proposal);
@@ -55,7 +59,7 @@ struct PossibleCallsToSubmit {
 	// // With Fellowship
 	// preimage.note(whitelist.dispatch_whitelisted_call_with_preimage(proposal));
 	// ```
-	preimage_for_public_referendum: Option<RuntimeCall>,
+	preimage_for_public_referendum: Option<(RuntimeCall, u32)>,
 	// ```
 	// fellowship_referenda.submit(
 	//     proposal_origin: Fellows,
@@ -141,9 +145,15 @@ fn main() {
 			});
 			PossibleCallsToSubmit {
 				// preimage.note_preimage(whitelist.whitelist_call(hash(proposal)));
-				preimage_for_whitelist_call: Some(preimage_for_whitelist_call),
+				preimage_for_whitelist_call: Some((
+					preimage_for_whitelist_call,
+					whitelist_call_len,
+				)),
 				// preimage.note_preimage(whitelist.dispatch_whitelisted_call_with_preimage(proposal));
-				preimage_for_public_referendum: Some(preimage_for_dispatch_whitelisted_call),
+				preimage_for_public_referendum: Some((
+					preimage_for_dispatch_whitelisted_call,
+					dispatch_whitelisted_call_len,
+				)),
 				// ```
 				// fellowship_referenda.submit(
 				//     proposal_origin: Fellows,
@@ -184,7 +194,7 @@ fn main() {
 				// None
 				preimage_for_whitelist_call: None,
 				// preimage.note_preimage(proposal);
-				preimage_for_public_referendum: Some(note_proposal_preimage),
+				preimage_for_public_referendum: Some((note_proposal_preimage, proposal_len)),
 				// None
 				fellowship_referendum_submission: None,
 				// ```
@@ -202,20 +212,34 @@ fn main() {
 		}
 	};
 
-	if let Some(c) = calls.preimage_for_whitelist_call {
-		println!("\nSubmit the preimage for the Fellowship referendum:");
-		print_output(&proposal_details.output, c);
+	if let Some((c, len)) = calls.preimage_for_whitelist_call {
+		if len <= proposal_details.output_len_limit {
+			println!("\nSubmit the preimage for the Fellowship referendum:");
+			print_output(&proposal_details.output, c);
+		} else {
+			println!(
+				"\nPreimage for the public whitelist call too large ({} bytes)",
+				len + 2
+			)
+		}
 	}
 	if let Some(c) = calls.fellowship_referendum_submission {
 		println!("\nOpen a Fellowship referendum to whitelist the call:");
 		print_output(&proposal_details.output, c);
 	}
-	if let Some(c) = calls.preimage_for_public_referendum {
-		println!("\nSubmit the preimage for the public referendum:");
-		print_output(&proposal_details.output, c);
+	if let Some((c, len)) = calls.preimage_for_public_referendum {
+		if len <= proposal_details.output_len_limit {
+			println!("\nSubmit the preimage for the public referendum:");
+			print_output(&proposal_details.output, c);
+		} else {
+			println!(
+				"\nPreimage for the public referendum too large ({} bytes)",
+				len + 2
+			)
+		}
 	}
 	if let Some(c) = calls.public_referendum_submission {
-		println!("\nOpen a public referendum to dispatch the whitelisted call:");
+		println!("\nOpen a public referendum to dispatch the call:");
 		print_output(&proposal_details.output, c);
 	}
 }

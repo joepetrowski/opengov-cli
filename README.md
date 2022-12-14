@@ -29,6 +29,12 @@ fn get_the_actual_proposed_action() -> ProposalDetails {
 		proposal: "0x630001000100a10f0204060202286bee880102957f0c9b47bc84d11116aef273e61565cf893801e7db0223aeea112e53922a4a",
 		// The OpenGov track that it will use.
 		track: OpenGovOrigin::WhitelistedCaller,
+		// Choose if you just want to see the hex-encoded `CallData`, or get a link to Polkadot JS
+		// Apps UI (`AppsUiLink`).
+		output: Output::AppsUiLink,
+		// Limit the length of calls printed to console. Prevents massive hex dumps for proposals
+		// like runtime upgrades.
+		output_len_limit: 1_000,
 	}
 }
 ```
