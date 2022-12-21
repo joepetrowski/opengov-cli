@@ -217,10 +217,12 @@ fn main() {
 			println!("\nSubmit the preimage for the Fellowship referendum:");
 			print_output(&proposal_details.output, c);
 		} else {
+			let call_hash = sp_core::blake2_256(&c.encode());
 			println!(
 				"\nPreimage for the public whitelist call too large ({} bytes)",
 				len + 2
-			)
+			);
+			println!("Submission should have the hash: 0x{}", hex::encode(call_hash));
 		}
 	}
 	if let Some(c) = calls.fellowship_referendum_submission {
@@ -232,10 +234,12 @@ fn main() {
 			println!("\nSubmit the preimage for the public referendum:");
 			print_output(&proposal_details.output, c);
 		} else {
+			let call_hash = sp_core::blake2_256(&c.encode());
 			println!(
 				"\nPreimage for the public referendum too large ({} bytes)",
 				len + 2
-			)
+			);
+			println!("Submission should have the hash: 0x{}", hex::encode(call_hash));
 		}
 	}
 	if let Some(c) = calls.public_referendum_submission {
