@@ -17,19 +17,6 @@ use kusama::runtime_types::{
 use parity_scale_codec::Encode as _;
 use subxt::ext::sp_core;
 
-struct ProposalDetails {
-	proposal: &'static str,
-	track: OpenGovOrigin,
-	output: Output,
-	output_len_limit: u32,
-}
-
-#[allow(dead_code)]
-enum Output {
-	CallData,
-	AppsUiLink,
-}
-
 // This is the thing you need to edit to use this!
 fn get_the_actual_proposed_action() -> ProposalDetails {
 	return ProposalDetails {
@@ -46,12 +33,38 @@ fn get_the_actual_proposed_action() -> ProposalDetails {
 	};
 }
 
+// Info and preferences provided by the user.
+struct ProposalDetails {
+	// The proposal, generated elsewhere and pasted here.
+	proposal: &'static str,
+	// The track to submit on.
+	track: OpenGovOrigin,
+	// How you would like to view the output.
+	output: Output,
+	// Cutoff length in bytes for printing the output. If too long, it will print the hash of the
+	// call you would need to submit so that you can verify before submission.
+	output_len_limit: u32,
+}
+
+#[allow(dead_code)]
+enum Output {
+	// Print just the call data (e.g. 0x1234).
+	CallData,
+	// Print a clickable link to view the decoded call on Polkadot JS Apps UI.
+	AppsUiLink,
+}
+
+enum CallOrHash {
+	Call(RuntimeCall),
+	Hash([u8; 32]),
+}
+
 // The set of calls that some user will need to sign and submit to initiate a referendum.
 struct PossibleCallsToSubmit {
 	// ```
 	// preimage.note(whitelist.whitelist_call(hash(proposal)));
 	// ```
-	preimage_for_whitelist_call: Option<(RuntimeCall, u32)>,
+	preimage_for_whitelist_call: Option<(CallOrHash, u32)>,
 	// ```
 	// // Without Fellowship
 	// preimage.note(proposal);
@@ -59,7 +72,7 @@ struct PossibleCallsToSubmit {
 	// // With Fellowship
 	// preimage.note(whitelist.dispatch_whitelisted_call_with_preimage(proposal));
 	// ```
-	preimage_for_public_referendum: Option<(RuntimeCall, u32)>,
+	preimage_for_public_referendum: Option<(CallOrHash, u32)>,
 	// ```
 	// fellowship_referenda.submit(
 	//     proposal_origin: Fellows,
@@ -143,16 +156,27 @@ fn main() {
 				},
 				enactment_moment: DispatchTime::After(10),
 			});
+
+			// Check the lengths and prepare preimages for printing.
+			let (whitelist_preimage_print, whitelist_preimage_print_len) = create_print_output(
+				preimage_for_whitelist_call,
+				proposal_details.output_len_limit,
+			);
+			let (dispatch_preimage_print, dispatch_preimage_print_len) = create_print_output(
+				preimage_for_dispatch_whitelisted_call,
+				proposal_details.output_len_limit,
+			);
+
 			PossibleCallsToSubmit {
 				// preimage.note_preimage(whitelist.whitelist_call(hash(proposal)));
 				preimage_for_whitelist_call: Some((
-					preimage_for_whitelist_call,
-					whitelist_call_len,
+					whitelist_preimage_print,
+					whitelist_preimage_print_len,
 				)),
 				// preimage.note_preimage(whitelist.dispatch_whitelisted_call_with_preimage(proposal));
 				preimage_for_public_referendum: Some((
-					preimage_for_dispatch_whitelisted_call,
-					dispatch_whitelisted_call_len,
+					dispatch_preimage_print,
+					dispatch_preimage_print_len,
 				)),
 				// ```
 				// fellowship_referenda.submit(
@@ -190,11 +214,13 @@ fn main() {
 				},
 				enactment_moment: DispatchTime::After(10),
 			});
+			let (preimage_print, preimage_print_len) =
+				create_print_output(note_proposal_preimage, proposal_details.output_len_limit);
 			PossibleCallsToSubmit {
 				// None
 				preimage_for_whitelist_call: None,
 				// preimage.note_preimage(proposal);
-				preimage_for_public_referendum: Some((note_proposal_preimage, proposal_len)),
+				preimage_for_public_referendum: Some((preimage_print, preimage_print_len)),
 				// None
 				fellowship_referendum_submission: None,
 				// ```
@@ -212,34 +238,38 @@ fn main() {
 		}
 	};
 
-	if let Some((c, len)) = calls.preimage_for_whitelist_call {
-		if len <= proposal_details.output_len_limit {
-			println!("\nSubmit the preimage for the Fellowship referendum:");
-			print_output(&proposal_details.output, c);
-		} else {
-			let call_hash = sp_core::blake2_256(&c.encode());
-			println!(
-				"\nPreimage for the public whitelist call too large ({} bytes)",
-				len + 2
-			);
-			println!("Submission should have the hash: 0x{}", hex::encode(call_hash));
+	if let Some((call_or_hash, len)) = calls.preimage_for_whitelist_call {
+		match call_or_hash {
+			CallOrHash::Call(c) => {
+				println!("\nSubmit the preimage for the Fellowship referendum:");
+				print_output(&proposal_details.output, c);
+			}
+			CallOrHash::Hash(h) => {
+				println!(
+					"\nPreimage for the public whitelist call too large ({} bytes)",
+					len
+				);
+				println!("Submission should have the hash: 0x{}", hex::encode(h));
+			}
 		}
 	}
 	if let Some(c) = calls.fellowship_referendum_submission {
 		println!("\nOpen a Fellowship referendum to whitelist the call:");
 		print_output(&proposal_details.output, c);
 	}
-	if let Some((c, len)) = calls.preimage_for_public_referendum {
-		if len <= proposal_details.output_len_limit {
-			println!("\nSubmit the preimage for the public referendum:");
-			print_output(&proposal_details.output, c);
-		} else {
-			let call_hash = sp_core::blake2_256(&c.encode());
-			println!(
-				"\nPreimage for the public referendum too large ({} bytes)",
-				len + 2
-			);
-			println!("Submission should have the hash: 0x{}", hex::encode(call_hash));
+	if let Some((call_or_hash, len)) = calls.preimage_for_public_referendum {
+		match call_or_hash {
+			CallOrHash::Call(c) => {
+				println!("\nSubmit the preimage for the public referendum:");
+				print_output(&proposal_details.output, c);
+			}
+			CallOrHash::Hash(h) => {
+				println!(
+					"\nPreimage for the public referendum too large ({} bytes)",
+					len
+				);
+				println!("Submission should have the hash: 0x{}", hex::encode(h));
+			}
 		}
 	}
 	if let Some(c) = calls.public_referendum_submission {
@@ -248,9 +278,26 @@ fn main() {
 	}
 }
 
+// Format the data to print to console.
 fn print_output(output: &Output, call: RuntimeCall) {
 	match output {
 		Output::CallData => println!("0x{}", hex::encode(call.encode())),
 		Output::AppsUiLink => println!("https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Fkusama-rpc.polkadot.io#/extrinsics/decode/0x{}", hex::encode(call.encode())),
 	}
+}
+
+// Take some call and a length limit as input. If the call length exceeds the limit, just return its
+// hash. Call length is recomputed and will be 2 bytes longer than the actual preimage length. This
+// is because the call is `preimage.note_preimage(call)`, so the outer pallet/call indices have a
+// length of 2 bytes.
+fn create_print_output(call: RuntimeCall, length_limit: u32) -> (CallOrHash, u32) {
+	let call_len = (*&call.encode().len()).try_into().unwrap();
+	let print_output: CallOrHash;
+	if call_len > length_limit {
+		let call_hash = sp_core::blake2_256(&call.encode());
+		print_output = CallOrHash::Hash(call_hash);
+	} else {
+		print_output = CallOrHash::Call(call)
+	}
+	(print_output, call_len)
 }
