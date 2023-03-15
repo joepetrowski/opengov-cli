@@ -12,6 +12,7 @@ use kusama::runtime_types::{
 	},
 	pallet_preimage::pallet::Call as PreimageCall,
 	pallet_referenda::pallet::Call as ReferendaCall,
+	pallet_utility::pallet::Call as UtilityCall,
 	pallet_whitelist::pallet::Call as WhitelistCall,
 };
 use parity_scale_codec::Encode as _;
@@ -21,7 +22,7 @@ use subxt::ext::sp_core;
 fn get_the_actual_proposed_action() -> ProposalDetails {
 	return ProposalDetails {
 		// The encoded proposal that we want to submit.
-		proposal: "0x",
+		proposal: "0x180010630001000100a10f0204060202286bee880102fe5476bc7ba7c8044e1fd07b20aa90523709fb25ceb177b7cf1b54bbf2ce7689630001000100a90f0204060202286bee880102c5eecc0cff46384cc3d2e77f4f6ddf5c7c0f7092967edf50f3cacdff362cb7391d045802000000006304000100a10f030000001d045802000000006304000100a90f03000000",
 		// The OpenGov track that it will use.
 		track: OpenGovOrigin::WhitelistedCaller,
 		// Choose if you just want to see the hex-encoded `CallData`, or get a link to Polkadot JS
@@ -30,6 +31,8 @@ fn get_the_actual_proposed_action() -> ProposalDetails {
 		// Limit the length of calls printed to console. Prevents massive hex dumps for proposals
 		// like runtime upgrades.
 		output_len_limit: 1_000,
+		// Whether or not to print a single `force_batch` call.
+		print_batch: true,
 	};
 }
 
@@ -44,6 +47,9 @@ struct ProposalDetails {
 	// Cutoff length in bytes for printing the output. If too long, it will print the hash of the
 	// call you would need to submit so that you can verify before submission.
 	output_len_limit: u32,
+	// Whether or not to group all calls into a batch. Uses `force_batch` in case the account does
+	// not have funds for pre-image deposits or is not a fellow.
+	print_batch: bool,
 }
 
 #[allow(dead_code)]
@@ -238,15 +244,18 @@ fn main() {
 		}
 	};
 
+	let mut batch_of_calls = Vec::new();
+
 	if let Some((call_or_hash, len)) = calls.preimage_for_whitelist_call {
 		match call_or_hash {
 			CallOrHash::Call(c) => {
 				println!("\nSubmit the preimage for the Fellowship referendum:");
-				print_output(&proposal_details.output, c);
+				print_output(&proposal_details.output, &c);
+				batch_of_calls.push(c);
 			}
 			CallOrHash::Hash(h) => {
 				println!(
-					"\nPreimage for the public whitelist call too large ({} bytes)",
+					"\nPreimage for the public whitelist call too large ({} bytes). Not included in batch.",
 					len
 				);
 				println!("Submission should have the hash: 0x{}", hex::encode(h));
@@ -255,17 +264,19 @@ fn main() {
 	}
 	if let Some(c) = calls.fellowship_referendum_submission {
 		println!("\nOpen a Fellowship referendum to whitelist the call:");
-		print_output(&proposal_details.output, c);
+		print_output(&proposal_details.output, &c);
+		batch_of_calls.push(c);
 	}
 	if let Some((call_or_hash, len)) = calls.preimage_for_public_referendum {
 		match call_or_hash {
 			CallOrHash::Call(c) => {
 				println!("\nSubmit the preimage for the public referendum:");
-				print_output(&proposal_details.output, c);
+				print_output(&proposal_details.output, &c);
+				batch_of_calls.push(c);
 			}
 			CallOrHash::Hash(h) => {
 				println!(
-					"\nPreimage for the public referendum too large ({} bytes)",
+					"\nPreimage for the public referendum too large ({} bytes). Not included in batch.",
 					len
 				);
 				println!("Submission should have the hash: 0x{}", hex::encode(h));
@@ -274,12 +285,20 @@ fn main() {
 	}
 	if let Some(c) = calls.public_referendum_submission {
 		println!("\nOpen a public referendum to dispatch the call:");
-		print_output(&proposal_details.output, c);
+		print_output(&proposal_details.output, &c);
+		batch_of_calls.push(c);
 	}
+
+	let batch = RuntimeCall::Utility(UtilityCall::force_batch { calls: batch_of_calls });
+	if proposal_details.print_batch {
+		println!("\nBatch including all calls:");
+		print_output(&proposal_details.output, &batch);
+	}
+
 }
 
 // Format the data to print to console.
-fn print_output(output: &Output, call: RuntimeCall) {
+fn print_output(output: &Output, call: &RuntimeCall) {
 	match output {
 		Output::CallData => println!("0x{}", hex::encode(call.encode())),
 		Output::AppsUiLink => println!("https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Fkusama-rpc.polkadot.io#/extrinsics/decode/0x{}", hex::encode(call.encode())),
