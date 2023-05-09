@@ -1,8 +1,5 @@
 #[subxt::subxt(runtime_metadata_url = "wss://kusama-rpc.polkadot.io:443")]
-pub mod kusama {
-	#[subxt(substitute_type = "sp_runtime::multiaddress::MultiAddress")]
-	use ::subxt::ext::sp_runtime::MultiAddress;
-}
+pub mod kusama {}
 
 use kusama::runtime_types::{
 	frame_support::traits::{preimages::Bounded::Lookup, schedule::DispatchTime},
