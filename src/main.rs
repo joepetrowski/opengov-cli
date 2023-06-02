@@ -55,10 +55,13 @@ struct ProposalDetails {
 	print_batch: bool,
 }
 
+#[allow(dead_code)]
 enum NetworkTrack {
 	Kusama(KusamaOpenGovOrigin),
+	Polkadot,
 }
 
+#[allow(dead_code)]
 enum NetworkRuntimeCall {
 	Kusama(KusamaRuntimeCall),
 }
@@ -71,16 +74,16 @@ enum Output {
 	AppsUiLink,
 }
 
-enum CallOrHash {
-	Call(NetworkRuntimeCall),
-	Hash([u8; 32]),
-}
-
 // Local concrete type to use in each runtime's `DispatchTime`
 #[allow(dead_code)]
 enum DispatchTimeWrapper {
 	At(u32),
 	After(u32),
+}
+
+enum CallOrHash {
+	Call(NetworkRuntimeCall),
+	Hash([u8; 32]),
 }
 
 // The set of calls that some user will need to sign and submit to initiate a referendum.
@@ -266,6 +269,32 @@ fn main() {
 						)),
 					}
 				}
+			}
+		},
+		NetworkTrack::Polkadot => {
+			println!("not implemented yet");
+			// Fellowship is on the Collectives parachain, so things are a bit different here.
+			//
+			// 1. Create a whitelist call on the Relay Chain:
+			//    let whitelist_call =
+			//     	  PolkadotRuntimeCall::Whitelist(WhitelistCall::whitelist_call {
+			// 		      call_hash: sp_core::H256(proposal_hash),
+			// 	      });
+			//
+			// 2. Create an XCM send call on the Collectives chain to Transact this on the Relay:
+			//    let send_whitelist = CollectivesRuntimeCall::PolkadotXcm(PolkadotXcmCall::send {
+			// 	      dest: MultiLocation { parents: 1, interior: Here },
+			// 	      message: vec![UnpaidExecution, Transact {call: whitelist_call, ..}],
+			//    });
+			//
+			// 3. Make a Fellowship referendum for `send_whitelist`.
+			//
+			// 4. Relay Chain public referendum should be the same as on Kusama.
+			PossibleCallsToSubmit {
+				preimage_for_whitelist_call: None,
+				preimage_for_public_referendum: None,
+				fellowship_referendum_submission: None,
+				public_referendum_submission: None,
 			}
 		}
 	};
