@@ -4,8 +4,7 @@ This script will construct the calls needed to submit a proposal to OpenGov on K
 
 ## Notes
 
-1. This hardcodes the dispatch time to be `After(10)`. Will update to make it configurable.
-2. This returns four calls, but they can actually be submitted in any order. But if dispatching a whitelisted call, the Fellowship referendum will have to enact (whitelisting the call) before the public one does. The preimages do not need to be submitted in order to start the referenda, but they will eventually in order to enact.
+1. This returns four calls, but they can actually be submitted in any order. But if dispatching a whitelisted call, the Fellowship referendum will have to enact (whitelisting the call) before the public one does. The preimages do not need to be submitted in order to start the referenda, but they will eventually in order to enact.
 
 ## Example
 
@@ -27,14 +26,19 @@ fn get_the_actual_proposed_action() -> ProposalDetails {
 	return ProposalDetails {
 		// The encoded proposal that we want to submit.
 		proposal: "0x630001000100a10f0204060202286bee880102957f0c9b47bc84d11116aef273e61565cf893801e7db0223aeea112e53922a4a",
-		// The OpenGov track that it will use.
-		track: OpenGovOrigin::WhitelistedCaller,
+		// The OpenGov track that it will use. You need to wrap this in either Kusama or Polkadot.
+		track: Kusama(OpenGovOrigin::WhitelistedCaller),
+		// When do you want this to enact. `At(block)` a specific block number or `After(blocks)`,
+		// some delay from passing.
+		dispatch: After(10),
 		// Choose if you just want to see the hex-encoded `CallData`, or get a link to Polkadot JS
 		// Apps UI (`AppsUiLink`).
 		output: Output::AppsUiLink,
 		// Limit the length of calls printed to console. Prevents massive hex dumps for proposals
 		// like runtime upgrades.
 		output_len_limit: 1_000,
+		// Whether or not to print a single `force_batch` call.
+		print_batch: true,
 	}
 }
 ```

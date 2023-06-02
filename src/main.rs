@@ -3,16 +3,9 @@ use subxt::ext::sp_core;
 
 #[subxt::subxt(runtime_metadata_url = "wss://kusama-rpc.polkadot.io:443")]
 pub mod kusama {}
-use kusama::runtime_types::{
-	frame_support::traits::{preimages::Bounded::Lookup, schedule::DispatchTime},
-	kusama_runtime::{
-		governance::origins::pallet_custom_origins::Origin as KusamaOpenGovOrigin, OriginCaller,
-		RuntimeCall as KusamaRuntimeCall,
-	},
-	pallet_preimage::pallet::Call as PreimageCall,
-	pallet_referenda::pallet::Call as ReferendaCall,
-	pallet_utility::pallet::Call as UtilityCall,
-	pallet_whitelist::pallet::Call as WhitelistCall,
+use kusama::runtime_types::kusama_runtime::{
+	governance::origins::pallet_custom_origins::Origin as KusamaOpenGovOrigin,
+	RuntimeCall as KusamaRuntimeCall,
 };
 
 #[subxt::subxt(runtime_metadata_url = "wss://rpc.polkadot.io:443")]
@@ -25,11 +18,14 @@ pub mod polkadot_collectives {}
 fn get_the_actual_proposed_action() -> ProposalDetails {
 	use NetworkTrack::*;
 	use Output::*;
+	use DispatchTimeWrapper::*;
 	return ProposalDetails {
 		// The encoded proposal that we want to submit.
-		proposal: "0x1233",
+		proposal: "0x1123",
 		// The OpenGov track that it will use.
 		track: Kusama(KusamaOpenGovOrigin::WhitelistedCaller),
+		// When do you want this to enact. `At(block)` or `After(blocks)`.
+		dispatch: After(10),
 		// Choose if you just want to see the hex-encoded `CallData`, or get a link to Polkadot JS
 		// Apps UI (`AppsUiLink`).
 		output: AppsUiLink,
@@ -47,6 +43,8 @@ struct ProposalDetails {
 	proposal: &'static str,
 	// The track to submit on.
 	track: NetworkTrack,
+	// When do you want this to enact. `At(block)` or `After(blocks)`.
+	dispatch: DispatchTimeWrapper,
 	// How you would like to view the output.
 	output: Output,
 	// Cutoff length in bytes for printing the output. If too long, it will print the hash of the
@@ -76,6 +74,13 @@ enum Output {
 enum CallOrHash {
 	Call(NetworkRuntimeCall),
 	Hash([u8; 32]),
+}
+
+// Local concrete type to use in each runtime's `DispatchTime`
+#[allow(dead_code)]
+enum DispatchTimeWrapper {
+	At(u32),
+	After(u32),
 }
 
 // The set of calls that some user will need to sign and submit to initiate a referendum.
@@ -126,10 +131,25 @@ fn main() {
 
 	let calls: PossibleCallsToSubmit = match proposal_details.track {
 		NetworkTrack::Kusama(kusama_track) => {
+			use kusama::runtime_types::{
+				frame_support::traits::{preimages::Bounded::Lookup, schedule::DispatchTime},
+				kusama_runtime::OriginCaller,
+				pallet_preimage::pallet::Call as PreimageCall,
+				pallet_referenda::pallet::Call as ReferendaCall,
+				pallet_whitelist::pallet::Call as WhitelistCall,
+			};
+
 			let proposal_as_runtime_call =
 				<KusamaRuntimeCall as parity_scale_codec::Decode>::decode(&mut &proposal_bytes[..])
 					.unwrap();
+
+			let public_referendum_dispatch_time = match proposal_details.dispatch {
+				DispatchTimeWrapper::At(block) => DispatchTime::At(block),
+				DispatchTimeWrapper::After(block) => DispatchTime::After(block),
+			};
+
 			match kusama_track {
+				// Whitelisted calls are special.
 				KusamaOpenGovOrigin::WhitelistedCaller => {
 					// First we need to whitelist this proposal. We will need:
 					//   1. To wrap the proposal hash in `whitelist.whitelist_call()` and submit
@@ -186,7 +206,7 @@ fn main() {
 							hash: sp_core::H256(dispatch_whitelisted_call_hash),
 							len: dispatch_whitelisted_call_len,
 						},
-						enactment_moment: DispatchTime::After(10),
+						enactment_moment: public_referendum_dispatch_time,
 					});
 
 					// Check the lengths and prepare preimages for printing.
@@ -202,44 +222,23 @@ fn main() {
 						);
 
 					PossibleCallsToSubmit {
-						// preimage.note_preimage(whitelist.whitelist_call(hash(proposal)));
 						preimage_for_whitelist_call: Some((
 							whitelist_preimage_print,
 							whitelist_preimage_print_len,
 						)),
-						// preimage.note_preimage(whitelist.dispatch_whitelisted_call_with_preimage(proposal));
 						preimage_for_public_referendum: Some((
 							dispatch_preimage_print,
 							dispatch_preimage_print_len,
 						)),
-						// ```
-						// fellowship_referenda.submit(
-						//     proposal_origin: Fellows,
-						//     proposal: Lookup {
-						//         hash: hash(whitelist.whitelist_call(proposal_hash)),
-						//         len: len(whitelist.whitelist_call(proposal_hash)),
-						//     },
-						//     enactment_moment: After(10),
-						// )
-						// ```
 						fellowship_referendum_submission: Some(NetworkRuntimeCall::Kusama(
 							fellowship_proposal,
 						)),
-						// ```
-						// referenda.submit(
-						//     proposal_origin: WhitelistedCaller,
-						//     proposal: Lookup {
-						//         hash: hash(whitelist.whitelist_call(proposal_hash)),
-						//         len: len(whitelist.dispatch_whitelisted_call_with_preimage(proposal)),
-						//     },
-						//     enactment_moment: After(10),
-						// )
-						// ```
 						public_referendum_submission: Some(NetworkRuntimeCall::Kusama(
 							public_proposal,
 						)),
 					}
 				}
+				// Everything else just uses its track.
 				_ => {
 					let note_proposal_preimage =
 						KusamaRuntimeCall::Preimage(PreimageCall::note_preimage {
@@ -251,7 +250,7 @@ fn main() {
 							hash: sp_core::H256(proposal_hash),
 							len: proposal_len,
 						},
-						enactment_moment: DispatchTime::After(10),
+						enactment_moment: public_referendum_dispatch_time,
 					});
 					let (preimage_print, preimage_print_len) = create_print_output(
 						note_proposal_preimage,
@@ -259,22 +258,9 @@ fn main() {
 					);
 
 					PossibleCallsToSubmit {
-						// None
 						preimage_for_whitelist_call: None,
-						// preimage.note_preimage(proposal);
 						preimage_for_public_referendum: Some((preimage_print, preimage_print_len)),
-						// None
 						fellowship_referendum_submission: None,
-						// ```
-						// referenda.submit(
-						//     proposal_origin: ProposalDetails.track,
-						//     proposal: Lookup {
-						//         hash: hash(proposal),
-						//         len:  len(proposal),
-						//     },
-						//     enactment_moment: After(10),
-						// )
-						// ```
 						public_referendum_submission: Some(NetworkRuntimeCall::Kusama(
 							public_proposal,
 						)),
@@ -335,6 +321,7 @@ fn main() {
 }
 
 fn handle_batch_of_calls(output: &Output, batch: Vec<NetworkRuntimeCall>) {
+	use kusama::runtime_types::pallet_utility::pallet::Call as KusamaUtilityCall;
 	let mut kusama_relay_batch = Vec::new();
 	// let mut polkadot_relay_batch = Vec::new();
 	// let mut polkadot_collectives_batch = Vec::new();
@@ -344,7 +331,7 @@ fn handle_batch_of_calls(output: &Output, batch: Vec<NetworkRuntimeCall>) {
 		}
 	}
 	if kusama_relay_batch.len() > 0 {
-		let batch = KusamaRuntimeCall::Utility(UtilityCall::force_batch {
+		let batch = KusamaRuntimeCall::Utility(KusamaUtilityCall::force_batch {
 			calls: kusama_relay_batch,
 		});
 		println!("\nBatch to submit on Kusama Relay Chain:");
