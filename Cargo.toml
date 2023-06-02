@@ -8,5 +8,5 @@ authors = ["joepetrowski"]
 
 [dependencies]
 parity-scale-codec = "3.2.1"
-subxt = "0.28.0"
+subxt = "0.29.0"
 hex = "0.4.3"

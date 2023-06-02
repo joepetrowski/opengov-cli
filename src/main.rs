@@ -139,6 +139,7 @@ fn main() {
 				kusama_runtime::OriginCaller,
 				pallet_preimage::pallet::Call as PreimageCall,
 				pallet_referenda::pallet::Call as ReferendaCall,
+				pallet_referenda::pallet::Call2 as FellowshipReferendaCall,
 				pallet_whitelist::pallet::Call as WhitelistCall,
 			};
 
@@ -172,7 +173,7 @@ fn main() {
 						});
 
 					let fellowship_proposal =
-						KusamaRuntimeCall::FellowshipReferenda(ReferendaCall::submit {
+						KusamaRuntimeCall::FellowshipReferenda(FellowshipReferendaCall::submit {
 							proposal_origin: Box::new(OriginCaller::Origins(
 								KusamaOpenGovOrigin::Fellows,
 							)),
