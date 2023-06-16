@@ -24,7 +24,8 @@ In the script, we will paste the _call data_ into:
 ```rust
 fn get_the_actual_proposed_action() -> ProposalDetails {
 	return ProposalDetails {
-		// The encoded proposal that we want to submit.
+		// The encoded proposal that we want to submit. This can either be the call data itself,
+		// e.g. "0x0102...", or a file path that contains the data, e.g. "./my_proposal.call".
 		proposal: "0x630001000100a10f0204060202286bee880102957f0c9b47bc84d11116aef273e61565cf893801e7db0223aeea112e53922a4a",
 		// The OpenGov track that it will use. You need to wrap this in either Kusama or Polkadot.
 		track: Kusama(OpenGovOrigin::WhitelistedCaller),
