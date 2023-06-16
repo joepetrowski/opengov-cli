@@ -29,9 +29,9 @@ fn get_the_actual_proposed_action() -> ProposalDetails {
 	use Output::*;
 	return ProposalDetails {
 		// The encoded proposal that we want to submit.
-		proposal: "0x00001468656c6c6f",
+		proposal: "0x0000645468652046656c6c6f777368697020736179732068656c6c6f",
 		// The OpenGov track that it will use.
-		track: Polkadot(PolkadotOpenGovOrigin::StakingAdmin),
+		track: Polkadot(PolkadotOpenGovOrigin::WhitelistedCaller),
 		// When do you want this to enact. `At(block)` or `After(blocks)`.
 		dispatch: After(10),
 		// Choose if you just want to see the hex-encoded `CallData`, or get a link to Polkadot JS
@@ -283,6 +283,27 @@ fn main() {
 			}
 		}
 		NetworkTrack::Polkadot(polkadot_track) => {
+			use polkadot_collectives::runtime_types::{
+				collectives_polkadot_runtime::OriginCaller as CollectivesOriginCaller,
+				frame_support::traits::{
+					preimages::Bounded::Lookup as CollectivesLookup,
+					schedule::DispatchTime as CollectivesDispatchTime,
+				},
+				pallet_preimage::pallet::Call as CollectivesPreimageCall,
+				pallet_referenda::pallet::Call as FellowshipReferendaCall,
+				pallet_xcm::pallet::Call as CollectivesXcmCall,
+				sp_weights::weight_v2::Weight,
+				xcm::{
+					double_encoded::DoubleEncoded,
+					v2::OriginKind,
+					v3::{
+						junctions::Junctions::Here, multilocation::MultiLocation, Instruction,
+						WeightLimit, Xcm,
+					},
+					VersionedMultiLocation,
+					VersionedXcm::V3,
+				},
+			};
 			use polkadot_relay::runtime_types::{
 				frame_support::traits::{preimages::Bounded::Lookup, schedule::DispatchTime},
 				pallet_preimage::pallet::Call as PreimageCall,
@@ -303,13 +324,143 @@ fn main() {
 			};
 
 			match polkadot_track {
+				// Fellowship is on the Collectives parachain, so things are a bit different here.
+				//
+				// 1. Create a whitelist call on the Relay Chain:
+				//
+				//    let whitelist_call =
+				//     	  PolkadotRuntimeCall::Whitelist(WhitelistCall::whitelist_call {
+				// 		      call_hash: sp_core::H256(proposal_hash),
+				// 	      });
+				//
+				// 2. Create an XCM send call on the Collectives chain to Transact this on the
+				//    Relay Chain:
+				//
+				//    let send_whitelist = CollectivesRuntimeCall::PolkadotXcm(
+				//        PolkadotXcmCall::send {
+				// 	          dest: MultiLocation { parents: 1, interior: Here },
+				// 	          message: vec![UnpaidExecution, Transact {call: whitelist_call, ..}],
+				//        }
+				//    );
+				//
+				// 3. Make a Fellowship referendum for `send_whitelist`.
+				//
+				// 4. Relay Chain public referendum should be the same as on Kusama.
 				PolkadotOpenGovOrigin::WhitelistedCaller => {
-					println!("not implemented yet");
+					// Whitelist the call on the Relay Chain.
+					let whitelist_call =
+						PolkadotRuntimeCall::Whitelist(WhitelistCall::whitelist_call {
+							call_hash: sp_core::H256(proposal_hash),
+						});
+					let encoded_whitelist_call = whitelist_call.encode();
+
+					// need to sort out v3 stuff
+					// This is what the Fellowship will actually vote on enacting.
+					let whitelist_over_xcm =
+						CollectivesRuntimeCall::PolkadotXcm(CollectivesXcmCall::send {
+							dest: Box::new(VersionedMultiLocation::V3(MultiLocation {
+								parents: 1,
+								interior: Here,
+							})),
+							message: Box::new(V3(Xcm(vec![
+								Instruction::UnpaidExecution {
+									weight_limit: WeightLimit::Unlimited,
+									check_origin: None,
+								},
+								Instruction::Transact {
+									origin_kind: OriginKind::Xcm,
+									require_weight_at_most: Weight {
+										// todo
+										ref_time: 1_000_000_000,
+										// We don't really care about proof size on the Relay Chain.
+										// Make it big so that it will definitely work.
+										proof_size: 1_000_000,
+									},
+									call: DoubleEncoded {
+										encoded: encoded_whitelist_call,
+									},
+								},
+							]))),
+						});
+
+					let whitelist_over_xcm_hash = sp_core::blake2_256(&whitelist_over_xcm.encode());
+					let whitelist_over_xcm_len: u32 =
+						(*&whitelist_over_xcm.encode().len()).try_into().unwrap();
+					let preimage_for_whitelist_over_xcm =
+						CollectivesRuntimeCall::Preimage(CollectivesPreimageCall::note_preimage {
+							bytes: whitelist_over_xcm.encode(),
+						});
+
+					// The actual Fellowship referendum submission.
+					let fellowship_proposal = CollectivesRuntimeCall::FellowshipReferenda(
+						FellowshipReferendaCall::submit {
+							proposal_origin: Box::new(CollectivesOriginCaller::FellowshipOrigins(
+								FellowshipOrigins::Fellows,
+							)),
+							proposal: CollectivesLookup {
+								hash: sp_core::H256(whitelist_over_xcm_hash),
+								len: whitelist_over_xcm_len,
+							},
+							enactment_moment: CollectivesDispatchTime::After(10u32),
+						},
+					);
+
+					// Now we put together the public referendum part. This still needs separate
+					// logic because the actual proposal gets wrapped in a Whitelist call.
+					let dispatch_whitelisted_call = PolkadotRuntimeCall::Whitelist(
+						WhitelistCall::dispatch_whitelisted_call_with_preimage {
+							call: Box::new(proposal_as_runtime_call),
+						},
+					);
+					let dispatch_whitelisted_call_hash =
+						sp_core::blake2_256(&dispatch_whitelisted_call.encode());
+					let dispatch_whitelisted_call_len: u32 =
+						(*&dispatch_whitelisted_call.encode().len())
+							.try_into()
+							.unwrap();
+
+					let preimage_for_dispatch_whitelisted_call =
+						PolkadotRuntimeCall::Preimage(PreimageCall::note_preimage {
+							bytes: dispatch_whitelisted_call.encode(),
+						});
+					let public_proposal = PolkadotRuntimeCall::Referenda(ReferendaCall::submit {
+						proposal_origin: Box::new(OriginCaller::Origins(
+							PolkadotOpenGovOrigin::WhitelistedCaller,
+						)),
+						proposal: Lookup {
+							hash: sp_core::H256(dispatch_whitelisted_call_hash),
+							len: dispatch_whitelisted_call_len,
+						},
+						enactment_moment: public_referendum_dispatch_time,
+					});
+
+					// Check the lengths and prepare preimages for printing.
+					let (whitelist_over_xcm_preimage_print, whitelist_over_xcm_preimage_print_len) =
+						create_polkadot_collectives_print_output(
+							preimage_for_whitelist_over_xcm,
+							proposal_details.output_len_limit,
+						);
+					let (dispatch_preimage_print, dispatch_preimage_print_len) =
+						create_polkadot_print_output(
+							preimage_for_dispatch_whitelisted_call,
+							proposal_details.output_len_limit,
+						);
+
 					PossibleCallsToSubmit {
-						preimage_for_whitelist_call: None,
-						preimage_for_public_referendum: None,
-						fellowship_referendum_submission: None,
-						public_referendum_submission: None,
+						preimage_for_whitelist_call: Some((
+							whitelist_over_xcm_preimage_print,
+							whitelist_over_xcm_preimage_print_len,
+						)),
+						preimage_for_public_referendum: Some((
+							dispatch_preimage_print,
+							dispatch_preimage_print_len,
+						)),
+						fellowship_referendum_submission: Some(
+							NetworkRuntimeCall::PolkadotCollectives(fellowship_proposal),
+						),
+						public_referendum_submission: Some(NetworkRuntimeCall::Polkadot(
+							public_proposal,
+						)),
 					}
 				}
 				_ => {
@@ -340,23 +491,6 @@ fn main() {
 					}
 				}
 			}
-			// Fellowship is on the Collectives parachain, so things are a bit different here.
-			//
-			// 1. Create a whitelist call on the Relay Chain:
-			//    let whitelist_call =
-			//     	  PolkadotRuntimeCall::Whitelist(WhitelistCall::whitelist_call {
-			// 		      call_hash: sp_core::H256(proposal_hash),
-			// 	      });
-			//
-			// 2. Create an XCM send call on the Collectives chain to Transact this on the Relay:
-			//    let send_whitelist = CollectivesRuntimeCall::PolkadotXcm(PolkadotXcmCall::send {
-			// 	      dest: MultiLocation { parents: 1, interior: Here },
-			// 	      message: vec![UnpaidExecution, Transact {call: whitelist_call, ..}],
-			//    });
-			//
-			// 3. Make a Fellowship referendum for `send_whitelist`.
-			//
-			// 4. Relay Chain public referendum should be the same as on Kusama.
 		}
 	};
 

@@ -1,2 +1,3 @@
 /target
 *.call
+collectives_types.rs
