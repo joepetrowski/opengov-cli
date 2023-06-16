@@ -1,4 +1,5 @@
 use parity_scale_codec::Encode as _;
+use std::fs;
 use subxt::ext::sp_core;
 
 #[subxt::subxt(runtime_metadata_url = "wss://kusama-rpc.polkadot.io:443")]
@@ -28,7 +29,8 @@ fn get_the_actual_proposed_action() -> ProposalDetails {
 	use NetworkTrack::*;
 	use Output::*;
 	return ProposalDetails {
-		// The encoded proposal that we want to submit.
+		// The encoded proposal that we want to submit. This can either be the call data itself,
+		// e.g. "0x0102...", or a file path that contains the data, e.g. "./my_proposal.call".
 		proposal: "0x0000645468652046656c6c6f777368697020736179732068656c6c6f",
 		// The OpenGov track that it will use.
 		track: Polkadot(PolkadotOpenGovOrigin::WhitelistedCaller),
@@ -137,8 +139,8 @@ struct PossibleCallsToSubmit {
 
 fn main() {
 	let proposal_details = get_the_actual_proposed_action();
-	let proposal_bytes = hex::decode(proposal_details.proposal.trim_start_matches("0x"))
-		.expect("Valid proposal; qed");
+
+	let proposal_bytes = get_proposal_bytes(proposal_details.proposal);
 	let proposal_hash = sp_core::blake2_256(&proposal_bytes);
 	let proposal_len: u32 = (*&proposal_bytes.len()).try_into().unwrap();
 
@@ -232,6 +234,21 @@ fn main() {
 							preimage_for_dispatch_whitelisted_call,
 							proposal_details.output_len_limit,
 						);
+
+					// If it's a hash, let's write the data to a file you can upload.
+					match dispatch_preimage_print {
+						CallOrHash::Call(_) => (),
+						CallOrHash::Hash(_) => {
+							let mut info_to_write = "0x".to_owned();
+							info_to_write
+								.push_str(hex::encode(dispatch_whitelisted_call.encode()).as_str());
+							fs::write(
+								"kusama_relay_public_referendum_preimage_to_note.call",
+								info_to_write,
+							)
+							.expect("it should write");
+						},
+					}
 
 					PossibleCallsToSubmit {
 						preimage_for_whitelist_call: Some((
@@ -349,7 +366,6 @@ fn main() {
 						});
 					let encoded_whitelist_call = whitelist_call.encode();
 
-					// need to sort out v3 stuff
 					// This is what the Fellowship will actually vote on enacting.
 					let whitelist_over_xcm =
 						CollectivesRuntimeCall::PolkadotXcm(CollectivesXcmCall::send {
@@ -437,6 +453,21 @@ fn main() {
 							proposal_details.output_len_limit,
 						);
 
+					// If it's a hash, let's write the data to a file you can upload.
+					match dispatch_preimage_print {
+						CallOrHash::Call(_) => (),
+						CallOrHash::Hash(_) => {
+							let mut info_to_write = "0x".to_owned();
+							info_to_write
+								.push_str(hex::encode(dispatch_whitelisted_call.encode()).as_str());
+							fs::write(
+								"polkadot_relay_public_referendum_preimage_to_note.call",
+								info_to_write,
+							)
+							.expect("it should write");
+						},
+					}
+
 					PossibleCallsToSubmit {
 						preimage_for_whitelist_call: Some((
 							whitelist_over_xcm_preimage_print,
@@ -517,6 +548,7 @@ fn main() {
 					"\nPreimage for the public referendum too large ({} bytes). Not included in batch.",
 					len
 				);
+				println!("A file was created that you can upload in `preimage.note_preimage` in Apps UI.");
 				println!("Submission should have the hash: 0x{}", hex::encode(h));
 			},
 		}
@@ -568,6 +600,19 @@ fn handle_batch_of_calls(output: &Output, batch: Vec<NetworkRuntimeCall>) {
 		});
 		println!("\nBatch to submit on Polkadot Collectives Chain:");
 		print_output(output, &NetworkRuntimeCall::PolkadotCollectives(batch));
+	}
+}
+
+// Check what the user entered for the proposal. If it is just call data, return it back. Otherwise,
+// we expect a path to a file that contains the call data. Read that in and return it.
+fn get_proposal_bytes(proposal: &'static str) -> Vec<u8> {
+	if proposal.starts_with("0x") {
+		// This is just call data
+		return hex::decode(proposal.trim_start_matches("0x")).expect("Valid proposal")
+	} else {
+		// This is a file path
+		let contents = fs::read_to_string(proposal).expect("Should give a valid file path");
+		return hex::decode(contents.as_str().trim_start_matches("0x")).expect("Valid proposal")
 	}
 }
 
