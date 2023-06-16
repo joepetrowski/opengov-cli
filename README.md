@@ -1,10 +1,10 @@
 # OpenGov Call Constructor
 
-This script will construct the calls needed to submit a proposal to OpenGov on Kusama. It assumes that you construct the call elsewhere (e.g. Polkadot JS Apps UI Extrinsics tab) and then paste in the raw call data. It will return all the calls that you will need to sign and submit (also using, e.g., the Apps UI Extrinsics tab).
+This script will construct the calls needed to submit a proposal to OpenGov on Kusama or Polkadot. It assumes that you construct the call elsewhere (e.g. Polkadot JS Apps UI Extrinsics tab) and then paste in the raw call data. It will return all the calls that you will need to sign and submit (also using, e.g., the Apps UI Extrinsics tab). Note that you may need to submit calls on multiple chains.
 
 ## Notes
 
-1. This returns four calls, but they can actually be submitted in any order. But if dispatching a whitelisted call, the Fellowship referendum will have to enact (whitelisting the call) before the public one does. The preimages do not need to be submitted in order to start the referenda, but they will eventually in order to enact.
+1. This returns up to four calls, but they can actually be submitted in any order. However, if dispatching a whitelisted call, the Fellowship referendum will have to _enact_ (whitelisting the call) before the public one does. The preimages do not need to be submitted in order to start the referenda, but they will eventually in order to enact.
 
 ## Example
 
@@ -45,6 +45,8 @@ fn get_the_actual_proposed_action() -> ProposalDetails {
 
 ### Run the Script
 
+#### Kusama
+
 ```
 $ cargo run
    Compiling opengov-submit v0.1.0 (/home/joe/parity/sideprojects/opengov-submit)
@@ -65,6 +67,29 @@ Open a public referendum to dispatch the whitelisted call:
 ```
 
 This will return either two or four calls, the latter if the origin is `WhitelistedCaller`, which will require a preimage and referendum for the Fellowship.
+
+#### Polkadot
+
+The Fellowship is on the Collectives parachain, so this will require a referendum on the Collectives chain for the Fellowship to whitelist a call, and then a referendum on the Relay Chain for it to pass public vote. Notice the WSS nodes pointing to different chains in the output.
+
+```
+$ cargo run
+   Compiling opengov-submit v0.1.0 (/home/joe/parity/sideprojects/opengov-submit)
+    Finished dev [unoptimized + debuginfo] target(s) in 30.32s
+     Running `target/debug/opengov-submit`
+
+Submit the preimage for the Fellowship referendum:
+https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Fpolkadot-collectives-rpc.polkadot.io#/extrinsics/decode/0x2b00dc1f0003010003082f0000060302286bee02093d008817000363631d09c4ac33f2960d5d26b02f8ec89ac7a986c0bdab2a3a9f354acb6167
+
+Open a Fellowship referendum to whitelist the call:
+https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Fpolkadot-collectives-rpc.polkadot.io#/extrinsics/decode/0x3d003e010259c8fcb1f6af54c364eb074abd824193044e1b3dac38dbc6f45307e7959e939037000000010a000000
+
+Submit the preimage for the public referendum:
+https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Frpc.polkadot.io#/extrinsics/decode/0x0a007817030000645468652046656c6c6f777368697020736179732068656c6c6f
+
+Open a public referendum to dispatch the call:
+https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Frpc.polkadot.io#/extrinsics/decode/0x1500160d022d1d8846a18770fc07a5b03383045d965aad65abb1077d0306142e60551813141e000000010a000000
+```
 
 ### Checking the Results
 
