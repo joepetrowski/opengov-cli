@@ -42,7 +42,7 @@ fn get_the_actual_proposed_action() -> ProposalDetails {
 		output_len_limit: 1_000,
 		// Whether or not to print a single `force_batch` call.
 		print_batch: true,
-	};
+	}
 }
 
 // Info and preferences provided by the user.
@@ -204,9 +204,7 @@ fn main() {
 					let dispatch_whitelisted_call_hash =
 						sp_core::blake2_256(&dispatch_whitelisted_call.encode());
 					let dispatch_whitelisted_call_len: u32 =
-						(*&dispatch_whitelisted_call.encode().len())
-							.try_into()
-							.unwrap();
+						(*&dispatch_whitelisted_call.encode().len()).try_into().unwrap();
 
 					let preimage_for_dispatch_whitelisted_call =
 						KusamaRuntimeCall::Preimage(PreimageCall::note_preimage {
@@ -251,7 +249,7 @@ fn main() {
 							public_proposal,
 						)),
 					}
-				}
+				},
 				// Everything else just uses its track.
 				_ => {
 					let note_proposal_preimage =
@@ -260,10 +258,7 @@ fn main() {
 						});
 					let public_proposal = KusamaRuntimeCall::Referenda(ReferendaCall::submit {
 						proposal_origin: Box::new(OriginCaller::Origins(kusama_track)),
-						proposal: Lookup {
-							hash: sp_core::H256(proposal_hash),
-							len: proposal_len,
-						},
+						proposal: Lookup { hash: sp_core::H256(proposal_hash), len: proposal_len },
 						enactment_moment: public_referendum_dispatch_time,
 					});
 					let (preimage_print, preimage_print_len) = create_kusama_print_output(
@@ -279,9 +274,9 @@ fn main() {
 							public_proposal,
 						)),
 					}
-				}
+				},
 			}
-		}
+		},
 		NetworkTrack::Polkadot(polkadot_track) => {
 			use polkadot_collectives::runtime_types::{
 				collectives_polkadot_runtime::OriginCaller as CollectivesOriginCaller,
@@ -376,9 +371,7 @@ fn main() {
 										// Make it big so that it will definitely work.
 										proof_size: 1_000_000,
 									},
-									call: DoubleEncoded {
-										encoded: encoded_whitelist_call,
-									},
+									call: DoubleEncoded { encoded: encoded_whitelist_call },
 								},
 							]))),
 						});
@@ -415,9 +408,7 @@ fn main() {
 					let dispatch_whitelisted_call_hash =
 						sp_core::blake2_256(&dispatch_whitelisted_call.encode());
 					let dispatch_whitelisted_call_len: u32 =
-						(*&dispatch_whitelisted_call.encode().len())
-							.try_into()
-							.unwrap();
+						(*&dispatch_whitelisted_call.encode().len()).try_into().unwrap();
 
 					let preimage_for_dispatch_whitelisted_call =
 						PolkadotRuntimeCall::Preimage(PreimageCall::note_preimage {
@@ -462,7 +453,7 @@ fn main() {
 							public_proposal,
 						)),
 					}
-				}
+				},
 				_ => {
 					let note_proposal_preimage =
 						PolkadotRuntimeCall::Preimage(PreimageCall::note_preimage {
@@ -470,10 +461,7 @@ fn main() {
 						});
 					let public_proposal = PolkadotRuntimeCall::Referenda(ReferendaCall::submit {
 						proposal_origin: Box::new(OriginCaller::Origins(polkadot_track)),
-						proposal: Lookup {
-							hash: sp_core::H256(proposal_hash),
-							len: proposal_len,
-						},
+						proposal: Lookup { hash: sp_core::H256(proposal_hash), len: proposal_len },
 						enactment_moment: public_referendum_dispatch_time,
 					});
 					let (preimage_print, preimage_print_len) = create_polkadot_print_output(
@@ -489,9 +477,9 @@ fn main() {
 							public_proposal,
 						)),
 					}
-				}
+				},
 			}
-		}
+		},
 	};
 
 	let mut batch_of_calls = Vec::new();
@@ -502,14 +490,14 @@ fn main() {
 				println!("\nSubmit the preimage for the Fellowship referendum:");
 				print_output(&proposal_details.output, &c);
 				batch_of_calls.push(c);
-			}
+			},
 			CallOrHash::Hash(h) => {
 				println!(
 					"\nPreimage for the public whitelist call too large ({} bytes). Not included in batch.",
 					len
 				);
 				println!("Submission should have the hash: 0x{}", hex::encode(h));
-			}
+			},
 		}
 	}
 	if let Some(c) = calls.fellowship_referendum_submission {
@@ -523,14 +511,14 @@ fn main() {
 				println!("\nSubmit the preimage for the public referendum:");
 				print_output(&proposal_details.output, &c);
 				batch_of_calls.push(c);
-			}
+			},
 			CallOrHash::Hash(h) => {
 				println!(
 					"\nPreimage for the public referendum too large ({} bytes). Not included in batch.",
 					len
 				);
 				println!("Submission should have the hash: 0x{}", hex::encode(h));
-			}
+			},
 		}
 	}
 	if let Some(c) = calls.public_referendum_submission {
@@ -596,7 +584,7 @@ fn print_output(output: &Output, network_call: &NetworkRuntimeCall) {
 					hex::encode(call.encode())
 				),
 			}
-		}
+		},
 		NetworkRuntimeCall::Polkadot(call) => {
 			let rpc: &'static str = "wss%3A%2F%2Frpc.polkadot.io";
 			match output {
@@ -607,7 +595,7 @@ fn print_output(output: &Output, network_call: &NetworkRuntimeCall) {
 					hex::encode(call.encode())
 				),
 			}
-		}
+		},
 		NetworkRuntimeCall::PolkadotCollectives(call) => {
 			let rpc: &'static str = "wss%3A%2F%2Fpolkadot-collectives-rpc.polkadot.io";
 			match output {
@@ -618,7 +606,7 @@ fn print_output(output: &Output, network_call: &NetworkRuntimeCall) {
 					hex::encode(call.encode())
 				),
 			}
-		}
+		},
 	}
 }
 
