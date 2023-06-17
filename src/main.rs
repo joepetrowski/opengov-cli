@@ -66,6 +66,13 @@ struct ProposalDetails {
 }
 
 #[allow(dead_code)]
+enum Network {
+	Kusama,
+	Polkadot,
+	PolkadotCollectives,
+}
+
+#[allow(dead_code)]
 enum NetworkTrack {
 	Kusama(KusamaOpenGovOrigin),
 	Polkadot(PolkadotOpenGovOrigin),
@@ -96,6 +103,80 @@ enum DispatchTimeWrapper {
 enum CallOrHash {
 	Call(NetworkRuntimeCall),
 	Hash([u8; 32]),
+}
+
+// All the info associated with a call in the forms you may need it in.
+struct CallInfo {
+	call: NetworkRuntimeCall,
+	encoded: Vec<u8>,
+	hash: [u8; 32],
+	length: u32,
+}
+
+impl CallInfo {
+	// Construct `Self` from a `NetworkRuntimeCall`.
+	fn from_runtime_call(call: NetworkRuntimeCall) -> Self {
+		let encoded = match call {
+			NetworkRuntimeCall::Kusama(cc) => cc.encode(),
+			NetworkRuntimeCall::Polkadot(cc) => cc.encode(),
+			NetworkRuntimeCall::PolkadotCollectives(cc) => cc.encode(),
+		};
+		let hash = sp_core::blake2_256(&encoded);
+		let length: u32 = (*&encoded.len()).try_into().unwrap();
+		Self { call, encoded: encoded.to_vec(), hash, length }
+	}
+
+	// Construct `Self` for some `network` given some `encoded` bytes.
+	fn from_bytes(encoded: &Vec<u8>, network: Network) -> Self {
+		let call = match network {
+			Network::Kusama => {
+				let runtime_call =
+					<KusamaRuntimeCall as parity_scale_codec::Decode>::decode(&mut &encoded[..])
+						.unwrap();
+				NetworkRuntimeCall::Kusama(runtime_call)
+			},
+			Network::Polkadot => {
+				let runtime_call =
+					<PolkadotRuntimeCall as parity_scale_codec::Decode>::decode(&mut &encoded[..])
+						.unwrap();
+				NetworkRuntimeCall::Polkadot(runtime_call)
+			},
+			Network::PolkadotCollectives => {
+				let runtime_call = <CollectivesRuntimeCall as parity_scale_codec::Decode>::decode(
+					&mut &encoded[..],
+				)
+				.unwrap();
+				NetworkRuntimeCall::PolkadotCollectives(runtime_call)
+			},
+		};
+		let hash = sp_core::blake2_256(&encoded);
+		let length = (*&encoded.len()).try_into().unwrap();
+		Self { call, encoded: encoded.to_vec(), hash, length }
+	}
+
+	// Strip the outer enum and return a Kusama Relay `RuntimeCall`.
+	fn get_kusama_call(&self) -> Result<&KusamaRuntimeCall, &'static str> {
+		match &self.call {
+			NetworkRuntimeCall::Kusama(cc) => return Ok(cc),
+			_ => return Err("not a kusama call"),
+		}
+	}
+
+	// Strip the outer enum and return a Polkadot Relay `RuntimeCall`.
+	fn get_polkadot_call(&self) -> Result<&PolkadotRuntimeCall, &'static str> {
+		match &self.call {
+			NetworkRuntimeCall::Polkadot(cc) => return Ok(cc),
+			_ => return Err("not a polkadot call"),
+		}
+	}
+
+	// Strip the outer enum and return a Polkadot Collectives `RuntimeCall`.
+	fn get_polkadot_collectives_call(&self) -> Result<&CollectivesRuntimeCall, &'static str> {
+		match &self.call {
+			NetworkRuntimeCall::PolkadotCollectives(cc) => return Ok(cc),
+			_ => return Err("not a polkadot collectives call"),
+		}
+	}
 }
 
 // The set of calls that some user will need to sign and submit to initiate a referendum.
@@ -141,8 +222,6 @@ fn main() {
 	let proposal_details = get_the_actual_proposed_action();
 
 	let proposal_bytes = get_proposal_bytes(proposal_details.proposal);
-	let proposal_hash = sp_core::blake2_256(&proposal_bytes);
-	let proposal_len: u32 = (*&proposal_bytes.len()).try_into().unwrap();
 
 	let calls: PossibleCallsToSubmit = match proposal_details.track {
 		NetworkTrack::Kusama(kusama_track) => {
@@ -155,9 +234,7 @@ fn main() {
 				pallet_whitelist::pallet::Call as WhitelistCall,
 			};
 
-			let proposal_as_runtime_call =
-				<KusamaRuntimeCall as parity_scale_codec::Decode>::decode(&mut &proposal_bytes[..])
-					.unwrap();
+			let proposal_call_info = CallInfo::from_bytes(&proposal_bytes, Network::Kusama);
 
 			let public_referendum_dispatch_time = match proposal_details.dispatch {
 				DispatchTimeWrapper::At(block) => DispatchTime::At(block),
@@ -174,7 +251,7 @@ fn main() {
 					//      this preimage.
 					let whitelist_call =
 						KusamaRuntimeCall::Whitelist(WhitelistCall::whitelist_call {
-							call_hash: sp_core::H256(proposal_hash),
+							call_hash: sp_core::H256(proposal_call_info.hash),
 						});
 					let whitelist_call_hash = sp_core::blake2_256(&whitelist_call.encode());
 					let whitelist_call_len: u32 =
@@ -200,7 +277,9 @@ fn main() {
 					// logic because the actual proposal gets wrapped in a Whitelist call.
 					let dispatch_whitelisted_call = KusamaRuntimeCall::Whitelist(
 						WhitelistCall::dispatch_whitelisted_call_with_preimage {
-							call: Box::new(proposal_as_runtime_call),
+							call: Box::new(
+								proposal_call_info.get_kusama_call().expect("it is a kusama call"),
+							),
 						},
 					);
 					let dispatch_whitelisted_call_hash =
@@ -275,7 +354,10 @@ fn main() {
 						});
 					let public_proposal = KusamaRuntimeCall::Referenda(ReferendaCall::submit {
 						proposal_origin: Box::new(OriginCaller::Origins(kusama_track)),
-						proposal: Lookup { hash: sp_core::H256(proposal_hash), len: proposal_len },
+						proposal: Lookup {
+							hash: sp_core::H256(proposal_call_info.hash),
+							len: proposal_call_info.length,
+						},
 						enactment_moment: public_referendum_dispatch_time,
 					});
 					let (preimage_print, preimage_print_len) = create_kusama_print_output(
@@ -324,11 +406,7 @@ fn main() {
 				polkadot_runtime::OriginCaller,
 			};
 
-			let proposal_as_runtime_call =
-				<PolkadotRuntimeCall as parity_scale_codec::Decode>::decode(
-					&mut &proposal_bytes[..],
-				)
-				.unwrap();
+			let proposal_call_info = CallInfo::from_bytes(&proposal_bytes, Network::Polkadot);
 
 			let public_referendum_dispatch_time = match proposal_details.dispatch {
 				DispatchTimeWrapper::At(block) => DispatchTime::At(block),
@@ -362,7 +440,7 @@ fn main() {
 					// Whitelist the call on the Relay Chain.
 					let whitelist_call =
 						PolkadotRuntimeCall::Whitelist(WhitelistCall::whitelist_call {
-							call_hash: sp_core::H256(proposal_hash),
+							call_hash: sp_core::H256(proposal_call_info.hash),
 						});
 					let encoded_whitelist_call = whitelist_call.encode();
 
@@ -418,7 +496,11 @@ fn main() {
 					// logic because the actual proposal gets wrapped in a Whitelist call.
 					let dispatch_whitelisted_call = PolkadotRuntimeCall::Whitelist(
 						WhitelistCall::dispatch_whitelisted_call_with_preimage {
-							call: Box::new(proposal_as_runtime_call),
+							call: Box::new(
+								proposal_call_info
+									.get_polkadot_call()
+									.expect("it is a polkadot call"),
+							),
 						},
 					);
 					let dispatch_whitelisted_call_hash =
@@ -492,7 +574,10 @@ fn main() {
 						});
 					let public_proposal = PolkadotRuntimeCall::Referenda(ReferendaCall::submit {
 						proposal_origin: Box::new(OriginCaller::Origins(polkadot_track)),
-						proposal: Lookup { hash: sp_core::H256(proposal_hash), len: proposal_len },
+						proposal: Lookup {
+							hash: sp_core::H256(proposal_call_info.hash),
+							len: proposal_call_info.length,
+						},
 						enactment_moment: public_referendum_dispatch_time,
 					});
 					let (preimage_print, preimage_print_len) = create_polkadot_print_output(
