@@ -66,6 +66,13 @@ struct ProposalDetails {
 }
 
 #[allow(dead_code)]
+enum Network {
+	Kusama,
+	Polkadot,
+	PolkadotCollectives,
+}
+
+#[allow(dead_code)]
 enum NetworkTrack {
 	Kusama(KusamaOpenGovOrigin),
 	Polkadot(PolkadotOpenGovOrigin),
@@ -96,6 +103,120 @@ enum DispatchTimeWrapper {
 enum CallOrHash {
 	Call(NetworkRuntimeCall),
 	Hash([u8; 32]),
+}
+
+// All the info associated with a call in the forms you may need it in.
+struct CallInfo {
+	call: NetworkRuntimeCall,
+	encoded: Vec<u8>,
+	hash: [u8; 32],
+	length: u32,
+}
+
+impl CallInfo {
+	// Construct `Self` from a `NetworkRuntimeCall`.
+	fn from_runtime_call(call: NetworkRuntimeCall) -> Self {
+		let encoded = match &call {
+			NetworkRuntimeCall::Kusama(cc) => cc.encode(),
+			NetworkRuntimeCall::Polkadot(cc) => cc.encode(),
+			NetworkRuntimeCall::PolkadotCollectives(cc) => cc.encode(),
+		};
+		let hash = sp_core::blake2_256(&encoded);
+		let length: u32 = (*&encoded.len()).try_into().unwrap();
+		Self { call, encoded: encoded.to_vec(), hash, length }
+	}
+
+	// Construct `Self` for some `network` given some `encoded` bytes.
+	fn from_bytes(encoded: &Vec<u8>, network: Network) -> Self {
+		let call = match network {
+			Network::Kusama => {
+				let runtime_call =
+					<KusamaRuntimeCall as parity_scale_codec::Decode>::decode(&mut &encoded[..])
+						.unwrap();
+				NetworkRuntimeCall::Kusama(runtime_call)
+			},
+			Network::Polkadot => {
+				let runtime_call =
+					<PolkadotRuntimeCall as parity_scale_codec::Decode>::decode(&mut &encoded[..])
+						.unwrap();
+				NetworkRuntimeCall::Polkadot(runtime_call)
+			},
+			Network::PolkadotCollectives => {
+				let runtime_call = <CollectivesRuntimeCall as parity_scale_codec::Decode>::decode(
+					&mut &encoded[..],
+				)
+				.unwrap();
+				NetworkRuntimeCall::PolkadotCollectives(runtime_call)
+			},
+		};
+		let hash = sp_core::blake2_256(&encoded);
+		let length = (*&encoded.len()).try_into().unwrap();
+		Self { call, encoded: encoded.to_vec(), hash, length }
+	}
+
+	// Strip the outer enum and return a Kusama Relay `RuntimeCall`.
+	fn get_kusama_call(&self) -> Result<KusamaRuntimeCall, &'static str> {
+		match &self.call {
+			NetworkRuntimeCall::Kusama(_) => {
+				let bytes = &self.encoded;
+				Ok(<KusamaRuntimeCall as parity_scale_codec::Decode>::decode(&mut &bytes[..])
+					.unwrap())
+			},
+			_ => return Err("not a kusama call"),
+		}
+	}
+
+	// Strip the outer enum and return a Polkadot Relay `RuntimeCall`.
+	fn get_polkadot_call(&self) -> Result<PolkadotRuntimeCall, &'static str> {
+		match &self.call {
+			NetworkRuntimeCall::Polkadot(_) => {
+				let bytes = &self.encoded;
+				Ok(<PolkadotRuntimeCall as parity_scale_codec::Decode>::decode(&mut &bytes[..])
+					.unwrap())
+			},
+			_ => return Err("not a polkadot call"),
+		}
+	}
+
+	// Strip the outer enum and return a Polkadot Collectives `RuntimeCall`.
+	fn get_polkadot_collectives_call(&self) -> Result<CollectivesRuntimeCall, &'static str> {
+		match &self.call {
+			NetworkRuntimeCall::PolkadotCollectives(_) => {
+				let bytes = &self.encoded;
+				Ok(<CollectivesRuntimeCall as parity_scale_codec::Decode>::decode(&mut &bytes[..])
+					.unwrap())
+			},
+			_ => return Err("not a polkadot collectives call"),
+		}
+	}
+
+	// Take `Self` and a length limit as input. If the call length exceeds the limit, just return
+	// its hash. Call length is recomputed and will be 2 bytes longer than the actual preimage
+	// length. This is because the call is `preimage.note_preimage(call)`, so the outer pallet/call
+	// indices have a length of 2 bytes.
+	fn create_print_output(&self, length_limit: u32) -> (CallOrHash, u32) {
+		let print_output: CallOrHash;
+		if self.length > length_limit {
+			print_output = CallOrHash::Hash(self.hash);
+		} else {
+			print_output = match &self.call {
+				NetworkRuntimeCall::Kusama(_) => {
+					let kusama_call = self.get_kusama_call().expect("kusama");
+					CallOrHash::Call(NetworkRuntimeCall::Kusama(kusama_call))
+				},
+				NetworkRuntimeCall::Polkadot(_) => {
+					let polkadot_call = self.get_polkadot_call().expect("polkadot");
+					CallOrHash::Call(NetworkRuntimeCall::Polkadot(polkadot_call))
+				},
+				NetworkRuntimeCall::PolkadotCollectives(_) => {
+					let collectives_call =
+						self.get_polkadot_collectives_call().expect("collectives");
+					CallOrHash::Call(NetworkRuntimeCall::PolkadotCollectives(collectives_call))
+				},
+			};
+		}
+		(print_output, self.length)
+	}
 }
 
 // The set of calls that some user will need to sign and submit to initiate a referendum.
@@ -139,10 +260,7 @@ struct PossibleCallsToSubmit {
 
 fn main() {
 	let proposal_details = get_the_actual_proposed_action();
-
 	let proposal_bytes = get_proposal_bytes(proposal_details.proposal);
-	let proposal_hash = sp_core::blake2_256(&proposal_bytes);
-	let proposal_len: u32 = (*&proposal_bytes.len()).try_into().unwrap();
 
 	let calls: PossibleCallsToSubmit = match proposal_details.track {
 		NetworkTrack::Kusama(kusama_track) => {
@@ -155,9 +273,7 @@ fn main() {
 				pallet_whitelist::pallet::Call as WhitelistCall,
 			};
 
-			let proposal_as_runtime_call =
-				<KusamaRuntimeCall as parity_scale_codec::Decode>::decode(&mut &proposal_bytes[..])
-					.unwrap();
+			let proposal_call_info = CallInfo::from_bytes(&proposal_bytes, Network::Kusama);
 
 			let public_referendum_dispatch_time = match proposal_details.dispatch {
 				DispatchTimeWrapper::At(block) => DispatchTime::At(block),
@@ -172,68 +288,70 @@ fn main() {
 					//      this as a preimage.
 					//   2. To submit a referendum to the Fellowship Referenda pallet to dispatch
 					//      this preimage.
-					let whitelist_call =
+					let whitelist_call = CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(
 						KusamaRuntimeCall::Whitelist(WhitelistCall::whitelist_call {
-							call_hash: sp_core::H256(proposal_hash),
-						});
-					let whitelist_call_hash = sp_core::blake2_256(&whitelist_call.encode());
-					let whitelist_call_len: u32 =
-						(*&whitelist_call.encode().len()).try_into().unwrap();
-					let preimage_for_whitelist_call =
-						KusamaRuntimeCall::Preimage(PreimageCall::note_preimage {
-							bytes: whitelist_call.encode(),
-						});
+							call_hash: sp_core::H256(proposal_call_info.hash),
+						}),
+					));
+					let preimage_for_whitelist_call = CallInfo::from_runtime_call(
+						NetworkRuntimeCall::Kusama(KusamaRuntimeCall::Preimage(
+							PreimageCall::note_preimage { bytes: whitelist_call.encoded },
+						)),
+					);
 
-					let fellowship_proposal =
-						KusamaRuntimeCall::FellowshipReferenda(FellowshipReferendaCall::submit {
-							proposal_origin: Box::new(OriginCaller::Origins(
-								KusamaOpenGovOrigin::Fellows,
-							)),
-							proposal: Lookup {
-								hash: sp_core::H256(whitelist_call_hash),
-								len: whitelist_call_len,
+					let fellowship_proposal = CallInfo::from_runtime_call(
+						NetworkRuntimeCall::Kusama(KusamaRuntimeCall::FellowshipReferenda(
+							FellowshipReferendaCall::submit {
+								proposal_origin: Box::new(OriginCaller::Origins(
+									KusamaOpenGovOrigin::Fellows,
+								)),
+								proposal: Lookup {
+									hash: sp_core::H256(whitelist_call.hash),
+									len: whitelist_call.length,
+								},
+								enactment_moment: DispatchTime::After(10),
 							},
-							enactment_moment: DispatchTime::After(10),
-						});
+						)),
+					);
 
 					// Now we put together the public referendum part. This still needs separate
 					// logic because the actual proposal gets wrapped in a Whitelist call.
-					let dispatch_whitelisted_call = KusamaRuntimeCall::Whitelist(
-						WhitelistCall::dispatch_whitelisted_call_with_preimage {
-							call: Box::new(proposal_as_runtime_call),
-						},
+					let dispatch_whitelisted_call = CallInfo::from_runtime_call(
+						NetworkRuntimeCall::Kusama(KusamaRuntimeCall::Whitelist(
+							WhitelistCall::dispatch_whitelisted_call_with_preimage {
+								call: Box::new(
+									proposal_call_info.get_kusama_call().expect("kusama"),
+								),
+							},
+						)),
 					);
-					let dispatch_whitelisted_call_hash =
-						sp_core::blake2_256(&dispatch_whitelisted_call.encode());
-					let dispatch_whitelisted_call_len: u32 =
-						(*&dispatch_whitelisted_call.encode().len()).try_into().unwrap();
 
 					let preimage_for_dispatch_whitelisted_call =
-						KusamaRuntimeCall::Preimage(PreimageCall::note_preimage {
-							bytes: dispatch_whitelisted_call.encode(),
-						});
-					let public_proposal = KusamaRuntimeCall::Referenda(ReferendaCall::submit {
-						proposal_origin: Box::new(OriginCaller::Origins(
-							KusamaOpenGovOrigin::WhitelistedCaller,
-						)),
-						proposal: Lookup {
-							hash: sp_core::H256(dispatch_whitelisted_call_hash),
-							len: dispatch_whitelisted_call_len,
-						},
-						enactment_moment: public_referendum_dispatch_time,
-					});
+						CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(
+							KusamaRuntimeCall::Preimage(PreimageCall::note_preimage {
+								bytes: dispatch_whitelisted_call.encoded.clone(),
+							}),
+						));
+					let public_proposal = CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(
+						KusamaRuntimeCall::Referenda(ReferendaCall::submit {
+							proposal_origin: Box::new(OriginCaller::Origins(
+								KusamaOpenGovOrigin::WhitelistedCaller,
+							)),
+							proposal: Lookup {
+								hash: sp_core::H256(dispatch_whitelisted_call.hash),
+								len: dispatch_whitelisted_call.length,
+							},
+							enactment_moment: public_referendum_dispatch_time,
+						}),
+					));
 
 					// Check the lengths and prepare preimages for printing.
 					let (whitelist_preimage_print, whitelist_preimage_print_len) =
-						create_kusama_print_output(
-							preimage_for_whitelist_call,
-							proposal_details.output_len_limit,
-						);
+						preimage_for_whitelist_call
+							.create_print_output(proposal_details.output_len_limit);
 					let (dispatch_preimage_print, dispatch_preimage_print_len) =
-						create_kusama_print_output(
-							preimage_for_dispatch_whitelisted_call,
-							proposal_details.output_len_limit,
-						);
+						preimage_for_dispatch_whitelisted_call
+							.create_print_output(proposal_details.output_len_limit);
 
 					// If it's a hash, let's write the data to a file you can upload.
 					match dispatch_preimage_print {
@@ -241,7 +359,7 @@ fn main() {
 						CallOrHash::Hash(_) => {
 							let mut info_to_write = "0x".to_owned();
 							info_to_write
-								.push_str(hex::encode(dispatch_whitelisted_call.encode()).as_str());
+								.push_str(hex::encode(dispatch_whitelisted_call.encoded).as_str());
 							fs::write(
 								"kusama_relay_public_referendum_preimage_to_note.call",
 								info_to_write,
@@ -259,37 +377,35 @@ fn main() {
 							dispatch_preimage_print,
 							dispatch_preimage_print_len,
 						)),
-						fellowship_referendum_submission: Some(NetworkRuntimeCall::Kusama(
-							fellowship_proposal,
-						)),
-						public_referendum_submission: Some(NetworkRuntimeCall::Kusama(
-							public_proposal,
-						)),
+						fellowship_referendum_submission: Some(fellowship_proposal.call),
+						public_referendum_submission: Some(public_proposal.call),
 					}
 				},
 				// Everything else just uses its track.
 				_ => {
-					let note_proposal_preimage =
-						KusamaRuntimeCall::Preimage(PreimageCall::note_preimage {
-							bytes: proposal_bytes,
-						});
-					let public_proposal = KusamaRuntimeCall::Referenda(ReferendaCall::submit {
-						proposal_origin: Box::new(OriginCaller::Origins(kusama_track)),
-						proposal: Lookup { hash: sp_core::H256(proposal_hash), len: proposal_len },
-						enactment_moment: public_referendum_dispatch_time,
-					});
-					let (preimage_print, preimage_print_len) = create_kusama_print_output(
-						note_proposal_preimage,
-						proposal_details.output_len_limit,
+					let note_proposal_preimage = CallInfo::from_runtime_call(
+						NetworkRuntimeCall::Kusama(KusamaRuntimeCall::Preimage(
+							PreimageCall::note_preimage { bytes: proposal_bytes },
+						)),
 					);
+					let public_proposal = CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(
+						KusamaRuntimeCall::Referenda(ReferendaCall::submit {
+							proposal_origin: Box::new(OriginCaller::Origins(kusama_track)),
+							proposal: Lookup {
+								hash: sp_core::H256(proposal_call_info.hash),
+								len: proposal_call_info.length,
+							},
+							enactment_moment: public_referendum_dispatch_time,
+						}),
+					));
+					let (preimage_print, preimage_print_len) = note_proposal_preimage
+						.create_print_output(proposal_details.output_len_limit);
 
 					PossibleCallsToSubmit {
 						preimage_for_whitelist_call: None,
 						preimage_for_public_referendum: Some((preimage_print, preimage_print_len)),
 						fellowship_referendum_submission: None,
-						public_referendum_submission: Some(NetworkRuntimeCall::Kusama(
-							public_proposal,
-						)),
+						public_referendum_submission: Some(public_proposal.call),
 					}
 				},
 			}
@@ -324,11 +440,7 @@ fn main() {
 				polkadot_runtime::OriginCaller,
 			};
 
-			let proposal_as_runtime_call =
-				<PolkadotRuntimeCall as parity_scale_codec::Decode>::decode(
-					&mut &proposal_bytes[..],
-				)
-				.unwrap();
+			let proposal_call_info = CallInfo::from_bytes(&proposal_bytes, Network::Polkadot);
 
 			let public_referendum_dispatch_time = match proposal_details.dispatch {
 				DispatchTimeWrapper::At(block) => DispatchTime::At(block),
@@ -360,98 +472,108 @@ fn main() {
 				// 4. Relay Chain public referendum should be the same as on Kusama.
 				PolkadotOpenGovOrigin::WhitelistedCaller => {
 					// Whitelist the call on the Relay Chain.
-					let whitelist_call =
+					let whitelist_call = CallInfo::from_runtime_call(NetworkRuntimeCall::Polkadot(
 						PolkadotRuntimeCall::Whitelist(WhitelistCall::whitelist_call {
-							call_hash: sp_core::H256(proposal_hash),
-						});
-					let encoded_whitelist_call = whitelist_call.encode();
+							call_hash: sp_core::H256(proposal_call_info.hash),
+						}),
+					));
 
 					// This is what the Fellowship will actually vote on enacting.
 					let whitelist_over_xcm =
-						CollectivesRuntimeCall::PolkadotXcm(CollectivesXcmCall::send {
-							dest: Box::new(VersionedMultiLocation::V3(MultiLocation {
-								parents: 1,
-								interior: Here,
-							})),
-							message: Box::new(V3(Xcm(vec![
-								Instruction::UnpaidExecution {
-									weight_limit: WeightLimit::Unlimited,
-									check_origin: None,
-								},
-								Instruction::Transact {
-									origin_kind: OriginKind::Xcm,
-									require_weight_at_most: Weight {
-										// todo
-										ref_time: 1_000_000_000,
-										// We don't really care about proof size on the Relay Chain.
-										// Make it big so that it will definitely work.
-										proof_size: 1_000_000,
+						CallInfo::from_runtime_call(NetworkRuntimeCall::PolkadotCollectives(
+							CollectivesRuntimeCall::PolkadotXcm(CollectivesXcmCall::send {
+								dest: Box::new(VersionedMultiLocation::V3(MultiLocation {
+									parents: 1,
+									interior: Here,
+								})),
+								message: Box::new(V3(Xcm(vec![
+									Instruction::UnpaidExecution {
+										weight_limit: WeightLimit::Unlimited,
+										check_origin: None,
 									},
-									call: DoubleEncoded { encoded: encoded_whitelist_call },
-								},
-							]))),
-						});
+									Instruction::Transact {
+										origin_kind: OriginKind::Xcm,
+										require_weight_at_most: Weight {
+											// todo
+											ref_time: 1_000_000_000,
+											// We don't really care about proof size on the Relay Chain.
+											// Make it big so that it will definitely work.
+											proof_size: 1_000_000,
+										},
+										call: DoubleEncoded { encoded: whitelist_call.encoded },
+									},
+								]))),
+							}),
+						));
 
-					let whitelist_over_xcm_hash = sp_core::blake2_256(&whitelist_over_xcm.encode());
-					let whitelist_over_xcm_len: u32 =
-						(*&whitelist_over_xcm.encode().len()).try_into().unwrap();
-					let preimage_for_whitelist_over_xcm =
-						CollectivesRuntimeCall::Preimage(CollectivesPreimageCall::note_preimage {
-							bytes: whitelist_over_xcm.encode(),
-						});
+					let preimage_for_whitelist_over_xcm = CallInfo::from_runtime_call(
+						NetworkRuntimeCall::PolkadotCollectives(CollectivesRuntimeCall::Preimage(
+							CollectivesPreimageCall::note_preimage {
+								bytes: whitelist_over_xcm.encoded,
+							},
+						)),
+					);
 
 					// The actual Fellowship referendum submission.
-					let fellowship_proposal = CollectivesRuntimeCall::FellowshipReferenda(
-						FellowshipReferendaCall::submit {
-							proposal_origin: Box::new(CollectivesOriginCaller::FellowshipOrigins(
-								FellowshipOrigins::Fellows,
-							)),
-							proposal: CollectivesLookup {
-								hash: sp_core::H256(whitelist_over_xcm_hash),
-								len: whitelist_over_xcm_len,
-							},
-							enactment_moment: CollectivesDispatchTime::After(10u32),
-						},
-					);
+					let fellowship_proposal =
+						CallInfo::from_runtime_call(NetworkRuntimeCall::PolkadotCollectives(
+							CollectivesRuntimeCall::FellowshipReferenda(
+								FellowshipReferendaCall::submit {
+									proposal_origin: Box::new(
+										CollectivesOriginCaller::FellowshipOrigins(
+											FellowshipOrigins::Fellows,
+										),
+									),
+									proposal: CollectivesLookup {
+										hash: sp_core::H256(whitelist_over_xcm.hash),
+										len: whitelist_over_xcm.length,
+									},
+									enactment_moment: CollectivesDispatchTime::After(10u32),
+								},
+							),
+						));
 
 					// Now we put together the public referendum part. This still needs separate
 					// logic because the actual proposal gets wrapped in a Whitelist call.
-					let dispatch_whitelisted_call = PolkadotRuntimeCall::Whitelist(
-						WhitelistCall::dispatch_whitelisted_call_with_preimage {
-							call: Box::new(proposal_as_runtime_call),
-						},
+					let dispatch_whitelisted_call = CallInfo::from_runtime_call(
+						NetworkRuntimeCall::Polkadot(PolkadotRuntimeCall::Whitelist(
+							WhitelistCall::dispatch_whitelisted_call_with_preimage {
+								call: Box::new(
+									proposal_call_info
+										.get_polkadot_call()
+										.expect("it is a polkadot call"),
+								),
+							},
+						)),
 					);
-					let dispatch_whitelisted_call_hash =
-						sp_core::blake2_256(&dispatch_whitelisted_call.encode());
-					let dispatch_whitelisted_call_len: u32 =
-						(*&dispatch_whitelisted_call.encode().len()).try_into().unwrap();
 
 					let preimage_for_dispatch_whitelisted_call =
-						PolkadotRuntimeCall::Preimage(PreimageCall::note_preimage {
-							bytes: dispatch_whitelisted_call.encode(),
-						});
-					let public_proposal = PolkadotRuntimeCall::Referenda(ReferendaCall::submit {
-						proposal_origin: Box::new(OriginCaller::Origins(
-							PolkadotOpenGovOrigin::WhitelistedCaller,
-						)),
-						proposal: Lookup {
-							hash: sp_core::H256(dispatch_whitelisted_call_hash),
-							len: dispatch_whitelisted_call_len,
-						},
-						enactment_moment: public_referendum_dispatch_time,
-					});
+						CallInfo::from_runtime_call(NetworkRuntimeCall::Polkadot(
+							PolkadotRuntimeCall::Preimage(PreimageCall::note_preimage {
+								bytes: dispatch_whitelisted_call.encoded.clone(),
+							}),
+						));
+					let public_proposal =
+						CallInfo::from_runtime_call(NetworkRuntimeCall::Polkadot(
+							PolkadotRuntimeCall::Referenda(ReferendaCall::submit {
+								proposal_origin: Box::new(OriginCaller::Origins(
+									PolkadotOpenGovOrigin::WhitelistedCaller,
+								)),
+								proposal: Lookup {
+									hash: sp_core::H256(dispatch_whitelisted_call.hash),
+									len: dispatch_whitelisted_call.length,
+								},
+								enactment_moment: public_referendum_dispatch_time,
+							}),
+						));
 
 					// Check the lengths and prepare preimages for printing.
 					let (whitelist_over_xcm_preimage_print, whitelist_over_xcm_preimage_print_len) =
-						create_polkadot_collectives_print_output(
-							preimage_for_whitelist_over_xcm,
-							proposal_details.output_len_limit,
-						);
+						preimage_for_whitelist_over_xcm
+							.create_print_output(proposal_details.output_len_limit);
 					let (dispatch_preimage_print, dispatch_preimage_print_len) =
-						create_polkadot_print_output(
-							preimage_for_dispatch_whitelisted_call,
-							proposal_details.output_len_limit,
-						);
+						preimage_for_dispatch_whitelisted_call
+							.create_print_output(proposal_details.output_len_limit);
 
 					// If it's a hash, let's write the data to a file you can upload.
 					match dispatch_preimage_print {
@@ -459,7 +581,7 @@ fn main() {
 						CallOrHash::Hash(_) => {
 							let mut info_to_write = "0x".to_owned();
 							info_to_write
-								.push_str(hex::encode(dispatch_whitelisted_call.encode()).as_str());
+								.push_str(hex::encode(dispatch_whitelisted_call.encoded).as_str());
 							fs::write(
 								"polkadot_relay_public_referendum_preimage_to_note.call",
 								info_to_write,
@@ -477,36 +599,35 @@ fn main() {
 							dispatch_preimage_print,
 							dispatch_preimage_print_len,
 						)),
-						fellowship_referendum_submission: Some(
-							NetworkRuntimeCall::PolkadotCollectives(fellowship_proposal),
-						),
-						public_referendum_submission: Some(NetworkRuntimeCall::Polkadot(
-							public_proposal,
-						)),
+						fellowship_referendum_submission: Some(fellowship_proposal.call),
+						public_referendum_submission: Some(public_proposal.call),
 					}
 				},
 				_ => {
-					let note_proposal_preimage =
-						PolkadotRuntimeCall::Preimage(PreimageCall::note_preimage {
-							bytes: proposal_bytes,
-						});
-					let public_proposal = PolkadotRuntimeCall::Referenda(ReferendaCall::submit {
-						proposal_origin: Box::new(OriginCaller::Origins(polkadot_track)),
-						proposal: Lookup { hash: sp_core::H256(proposal_hash), len: proposal_len },
-						enactment_moment: public_referendum_dispatch_time,
-					});
-					let (preimage_print, preimage_print_len) = create_polkadot_print_output(
-						note_proposal_preimage,
-						proposal_details.output_len_limit,
+					let note_proposal_preimage = CallInfo::from_runtime_call(
+						NetworkRuntimeCall::Polkadot(PolkadotRuntimeCall::Preimage(
+							PreimageCall::note_preimage { bytes: proposal_bytes },
+						)),
 					);
+					let public_proposal =
+						CallInfo::from_runtime_call(NetworkRuntimeCall::Polkadot(
+							PolkadotRuntimeCall::Referenda(ReferendaCall::submit {
+								proposal_origin: Box::new(OriginCaller::Origins(polkadot_track)),
+								proposal: Lookup {
+									hash: sp_core::H256(proposal_call_info.hash),
+									len: proposal_call_info.length,
+								},
+								enactment_moment: public_referendum_dispatch_time,
+							}),
+						));
+					let (preimage_print, preimage_print_len) = note_proposal_preimage
+						.create_print_output(proposal_details.output_len_limit);
 
 					PossibleCallsToSubmit {
 						preimage_for_whitelist_call: None,
 						preimage_for_public_referendum: Some((preimage_print, preimage_print_len)),
 						fellowship_referendum_submission: None,
-						public_referendum_submission: Some(NetworkRuntimeCall::Polkadot(
-							public_proposal,
-						)),
+						public_referendum_submission: Some(public_proposal.call),
 					}
 				},
 			}
@@ -653,48 +774,4 @@ fn print_output(output: &Output, network_call: &NetworkRuntimeCall) {
 			}
 		},
 	}
-}
-
-// Take some call and a length limit as input. If the call length exceeds the limit, just return its
-// hash. Call length is recomputed and will be 2 bytes longer than the actual preimage length. This
-// is because the call is `preimage.note_preimage(call)`, so the outer pallet/call indices have a
-// length of 2 bytes.
-fn create_kusama_print_output(call: KusamaRuntimeCall, length_limit: u32) -> (CallOrHash, u32) {
-	let call_len = (*&call.encode().len()).try_into().unwrap();
-	let print_output: CallOrHash;
-	if call_len > length_limit {
-		let call_hash = sp_core::blake2_256(&call.encode());
-		print_output = CallOrHash::Hash(call_hash);
-	} else {
-		print_output = CallOrHash::Call(NetworkRuntimeCall::Kusama(call))
-	}
-	(print_output, call_len)
-}
-
-// dirty dirty dirty
-fn create_polkadot_print_output(call: PolkadotRuntimeCall, length_limit: u32) -> (CallOrHash, u32) {
-	let call_len = (*&call.encode().len()).try_into().unwrap();
-	let print_output: CallOrHash;
-	if call_len > length_limit {
-		let call_hash = sp_core::blake2_256(&call.encode());
-		print_output = CallOrHash::Hash(call_hash);
-	} else {
-		print_output = CallOrHash::Call(NetworkRuntimeCall::Polkadot(call))
-	}
-	(print_output, call_len)
-}
-
-fn create_polkadot_collectives_print_output(
-	call: CollectivesRuntimeCall,
-	length_limit: u32,
-) -> (CallOrHash, u32) {
-	let call_len = (*&call.encode().len()).try_into().unwrap();
-	let print_output: CallOrHash;
-	if call_len > length_limit {
-		let call_hash = sp_core::blake2_256(&call.encode());
-		print_output = CallOrHash::Hash(call_hash);
-	} else {
-		print_output = CallOrHash::Call(NetworkRuntimeCall::PolkadotCollectives(call))
-	}
-	(print_output, call_len)
 }
