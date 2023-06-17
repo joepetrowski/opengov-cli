@@ -116,7 +116,7 @@ struct CallInfo {
 impl CallInfo {
 	// Construct `Self` from a `NetworkRuntimeCall`.
 	fn from_runtime_call(call: NetworkRuntimeCall) -> Self {
-		let encoded = match call {
+		let encoded = match &call {
 			NetworkRuntimeCall::Kusama(cc) => cc.encode(),
 			NetworkRuntimeCall::Polkadot(cc) => cc.encode(),
 			NetworkRuntimeCall::PolkadotCollectives(cc) => cc.encode(),
@@ -155,25 +155,37 @@ impl CallInfo {
 	}
 
 	// Strip the outer enum and return a Kusama Relay `RuntimeCall`.
-	fn get_kusama_call(&self) -> Result<&KusamaRuntimeCall, &'static str> {
+	fn get_kusama_call(&self) -> Result<KusamaRuntimeCall, &'static str> {
 		match &self.call {
-			NetworkRuntimeCall::Kusama(cc) => return Ok(cc),
+			NetworkRuntimeCall::Kusama(_) => {
+				let bytes = &self.encoded;
+				Ok(<KusamaRuntimeCall as parity_scale_codec::Decode>::decode(&mut &bytes[..])
+					.unwrap())
+			},
 			_ => return Err("not a kusama call"),
 		}
 	}
 
 	// Strip the outer enum and return a Polkadot Relay `RuntimeCall`.
-	fn get_polkadot_call(&self) -> Result<&PolkadotRuntimeCall, &'static str> {
+	fn get_polkadot_call(&self) -> Result<PolkadotRuntimeCall, &'static str> {
 		match &self.call {
-			NetworkRuntimeCall::Polkadot(cc) => return Ok(cc),
+			NetworkRuntimeCall::Polkadot(_) => {
+				let bytes = &self.encoded;
+				Ok(<PolkadotRuntimeCall as parity_scale_codec::Decode>::decode(&mut &bytes[..])
+					.unwrap())
+			},
 			_ => return Err("not a polkadot call"),
 		}
 	}
 
 	// Strip the outer enum and return a Polkadot Collectives `RuntimeCall`.
-	fn get_polkadot_collectives_call(&self) -> Result<&CollectivesRuntimeCall, &'static str> {
+	fn get_polkadot_collectives_call(&self) -> Result<CollectivesRuntimeCall, &'static str> {
 		match &self.call {
-			NetworkRuntimeCall::PolkadotCollectives(cc) => return Ok(cc),
+			NetworkRuntimeCall::PolkadotCollectives(_) => {
+				let bytes = &self.encoded;
+				Ok(<CollectivesRuntimeCall as parity_scale_codec::Decode>::decode(&mut &bytes[..])
+					.unwrap())
+			},
 			_ => return Err("not a polkadot collectives call"),
 		}
 	}
