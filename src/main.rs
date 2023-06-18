@@ -1,33 +1,8 @@
 use parity_scale_codec::Encode as _;
 use std::fs;
 use subxt::ext::sp_core;
-
-#[subxt::subxt(
-	runtime_metadata_url = "wss://kusama-rpc.polkadot.io:443",
-	derive_for_all_types = "PartialEq, Clone"
-)]
-pub mod kusama {}
-use kusama::runtime_types::kusama_runtime::{
-	governance::origins::pallet_custom_origins::Origin as KusamaOpenGovOrigin,
-	RuntimeCall as KusamaRuntimeCall,
-};
-
-#[subxt::subxt(
-	runtime_metadata_url = "wss://rpc.polkadot.io:443",
-	derive_for_all_types = "PartialEq, Clone"
-)]
-pub mod polkadot_relay {}
-use polkadot_relay::runtime_types::polkadot_runtime::{
-	governance::origins::pallet_custom_origins::Origin as PolkadotOpenGovOrigin,
-	RuntimeCall as PolkadotRuntimeCall,
-};
-
-#[subxt::subxt(runtime_metadata_url = "wss://polkadot-collectives-rpc.polkadot.io:443")]
-pub mod polkadot_collectives {}
-use polkadot_collectives::runtime_types::collectives_polkadot_runtime::{
-	fellowship::origins::pallet_origins::Origin as FellowshipOrigins,
-	RuntimeCall as CollectivesRuntimeCall,
-};
+mod types;
+use crate::types::*;
 
 #[cfg(test)]
 mod tests;
@@ -63,72 +38,6 @@ fn main() {
 	let calls = generate_calls(&proposal_details);
 	// Tell the user what to do.
 	deliver_output(proposal_details, calls);
-}
-
-// Info and preferences provided by the user.
-struct ProposalDetails {
-	// The proposal, generated elsewhere and pasted here.
-	proposal: &'static str,
-	// The track to submit on.
-	track: NetworkTrack,
-	// When do you want this to enact. `At(block)` or `After(blocks)`.
-	dispatch: DispatchTimeWrapper,
-	// How you would like to view the output.
-	output: Output,
-	// Cutoff length in bytes for printing the output. If too long, it will print the hash of the
-	// call you would need to submit so that you can verify before submission.
-	output_len_limit: u32,
-	// Whether or not to group all calls into a batch. Uses `force_batch` in case the account does
-	// not have funds for pre-image deposits or is not a fellow.
-	print_batch: bool,
-}
-
-#[allow(dead_code)]
-enum Network {
-	Kusama,
-	Polkadot,
-	PolkadotCollectives,
-}
-
-#[allow(dead_code)]
-enum NetworkTrack {
-	Kusama(KusamaOpenGovOrigin),
-	Polkadot(PolkadotOpenGovOrigin),
-}
-
-#[allow(dead_code)]
-enum NetworkRuntimeCall {
-	Kusama(KusamaRuntimeCall),
-	Polkadot(PolkadotRuntimeCall),
-	PolkadotCollectives(CollectivesRuntimeCall),
-}
-
-#[allow(dead_code)]
-enum Output {
-	// Print just the call data (e.g. 0x1234).
-	CallData,
-	// Print a clickable link to view the decoded call on Polkadot JS Apps UI.
-	AppsUiLink,
-}
-
-// Local concrete type to use in each runtime's `DispatchTime`
-#[allow(dead_code)]
-enum DispatchTimeWrapper {
-	At(u32),
-	After(u32),
-}
-
-enum CallOrHash {
-	Call(NetworkRuntimeCall),
-	Hash([u8; 32]),
-}
-
-// All the info associated with a call in the forms you may need it in.
-struct CallInfo {
-	call: NetworkRuntimeCall,
-	encoded: Vec<u8>,
-	hash: [u8; 32],
-	length: u32,
 }
 
 impl CallInfo {
@@ -235,45 +144,6 @@ impl CallInfo {
 		}
 		(print_output, self.length)
 	}
-}
-
-// The set of calls that some user will need to sign and submit to initiate a referendum.
-struct PossibleCallsToSubmit {
-	// ```
-	// preimage.note(whitelist.whitelist_call(hash(proposal)));
-	// ```
-	preimage_for_whitelist_call: Option<(CallOrHash, u32)>,
-	// ```
-	// // Without Fellowship
-	// preimage.note(proposal);
-	//
-	// // With Fellowship
-	// preimage.note(whitelist.dispatch_whitelisted_call_with_preimage(proposal));
-	// ```
-	preimage_for_public_referendum: Option<(CallOrHash, u32)>,
-	// ```
-	// fellowship_referenda.submit(
-	//     proposal_origin: Fellows,
-	//     proposal: Lookup {
-	//         hash: hash(whitelist.whitelist_call(proposal_hash)),
-	//         len: len(whitelist.whitelist_call(proposal_hash)),
-	//     },
-	//     enactment_moment: After(10),
-	// )
-	// ```
-	fellowship_referendum_submission: Option<NetworkRuntimeCall>,
-	// ```
-	// referenda.submit(
-	//     proposal_origin: ProposalDetails.track,
-	//     proposal: Lookup {
-	// //            No whitelist   ||  Whitelist
-	//         hash: hash(proposal) OR hash(whitelist.whitelist_call(proposal_hash)),
-	//         len:  len(proposal)  OR len(whitelist.dispatch_whitelisted_call_with_preimage(proposal)),
-	//     },
-	//     enactment_moment: After(10),
-	// )
-	// ```
-	public_referendum_submission: Option<NetworkRuntimeCall>,
 }
 
 fn generate_calls(proposal_details: &ProposalDetails) -> PossibleCallsToSubmit {
