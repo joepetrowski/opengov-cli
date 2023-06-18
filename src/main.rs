@@ -2,14 +2,20 @@ use parity_scale_codec::Encode as _;
 use std::fs;
 use subxt::ext::sp_core;
 
-#[subxt::subxt(runtime_metadata_url = "wss://kusama-rpc.polkadot.io:443")]
+#[subxt::subxt(
+	runtime_metadata_url = "wss://kusama-rpc.polkadot.io:443",
+	derive_for_all_types = "PartialEq, Clone"
+)]
 pub mod kusama {}
 use kusama::runtime_types::kusama_runtime::{
 	governance::origins::pallet_custom_origins::Origin as KusamaOpenGovOrigin,
 	RuntimeCall as KusamaRuntimeCall,
 };
 
-#[subxt::subxt(runtime_metadata_url = "wss://rpc.polkadot.io:443")]
+#[subxt::subxt(
+	runtime_metadata_url = "wss://rpc.polkadot.io:443",
+	derive_for_all_types = "PartialEq, Clone"
+)]
 pub mod polkadot_relay {}
 use polkadot_relay::runtime_types::polkadot_runtime::{
 	governance::origins::pallet_custom_origins::Origin as PolkadotOpenGovOrigin,
@@ -22,6 +28,9 @@ use polkadot_collectives::runtime_types::collectives_polkadot_runtime::{
 	fellowship::origins::pallet_origins::Origin as FellowshipOrigins,
 	RuntimeCall as CollectivesRuntimeCall,
 };
+
+#[cfg(test)]
+mod tests;
 
 // This is the thing you need to edit to use this!
 fn get_the_actual_proposed_action() -> ProposalDetails {
@@ -260,9 +269,63 @@ struct PossibleCallsToSubmit {
 
 fn main() {
 	let proposal_details = get_the_actual_proposed_action();
+	let calls = generate_calls(&proposal_details);
+
+	let mut batch_of_calls = Vec::new();
+
+	if let Some((call_or_hash, len)) = calls.preimage_for_whitelist_call {
+		match call_or_hash {
+			CallOrHash::Call(c) => {
+				println!("\nSubmit the preimage for the Fellowship referendum:");
+				print_output(&proposal_details.output, &c);
+				batch_of_calls.push(c);
+			},
+			CallOrHash::Hash(h) => {
+				println!(
+					"\nPreimage for the public whitelist call too large ({} bytes). Not included in batch.",
+					len
+				);
+				println!("Submission should have the hash: 0x{}", hex::encode(h));
+			},
+		}
+	}
+	if let Some(c) = calls.fellowship_referendum_submission {
+		println!("\nOpen a Fellowship referendum to whitelist the call:");
+		print_output(&proposal_details.output, &c);
+		batch_of_calls.push(c);
+	}
+	if let Some((call_or_hash, len)) = calls.preimage_for_public_referendum {
+		match call_or_hash {
+			CallOrHash::Call(c) => {
+				println!("\nSubmit the preimage for the public referendum:");
+				print_output(&proposal_details.output, &c);
+				batch_of_calls.push(c);
+			},
+			CallOrHash::Hash(h) => {
+				println!(
+					"\nPreimage for the public referendum too large ({} bytes). Not included in batch.",
+					len
+				);
+				println!("A file was created that you can upload in `preimage.note_preimage` in Apps UI.");
+				println!("Submission should have the hash: 0x{}", hex::encode(h));
+			},
+		}
+	}
+	if let Some(c) = calls.public_referendum_submission {
+		println!("\nOpen a public referendum to dispatch the call:");
+		print_output(&proposal_details.output, &c);
+		batch_of_calls.push(c);
+	}
+
+	if proposal_details.print_batch {
+		handle_batch_of_calls(&proposal_details.output, batch_of_calls);
+	}
+}
+
+fn generate_calls(proposal_details: &ProposalDetails) -> PossibleCallsToSubmit {
 	let proposal_bytes = get_proposal_bytes(proposal_details.proposal);
 
-	let calls: PossibleCallsToSubmit = match proposal_details.track {
+	match &proposal_details.track {
 		NetworkTrack::Kusama(kusama_track) => {
 			use kusama::runtime_types::{
 				frame_support::traits::{preimages::Bounded::Lookup, schedule::DispatchTime},
@@ -390,7 +453,7 @@ fn main() {
 					);
 					let public_proposal = CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(
 						KusamaRuntimeCall::Referenda(ReferendaCall::submit {
-							proposal_origin: Box::new(OriginCaller::Origins(kusama_track)),
+							proposal_origin: Box::new(OriginCaller::Origins(kusama_track.clone())),
 							proposal: Lookup {
 								hash: sp_core::H256(proposal_call_info.hash),
 								len: proposal_call_info.length,
@@ -612,7 +675,9 @@ fn main() {
 					let public_proposal =
 						CallInfo::from_runtime_call(NetworkRuntimeCall::Polkadot(
 							PolkadotRuntimeCall::Referenda(ReferendaCall::submit {
-								proposal_origin: Box::new(OriginCaller::Origins(polkadot_track)),
+								proposal_origin: Box::new(OriginCaller::Origins(
+									polkadot_track.clone(),
+								)),
 								proposal: Lookup {
 									hash: sp_core::H256(proposal_call_info.hash),
 									len: proposal_call_info.length,
@@ -632,56 +697,6 @@ fn main() {
 				},
 			}
 		},
-	};
-
-	let mut batch_of_calls = Vec::new();
-
-	if let Some((call_or_hash, len)) = calls.preimage_for_whitelist_call {
-		match call_or_hash {
-			CallOrHash::Call(c) => {
-				println!("\nSubmit the preimage for the Fellowship referendum:");
-				print_output(&proposal_details.output, &c);
-				batch_of_calls.push(c);
-			},
-			CallOrHash::Hash(h) => {
-				println!(
-					"\nPreimage for the public whitelist call too large ({} bytes). Not included in batch.",
-					len
-				);
-				println!("Submission should have the hash: 0x{}", hex::encode(h));
-			},
-		}
-	}
-	if let Some(c) = calls.fellowship_referendum_submission {
-		println!("\nOpen a Fellowship referendum to whitelist the call:");
-		print_output(&proposal_details.output, &c);
-		batch_of_calls.push(c);
-	}
-	if let Some((call_or_hash, len)) = calls.preimage_for_public_referendum {
-		match call_or_hash {
-			CallOrHash::Call(c) => {
-				println!("\nSubmit the preimage for the public referendum:");
-				print_output(&proposal_details.output, &c);
-				batch_of_calls.push(c);
-			},
-			CallOrHash::Hash(h) => {
-				println!(
-					"\nPreimage for the public referendum too large ({} bytes). Not included in batch.",
-					len
-				);
-				println!("A file was created that you can upload in `preimage.note_preimage` in Apps UI.");
-				println!("Submission should have the hash: 0x{}", hex::encode(h));
-			},
-		}
-	}
-	if let Some(c) = calls.public_referendum_submission {
-		println!("\nOpen a public referendum to dispatch the call:");
-		print_output(&proposal_details.output, &c);
-		batch_of_calls.push(c);
-	}
-
-	if proposal_details.print_batch {
-		handle_batch_of_calls(&proposal_details.output, batch_of_calls);
 	}
 }
 
