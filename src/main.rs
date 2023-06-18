@@ -56,6 +56,15 @@ fn get_the_actual_proposed_action() -> ProposalDetails {
 	}
 }
 
+fn main() {
+	// Find out what the user wants to do.
+	let proposal_details = get_the_actual_proposed_action();
+	// Generate the calls necessary.
+	let calls = generate_calls(&proposal_details);
+	// Tell the user what to do.
+	deliver_output(proposal_details, calls);
+}
+
 // Info and preferences provided by the user.
 struct ProposalDetails {
 	// The proposal, generated elsewhere and pasted here.
@@ -265,61 +274,6 @@ struct PossibleCallsToSubmit {
 	// )
 	// ```
 	public_referendum_submission: Option<NetworkRuntimeCall>,
-}
-
-fn main() {
-	let proposal_details = get_the_actual_proposed_action();
-	let calls = generate_calls(&proposal_details);
-
-	let mut batch_of_calls = Vec::new();
-
-	if let Some((call_or_hash, len)) = calls.preimage_for_whitelist_call {
-		match call_or_hash {
-			CallOrHash::Call(c) => {
-				println!("\nSubmit the preimage for the Fellowship referendum:");
-				print_output(&proposal_details.output, &c);
-				batch_of_calls.push(c);
-			},
-			CallOrHash::Hash(h) => {
-				println!(
-					"\nPreimage for the public whitelist call too large ({} bytes). Not included in batch.",
-					len
-				);
-				println!("Submission should have the hash: 0x{}", hex::encode(h));
-			},
-		}
-	}
-	if let Some(c) = calls.fellowship_referendum_submission {
-		println!("\nOpen a Fellowship referendum to whitelist the call:");
-		print_output(&proposal_details.output, &c);
-		batch_of_calls.push(c);
-	}
-	if let Some((call_or_hash, len)) = calls.preimage_for_public_referendum {
-		match call_or_hash {
-			CallOrHash::Call(c) => {
-				println!("\nSubmit the preimage for the public referendum:");
-				print_output(&proposal_details.output, &c);
-				batch_of_calls.push(c);
-			},
-			CallOrHash::Hash(h) => {
-				println!(
-					"\nPreimage for the public referendum too large ({} bytes). Not included in batch.",
-					len
-				);
-				println!("A file was created that you can upload in `preimage.note_preimage` in Apps UI.");
-				println!("Submission should have the hash: 0x{}", hex::encode(h));
-			},
-		}
-	}
-	if let Some(c) = calls.public_referendum_submission {
-		println!("\nOpen a public referendum to dispatch the call:");
-		print_output(&proposal_details.output, &c);
-		batch_of_calls.push(c);
-	}
-
-	if proposal_details.print_batch {
-		handle_batch_of_calls(&proposal_details.output, batch_of_calls);
-	}
 }
 
 fn generate_calls(proposal_details: &ProposalDetails) -> PossibleCallsToSubmit {
@@ -697,6 +651,58 @@ fn generate_calls(proposal_details: &ProposalDetails) -> PossibleCallsToSubmit {
 				},
 			}
 		},
+	}
+}
+
+fn deliver_output(proposal_details: ProposalDetails, calls: PossibleCallsToSubmit) {
+	let mut batch_of_calls = Vec::new();
+
+	if let Some((call_or_hash, len)) = calls.preimage_for_whitelist_call {
+		match call_or_hash {
+			CallOrHash::Call(c) => {
+				println!("\nSubmit the preimage for the Fellowship referendum:");
+				print_output(&proposal_details.output, &c);
+				batch_of_calls.push(c);
+			},
+			CallOrHash::Hash(h) => {
+				println!(
+					"\nPreimage for the public whitelist call too large ({} bytes). Not included in batch.",
+					len
+				);
+				println!("Submission should have the hash: 0x{}", hex::encode(h));
+			},
+		}
+	}
+	if let Some(c) = calls.fellowship_referendum_submission {
+		println!("\nOpen a Fellowship referendum to whitelist the call:");
+		print_output(&proposal_details.output, &c);
+		batch_of_calls.push(c);
+	}
+	if let Some((call_or_hash, len)) = calls.preimage_for_public_referendum {
+		match call_or_hash {
+			CallOrHash::Call(c) => {
+				println!("\nSubmit the preimage for the public referendum:");
+				print_output(&proposal_details.output, &c);
+				batch_of_calls.push(c);
+			},
+			CallOrHash::Hash(h) => {
+				println!(
+					"\nPreimage for the public referendum too large ({} bytes). Not included in batch.",
+					len
+				);
+				println!("A file was created that you can upload in `preimage.note_preimage` in Apps UI.");
+				println!("Submission should have the hash: 0x{}", hex::encode(h));
+			},
+		}
+	}
+	if let Some(c) = calls.public_referendum_submission {
+		println!("\nOpen a public referendum to dispatch the call:");
+		print_output(&proposal_details.output, &c);
+		batch_of_calls.push(c);
+	}
+
+	if proposal_details.print_batch {
+		handle_batch_of_calls(&proposal_details.output, batch_of_calls);
 	}
 }
 
