@@ -1,6 +1,4 @@
-use parity_scale_codec::Encode as _;
 use std::fs;
-use subxt::ext::sp_core;
 mod types;
 use crate::types::*;
 
@@ -38,112 +36,6 @@ fn main() {
 	let calls = generate_calls(&proposal_details);
 	// Tell the user what to do.
 	deliver_output(proposal_details, calls);
-}
-
-impl CallInfo {
-	// Construct `Self` from a `NetworkRuntimeCall`.
-	fn from_runtime_call(call: NetworkRuntimeCall) -> Self {
-		let encoded = match &call {
-			NetworkRuntimeCall::Kusama(cc) => cc.encode(),
-			NetworkRuntimeCall::Polkadot(cc) => cc.encode(),
-			NetworkRuntimeCall::PolkadotCollectives(cc) => cc.encode(),
-		};
-		let hash = sp_core::blake2_256(&encoded);
-		let length: u32 = (*&encoded.len()).try_into().unwrap();
-		Self { call, encoded: encoded.to_vec(), hash, length }
-	}
-
-	// Construct `Self` for some `network` given some `encoded` bytes.
-	fn from_bytes(encoded: &Vec<u8>, network: Network) -> Self {
-		let call = match network {
-			Network::Kusama => {
-				let runtime_call =
-					<KusamaRuntimeCall as parity_scale_codec::Decode>::decode(&mut &encoded[..])
-						.unwrap();
-				NetworkRuntimeCall::Kusama(runtime_call)
-			},
-			Network::Polkadot => {
-				let runtime_call =
-					<PolkadotRuntimeCall as parity_scale_codec::Decode>::decode(&mut &encoded[..])
-						.unwrap();
-				NetworkRuntimeCall::Polkadot(runtime_call)
-			},
-			Network::PolkadotCollectives => {
-				let runtime_call = <CollectivesRuntimeCall as parity_scale_codec::Decode>::decode(
-					&mut &encoded[..],
-				)
-				.unwrap();
-				NetworkRuntimeCall::PolkadotCollectives(runtime_call)
-			},
-		};
-		let hash = sp_core::blake2_256(&encoded);
-		let length = (*&encoded.len()).try_into().unwrap();
-		Self { call, encoded: encoded.to_vec(), hash, length }
-	}
-
-	// Strip the outer enum and return a Kusama Relay `RuntimeCall`.
-	fn get_kusama_call(&self) -> Result<KusamaRuntimeCall, &'static str> {
-		match &self.call {
-			NetworkRuntimeCall::Kusama(_) => {
-				let bytes = &self.encoded;
-				Ok(<KusamaRuntimeCall as parity_scale_codec::Decode>::decode(&mut &bytes[..])
-					.unwrap())
-			},
-			_ => return Err("not a kusama call"),
-		}
-	}
-
-	// Strip the outer enum and return a Polkadot Relay `RuntimeCall`.
-	fn get_polkadot_call(&self) -> Result<PolkadotRuntimeCall, &'static str> {
-		match &self.call {
-			NetworkRuntimeCall::Polkadot(_) => {
-				let bytes = &self.encoded;
-				Ok(<PolkadotRuntimeCall as parity_scale_codec::Decode>::decode(&mut &bytes[..])
-					.unwrap())
-			},
-			_ => return Err("not a polkadot call"),
-		}
-	}
-
-	// Strip the outer enum and return a Polkadot Collectives `RuntimeCall`.
-	fn get_polkadot_collectives_call(&self) -> Result<CollectivesRuntimeCall, &'static str> {
-		match &self.call {
-			NetworkRuntimeCall::PolkadotCollectives(_) => {
-				let bytes = &self.encoded;
-				Ok(<CollectivesRuntimeCall as parity_scale_codec::Decode>::decode(&mut &bytes[..])
-					.unwrap())
-			},
-			_ => return Err("not a polkadot collectives call"),
-		}
-	}
-
-	// Take `Self` and a length limit as input. If the call length exceeds the limit, just return
-	// its hash. Call length is recomputed and will be 2 bytes longer than the actual preimage
-	// length. This is because the call is `preimage.note_preimage(call)`, so the outer pallet/call
-	// indices have a length of 2 bytes.
-	fn create_print_output(&self, length_limit: u32) -> (CallOrHash, u32) {
-		let print_output: CallOrHash;
-		if self.length > length_limit {
-			print_output = CallOrHash::Hash(self.hash);
-		} else {
-			print_output = match &self.call {
-				NetworkRuntimeCall::Kusama(_) => {
-					let kusama_call = self.get_kusama_call().expect("kusama");
-					CallOrHash::Call(NetworkRuntimeCall::Kusama(kusama_call))
-				},
-				NetworkRuntimeCall::Polkadot(_) => {
-					let polkadot_call = self.get_polkadot_call().expect("polkadot");
-					CallOrHash::Call(NetworkRuntimeCall::Polkadot(polkadot_call))
-				},
-				NetworkRuntimeCall::PolkadotCollectives(_) => {
-					let collectives_call =
-						self.get_polkadot_collectives_call().expect("collectives");
-					CallOrHash::Call(NetworkRuntimeCall::PolkadotCollectives(collectives_call))
-				},
-			};
-		}
-		(print_output, self.length)
-	}
 }
 
 fn generate_calls(proposal_details: &ProposalDetails) -> PossibleCallsToSubmit {
