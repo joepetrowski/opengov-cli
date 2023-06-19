@@ -13,11 +13,11 @@ fn get_the_actual_proposed_action() -> ProposalDetails {
 	return ProposalDetails {
 		// The encoded proposal that we want to submit. This can either be the call data itself,
 		// e.g. "0x0102...", or a file path that contains the data, e.g. "./my_proposal.call".
-		proposal: "0x0000645468652046656c6c6f777368697020736179732068656c6c6f",
+		proposal: "./polkadot-9430.call",
 		// The OpenGov track that it will use.
 		track: Polkadot(PolkadotOpenGovOrigin::WhitelistedCaller),
 		// When do you want this to enact. `At(block)` or `After(blocks)`.
-		dispatch: After(10),
+		dispatch: At(16_450_000),
 		// Choose if you just want to see the hex-encoded `CallData`, or get a link to Polkadot JS
 		// Apps UI (`AppsUiLink`).
 		output: AppsUiLink,
@@ -29,16 +29,17 @@ fn get_the_actual_proposed_action() -> ProposalDetails {
 	}
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
 	// Find out what the user wants to do.
 	let proposal_details = get_the_actual_proposed_action();
 	// Generate the calls necessary.
-	let calls = generate_calls(&proposal_details);
+	let calls = generate_calls(&proposal_details).await;
 	// Tell the user what to do.
 	deliver_output(proposal_details, calls);
 }
 
-fn generate_calls(proposal_details: &ProposalDetails) -> PossibleCallsToSubmit {
+async fn generate_calls(proposal_details: &ProposalDetails) -> PossibleCallsToSubmit {
 	let proposal_bytes = get_proposal_bytes(proposal_details.proposal);
 
 	match &proposal_details.track {
@@ -257,6 +258,9 @@ fn generate_calls(proposal_details: &ProposalDetails) -> PossibleCallsToSubmit {
 						}),
 					));
 
+					let relay_weight_needed =
+						get_relay_weight_needed(&whitelist_call.encoded).await;
+
 					// This is what the Fellowship will actually vote on enacting.
 					let whitelist_over_xcm =
 						CallInfo::from_runtime_call(NetworkRuntimeCall::PolkadotCollectives(
@@ -274,10 +278,10 @@ fn generate_calls(proposal_details: &ProposalDetails) -> PossibleCallsToSubmit {
 										origin_kind: OriginKind::Xcm,
 										require_weight_at_most: Weight {
 											// todo
-											ref_time: 1_000_000_000,
+											ref_time: 2 * relay_weight_needed.ref_time,
 											// We don't really care about proof size on the Relay Chain.
 											// Make it big so that it will definitely work.
-											proof_size: 1_000_000,
+											proof_size: 2 * relay_weight_needed.proof_size,
 										},
 										call: DoubleEncoded { encoded: whitelist_call.encoded },
 									},
@@ -414,6 +418,19 @@ fn generate_calls(proposal_details: &ProposalDetails) -> PossibleCallsToSubmit {
 			}
 		},
 	}
+}
+
+use polkadot_collectives::runtime_types::sp_weights::weight_v2::Weight;
+async fn get_relay_weight_needed(call: &Vec<u8>) -> Weight {
+	use subxt::{OnlineClient, PolkadotConfig};
+
+	let relay_api = OnlineClient::<PolkadotConfig>::new().await.expect("an api");
+	let runtime_apis = relay_api.runtime_api().at_latest().await.expect("latest");
+	let (relay_weight_needed, _, _): (Weight, u8, u128) = runtime_apis
+		.call_raw("TransactionPaymentCallApi_query_call_info", Some(call))
+		.await
+		.expect("i hope it works");
+	relay_weight_needed
 }
 
 fn deliver_output(proposal_details: ProposalDetails, calls: PossibleCallsToSubmit) {
