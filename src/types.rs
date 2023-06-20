@@ -22,9 +22,14 @@ pub(super) use polkadot_relay::runtime_types::polkadot_runtime::{
 
 #[subxt::subxt(runtime_metadata_url = "wss://polkadot-collectives-rpc.polkadot.io:443")]
 pub mod polkadot_collectives {}
-pub(super) use polkadot_collectives::runtime_types::collectives_polkadot_runtime::{
-	fellowship::origins::pallet_origins::Origin as FellowshipOrigins,
-	RuntimeCall as CollectivesRuntimeCall,
+pub(super) use polkadot_collectives::runtime_types::{
+	collectives_polkadot_runtime::{
+		fellowship::origins::pallet_origins::Origin as FellowshipOrigins,
+		RuntimeCall as CollectivesRuntimeCall,
+	},
+	// We'll use Collectives `Weight` throughout. It sort of needs to be consistent across chains
+	// for anything to work anyway.
+	sp_weights::weight_v2::Weight,
 };
 
 #[allow(dead_code)]
@@ -50,6 +55,10 @@ pub(super) struct ProposalDetails {
 	// Whether or not to group all calls into a batch. Uses `force_batch` in case the account does
 	// not have funds for pre-image deposits or is not a fellow.
 	pub(super) print_batch: bool,
+	// `Some` if you want to manually set the `require_weight_at_most` parameter used in any
+	// `Transact` instruction. If `None`, then the program will fetch the required weight (plus a 2x
+	// factor of safety) and construct the instruction with that.
+	pub(super) transact_weight_override: Option<Weight>,
 }
 
 // The network and OpenGov track this proposal should be voted on.
@@ -174,6 +183,27 @@ impl CallInfo {
 			},
 			_ => return Err("not a polkadot collectives call"),
 		}
+	}
+
+	pub(super) async fn get_transact_weight_needed(&self, network: Network) -> Weight {
+		use subxt::{OnlineClient, PolkadotConfig};
+
+		let url = match network {
+			Network::Kusama => "wss://kusama-rpc.polkadot.io:443",
+			Network::Polkadot => "wss://rpc.polkadot.io:443",
+			Network::PolkadotCollectives => "wss://polkadot-collectives-rpc.polkadot.io:443",
+		};
+
+		let mut args = self.encoded.clone();
+		self.length.encode_to(&mut args);
+
+		let relay_api = OnlineClient::<PolkadotConfig>::from_url(url).await.expect("an api");
+		let runtime_apis = relay_api.runtime_api().at_latest().await.expect("latest block");
+		let (weight_needed, _, _): (Weight, u8, u128) = runtime_apis
+			.call_raw("TransactionPaymentCallApi_query_call_info", Some(&args))
+			.await
+			.expect("response from API");
+		weight_needed
 	}
 
 	// Take `Self` and a length limit as input. If the call length exceeds the limit, just return

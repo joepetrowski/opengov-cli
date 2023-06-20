@@ -3,7 +3,7 @@ mod tests {
 	use crate::polkadot_relay::runtime_types::frame_system::pallet::Call as PolkadotRelaySystemCall;
 	use crate::{
 		generate_calls, get_proposal_bytes, CallInfo, CallOrHash, KusamaOpenGovOrigin, Network,
-		NetworkRuntimeCall, PolkadotOpenGovOrigin, PolkadotRuntimeCall, ProposalDetails,
+		NetworkRuntimeCall, PolkadotOpenGovOrigin, PolkadotRuntimeCall, ProposalDetails, Weight,
 	};
 
 	fn polkadot_whitelist_remark_user_input() -> ProposalDetails {
@@ -18,6 +18,10 @@ mod tests {
 			output: AppsUiLink,
 			output_len_limit: 1_000,
 			print_batch: true,
+			transact_weight_override: Some(Weight {
+				ref_time: 1_000_000_000,
+				proof_size: 1_000_000,
+			}),
 		}
 	}
 
@@ -33,6 +37,10 @@ mod tests {
 			output: AppsUiLink,
 			output_len_limit: 1_000,
 			print_batch: true,
+			transact_weight_override: Some(Weight {
+				ref_time: 1_000_000_000,
+				proof_size: 1_000_000,
+			}),
 		}
 	}
 
@@ -48,6 +56,10 @@ mod tests {
 			output: AppsUiLink,
 			output_len_limit: 1_000,
 			print_batch: true,
+			transact_weight_override: Some(Weight {
+				ref_time: 1_000_000_000,
+				proof_size: 1_000_000,
+			}),
 		}
 	}
 
@@ -63,6 +75,10 @@ mod tests {
 			output: AppsUiLink,
 			output_len_limit: 1_000,
 			print_batch: true,
+			transact_weight_override: Some(Weight {
+				ref_time: 1_000_000_000,
+				proof_size: 1_000_000,
+			}),
 		}
 	}
 
@@ -78,6 +94,10 @@ mod tests {
 			output: AppsUiLink,
 			output_len_limit: 5, // very limiting
 			print_batch: true,
+			transact_weight_override: Some(Weight {
+				ref_time: 1_000_000_000,
+				proof_size: 1_000_000,
+			}),
 		}
 	}
 
@@ -130,10 +150,10 @@ mod tests {
 		assert_eq!(call_info.length, 22u32);
 	}
 
-	#[test]
-	fn it_starts_polkadot_non_fellowship_referenda_correctly() {
+	#[tokio::test]
+	async fn it_starts_polkadot_non_fellowship_referenda_correctly() {
 		let proposal_details = polkadot_staking_validator_user_input();
-		let calls = generate_calls(&proposal_details);
+		let calls = generate_calls(&proposal_details).await;
 
 		let public_preimage =
 			hex::decode("0x0a000c070ac8".trim_start_matches("0x")).expect("Valid call");
@@ -161,10 +181,10 @@ mod tests {
 		}
 	}
 
-	#[test]
-	fn it_starts_polkadot_fellowship_referenda_correctly() {
+	#[tokio::test]
+	async fn it_starts_polkadot_fellowship_referenda_correctly() {
 		let proposal_details = polkadot_whitelist_remark_user_input();
-		let calls = generate_calls(&proposal_details);
+		let calls = generate_calls(&proposal_details).await;
 
 		let fellowship_preimage = hex::decode("0x2b00dc1f0003010003082f0000060302286bee02093d008817008821e8db19b8e34b62ee8bc618a5ed3eecb9761d7d81349b00aa5ce5dfca2534".trim_start_matches("0x")).expect("Valid call");
 		let fellowship_referendum = hex::decode("0x3d003e0102adb9e4e4165f92f984690cac8816898978b7dfc8aff6db735ffd5ec9b043009737000000010a000000".trim_start_matches("0x")).expect("Valid call");
@@ -211,10 +231,10 @@ mod tests {
 		}
 	}
 
-	#[test]
-	fn it_starts_kusama_non_fellowship_referenda_correctly() {
+	#[tokio::test]
+	async fn it_starts_kusama_non_fellowship_referenda_correctly() {
 		let proposal_details = kusama_staking_validator_user_input();
-		let calls = generate_calls(&proposal_details);
+		let calls = generate_calls(&proposal_details).await;
 
 		let public_preimage =
 			hex::decode("0x20000c060ac8".trim_start_matches("0x")).expect("Valid call");
@@ -242,10 +262,10 @@ mod tests {
 		}
 	}
 
-	#[test]
-	fn it_starts_kusama_fellowship_referenda_correctly() {
+	#[tokio::test]
+	async fn it_starts_kusama_fellowship_referenda_correctly() {
 		let proposal_details = kusama_whitelist_remark_user_input();
-		let calls = generate_calls(&proposal_details);
+		let calls = generate_calls(&proposal_details).await;
 
 		let fellowship_preimage = hex::decode(
 			"0x2000882c008821e8db19b8e34b62ee8bc618a5ed3eecb9761d7d81349b00aa5ce5dfca2534"
