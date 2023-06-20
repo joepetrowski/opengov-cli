@@ -26,19 +26,23 @@ fn get_the_actual_proposed_action() -> ProposalDetails {
 		output_len_limit: 1_000,
 		// Whether or not to print a single `force_batch` call.
 		print_batch: true,
+		// If `None`, will fetch the needed weight from an API. You probably want `None`, unless
+		// you know what you're doing.
+		transact_weight_override: None,
 	}
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
 	// Find out what the user wants to do.
 	let proposal_details = get_the_actual_proposed_action();
 	// Generate the calls necessary.
-	let calls = generate_calls(&proposal_details);
+	let calls = generate_calls(&proposal_details).await;
 	// Tell the user what to do.
 	deliver_output(proposal_details, calls);
 }
 
-fn generate_calls(proposal_details: &ProposalDetails) -> PossibleCallsToSubmit {
+async fn generate_calls(proposal_details: &ProposalDetails) -> PossibleCallsToSubmit {
 	let proposal_bytes = get_proposal_bytes(proposal_details.proposal);
 
 	match &proposal_details.track {
@@ -199,7 +203,6 @@ fn generate_calls(proposal_details: &ProposalDetails) -> PossibleCallsToSubmit {
 				pallet_preimage::pallet::Call as CollectivesPreimageCall,
 				pallet_referenda::pallet::Call as FellowshipReferendaCall,
 				pallet_xcm::pallet::Call as CollectivesXcmCall,
-				sp_weights::weight_v2::Weight,
 				xcm::{
 					double_encoded::DoubleEncoded,
 					v2::OriginKind,
@@ -257,6 +260,26 @@ fn generate_calls(proposal_details: &ProposalDetails) -> PossibleCallsToSubmit {
 						}),
 					));
 
+					let (ref_time, proof_size) =
+						// The user may want to override the computed values, e.g. for deterministic
+						// testing.
+						if let Some(weight_override) = &proposal_details.transact_weight_override {
+							(weight_override.ref_time, weight_override.proof_size)
+						} else {
+							// Do some weight calculation for execution of Transact on the Relay
+							// Chain.
+							let max_ref_time: u64 = 2_000_000_000_000 - 1;
+							let max_proof_size: u64 = 5 * 1024 * 1024 - 1;
+							let relay_weight_needed =
+								whitelist_call.get_transact_weight_needed(Network::Polkadot).await;
+							// Double the weight needed, just to be safe from a runtime upgrade that
+							// could change things during the referendum period.
+							(
+								(2 * relay_weight_needed.ref_time).min(max_ref_time),
+								(2 * relay_weight_needed.proof_size).min(max_proof_size),
+							)
+						};
+
 					// This is what the Fellowship will actually vote on enacting.
 					let whitelist_over_xcm =
 						CallInfo::from_runtime_call(NetworkRuntimeCall::PolkadotCollectives(
@@ -272,13 +295,7 @@ fn generate_calls(proposal_details: &ProposalDetails) -> PossibleCallsToSubmit {
 									},
 									Instruction::Transact {
 										origin_kind: OriginKind::Xcm,
-										require_weight_at_most: Weight {
-											// todo
-											ref_time: 1_000_000_000,
-											// We don't really care about proof size on the Relay Chain.
-											// Make it big so that it will definitely work.
-											proof_size: 1_000_000,
-										},
+										require_weight_at_most: Weight { ref_time, proof_size },
 										call: DoubleEncoded { encoded: whitelist_call.encoded },
 									},
 								]))),

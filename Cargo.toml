@@ -10,3 +10,4 @@ authors = ["joepetrowski"]
 parity-scale-codec = "3.2.1"
 subxt = "0.29.0"
 hex = "0.4.3"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
