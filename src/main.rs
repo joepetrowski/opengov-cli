@@ -13,11 +13,11 @@ fn get_the_actual_proposed_action() -> ProposalDetails {
 	return ProposalDetails {
 		// The encoded proposal that we want to submit. This can either be the call data itself,
 		// e.g. "0x0102...", or a file path that contains the data, e.g. "./my_proposal.call".
-		proposal: "./polkadot-9430.call",
+		proposal: "0x0000645468652046656c6c6f777368697020736179732068656c6c6f",
 		// The OpenGov track that it will use.
 		track: Polkadot(PolkadotOpenGovOrigin::WhitelistedCaller),
 		// When do you want this to enact. `At(block)` or `After(blocks)`.
-		dispatch: At(16_450_000),
+		dispatch: After(10),
 		// Choose if you just want to see the hex-encoded `CallData`, or get a link to Polkadot JS
 		// Apps UI (`AppsUiLink`).
 		output: AppsUiLink,
