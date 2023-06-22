@@ -11,7 +11,10 @@ This script will construct the calls needed to submit a proposal to OpenGov on K
 This is a CLI program. Currently it only has one subcommand, `submit-referendum`.
 
 ```
-> ./target/debug/opengov-cli submit-referendum --help
+$ git clone https://github.com/joepetrowski/opengov-submit.git
+$ cd opengov-submit
+$ cargo build
+$ ./target/debug/opengov-cli submit-referendum --help
 
 Usage: opengov-cli submit-referendum [OPTIONS] --proposal <PROPOSAL> --network <NETWORK> --track <TRACK> --when <WHEN> --blocks <BLOCKS>
 
@@ -49,8 +52,6 @@ Call data:
 
 This has a call hash of `0x4149bf15976cd3c0c244ca0cd43d59fed76f4bb936b186cc18bd88dee6edd986`.
 
-In the script, we will paste the _call data_ into:
-
 ### Run the Script
 
 #### Kusama
@@ -80,6 +81,8 @@ https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Fkusama-rpc.polkadot.io#/extrinsics
 This will return either two or four calls, the latter if the origin is `WhitelistedCaller`, which will require a preimage and referendum for the Fellowship. It also returns a batch call if you want to submit them all at once (you can hide this with `--no-batch "true"`).
 
 #### Polkadot
+
+For Polkadot, we will use a proposal of `0x0000645468652046656c6c6f777368697020736179732068656c6c6f`, which is a `system.remark` call. We will use the Fellowship to whitelist it.
 
 The Fellowship is on the Collectives parachain, so this will require a referendum on the Collectives chain for the Fellowship to whitelist a call, and then a referendum on the Relay Chain for it to pass public vote. Notice the WSS nodes pointing to different chains in the output.
 
