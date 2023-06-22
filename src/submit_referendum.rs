@@ -166,7 +166,9 @@ pub(crate) async fn generate_calls(proposal_details: &ProposalDetails) -> Possib
 				preimage_for_whitelist_call: None,
 				preimage_for_public_referendum: Some((preimage_print, preimage_print_len)),
 				fellowship_referendum_submission: None,
-				public_referendum_submission: Some(public_proposal.call),
+				public_referendum_submission: Some(NetworkRuntimeCall::Kusama(
+					public_proposal.get_kusama_call().expect("kusama"),
+				)),
 			}
 		},
 
@@ -285,8 +287,12 @@ pub(crate) async fn generate_calls(proposal_details: &ProposalDetails) -> Possib
 							dispatch_preimage_print,
 							dispatch_preimage_print_len,
 						)),
-						fellowship_referendum_submission: Some(fellowship_proposal.call),
-						public_referendum_submission: Some(public_proposal.call),
+						fellowship_referendum_submission: Some(NetworkRuntimeCall::Kusama(
+							fellowship_proposal.get_kusama_call().expect("kusama"),
+						)),
+						public_referendum_submission: Some(NetworkRuntimeCall::Kusama(
+							public_proposal.get_kusama_call().expect("kusama"),
+						)),
 					}
 				},
 
@@ -314,7 +320,9 @@ pub(crate) async fn generate_calls(proposal_details: &ProposalDetails) -> Possib
 						preimage_for_whitelist_call: None,
 						preimage_for_public_referendum: Some((preimage_print, preimage_print_len)),
 						fellowship_referendum_submission: None,
-						public_referendum_submission: Some(public_proposal.call),
+						public_referendum_submission: Some(NetworkRuntimeCall::Kusama(
+							public_proposal.get_kusama_call().expect("kusama"),
+						)),
 					}
 				},
 			}
@@ -361,7 +369,9 @@ pub(crate) async fn generate_calls(proposal_details: &ProposalDetails) -> Possib
 				preimage_for_whitelist_call: None,
 				preimage_for_public_referendum: Some((preimage_print, preimage_print_len)),
 				fellowship_referendum_submission: None,
-				public_referendum_submission: Some(public_proposal.call),
+				public_referendum_submission: Some(NetworkRuntimeCall::Polkadot(
+					public_proposal.get_polkadot_call().expect("polkadot"),
+				)),
 			}
 		},
 
@@ -568,8 +578,16 @@ pub(crate) async fn generate_calls(proposal_details: &ProposalDetails) -> Possib
 							dispatch_preimage_print,
 							dispatch_preimage_print_len,
 						)),
-						fellowship_referendum_submission: Some(fellowship_proposal.call),
-						public_referendum_submission: Some(public_proposal.call),
+						fellowship_referendum_submission: Some(
+							NetworkRuntimeCall::PolkadotCollectives(
+								fellowship_proposal
+									.get_polkadot_collectives_call()
+									.expect("polkadot collectives"),
+							),
+						),
+						public_referendum_submission: Some(NetworkRuntimeCall::Polkadot(
+							public_proposal.get_polkadot_call().expect("polkadot"),
+						)),
 					}
 				},
 
@@ -600,7 +618,9 @@ pub(crate) async fn generate_calls(proposal_details: &ProposalDetails) -> Possib
 						preimage_for_whitelist_call: None,
 						preimage_for_public_referendum: Some((preimage_print, preimage_print_len)),
 						fellowship_referendum_submission: None,
-						public_referendum_submission: Some(public_proposal.call),
+						public_referendum_submission: Some(NetworkRuntimeCall::Polkadot(
+							public_proposal.get_polkadot_call().expect("polkadot"),
+						)),
 					}
 				},
 			}
