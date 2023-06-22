@@ -25,7 +25,7 @@ pub(crate) struct ReferendumArgs {
 	#[clap(long = "blocks", short)]
 	blocks: u32,
 
-	/// Output length limit
+	/// Output length limit. Defaults to 1,000.
 	#[clap(long = "output-len-limit")]
 	output_len_limit: Option<u32>,
 
@@ -33,7 +33,7 @@ pub(crate) struct ReferendumArgs {
 	#[clap(long = "no-batch")]
 	no_batch: bool,
 
-	/// Output. `AppsUiLink` or `CallData`.
+	/// Form of output. `AppsUiLink` or `CallData`. Defaults to Apps UI.
 	#[clap(long = "output")]
 	output: Option<String>,
 }
