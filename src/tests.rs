@@ -2,8 +2,9 @@
 mod tests {
 	use crate::polkadot_relay::runtime_types::frame_system::pallet::Call as PolkadotRelaySystemCall;
 	use crate::{
-		generate_calls, get_proposal_bytes, CallInfo, CallOrHash, KusamaOpenGovOrigin, Network,
-		NetworkRuntimeCall, PolkadotOpenGovOrigin, PolkadotRuntimeCall, ProposalDetails, Weight,
+		submit_referendum::{generate_calls, get_proposal_bytes},
+		CallInfo, CallOrHash, KusamaOpenGovOrigin, Network, NetworkRuntimeCall,
+		PolkadotOpenGovOrigin, PolkadotRuntimeCall, ProposalDetails, Weight,
 	};
 
 	fn polkadot_whitelist_remark_user_input() -> ProposalDetails {
