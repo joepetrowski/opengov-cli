@@ -1,3 +1,5 @@
 /target
 *.call
 collectives_types.rs
+kusama_types.rs
+polkadot_types.rs

@@ -56,6 +56,7 @@ fn parse_inputs(prefs: ReferendumArgs) -> ProposalDetails {
 
 	let track = match prefs.network.to_ascii_lowercase().as_str() {
 		"polkadot" => match prefs.track.to_ascii_lowercase().as_str() {
+			"root" => PolkadotRoot,
 			"whitelisted-caller" | "whitelistedcaller" =>
 				Polkadot(PolkadotOpenGovOrigin::WhitelistedCaller),
 			"staking-admin" | "stakingadmin" => Polkadot(PolkadotOpenGovOrigin::StakingAdmin),
@@ -69,9 +70,10 @@ fn parse_inputs(prefs: ReferendumArgs) -> ProposalDetails {
 				Polkadot(PolkadotOpenGovOrigin::ReferendumKiller),
 			"referendum-canceller" | "referendumcanceller" =>
 				Polkadot(PolkadotOpenGovOrigin::ReferendumCanceller),
-			_ => panic!("Unsupported track! Tracks should be in the form `general-admin` or `generaladmin`. Note: Does not support `root` (yet)."),
+			_ => panic!("Unsupported track! Tracks should be in the form `general-admin` or `generaladmin`."),
 		},
 		"kusama" => match prefs.track.to_ascii_lowercase().as_str() {
+			"root" => KusamaRoot,
 			"whitelisted-caller" | "whitelistedcaller" =>
 				Kusama(KusamaOpenGovOrigin::WhitelistedCaller),
 			"staking-admin" | "stakingadmin" => Kusama(KusamaOpenGovOrigin::StakingAdmin),
@@ -84,7 +86,7 @@ fn parse_inputs(prefs: ReferendumArgs) -> ProposalDetails {
 				Kusama(KusamaOpenGovOrigin::ReferendumKiller),
 			"referendum-canceller" | "referendumcanceller" =>
 				Kusama(KusamaOpenGovOrigin::ReferendumCanceller),
-			_ => panic!("Unsupported track! Tracks should be in the form `general-admin` or `generaladmin`. Note: Does not support `root` (yet)."),
+			_ => panic!("Unsupported track! Tracks should be in the form `general-admin` or `generaladmin`."),
 		},
 		_ => panic!("`network` must be `polkadot` or `kusama`"),
 	};
@@ -124,6 +126,51 @@ pub(crate) async fn generate_calls(proposal_details: &ProposalDetails) -> Possib
 	let proposal_bytes = get_proposal_bytes(proposal_details.proposal.clone());
 
 	match &proposal_details.track {
+		// Kusama Root Origin. This is kind of dirty but it works. Since the Root origin is not part
+		// of `OpenGovOrigin`, we match it specially.
+		NetworkTrack::KusamaRoot => {
+			use kusama::runtime_types::{
+				frame_support::{
+					dispatch::RawOrigin,
+					traits::{preimages::Bounded::Lookup, schedule::DispatchTime},
+				},
+				kusama_runtime::OriginCaller,
+				pallet_preimage::pallet::Call as PreimageCall,
+				pallet_referenda::pallet::Call as ReferendaCall,
+			};
+
+			let proposal_call_info = CallInfo::from_bytes(&proposal_bytes, Network::Kusama);
+
+			let public_referendum_dispatch_time = match proposal_details.dispatch {
+				DispatchTimeWrapper::At(block) => DispatchTime::At(block),
+				DispatchTimeWrapper::After(block) => DispatchTime::After(block),
+			};
+
+			let note_proposal_preimage = CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(
+				KusamaRuntimeCall::Preimage(PreimageCall::note_preimage { bytes: proposal_bytes }),
+			));
+			let public_proposal = CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(
+				KusamaRuntimeCall::Referenda(ReferendaCall::submit {
+					proposal_origin: Box::new(OriginCaller::system(RawOrigin::Root)),
+					proposal: Lookup {
+						hash: sp_core::H256(proposal_call_info.hash),
+						len: proposal_call_info.length,
+					},
+					enactment_moment: public_referendum_dispatch_time,
+				}),
+			));
+			let (preimage_print, preimage_print_len) =
+				note_proposal_preimage.create_print_output(proposal_details.output_len_limit);
+
+			PossibleCallsToSubmit {
+				preimage_for_whitelist_call: None,
+				preimage_for_public_referendum: Some((preimage_print, preimage_print_len)),
+				fellowship_referendum_submission: None,
+				public_referendum_submission: Some(public_proposal.call),
+			}
+		},
+
+		// All other Kusama origins.
 		NetworkTrack::Kusama(kusama_track) => {
 			use kusama::runtime_types::{
 				frame_support::traits::{preimages::Bounded::Lookup, schedule::DispatchTime},
@@ -242,6 +289,7 @@ pub(crate) async fn generate_calls(proposal_details: &ProposalDetails) -> Possib
 						public_referendum_submission: Some(public_proposal.call),
 					}
 				},
+
 				// Everything else just uses its track.
 				_ => {
 					let note_proposal_preimage = CallInfo::from_runtime_call(
@@ -271,6 +319,53 @@ pub(crate) async fn generate_calls(proposal_details: &ProposalDetails) -> Possib
 				},
 			}
 		},
+
+		// Same for Polkadot Root origin. It is not part of OpenGovOrigins, so it gets its own arm.
+		NetworkTrack::PolkadotRoot => {
+			use polkadot_relay::runtime_types::{
+				frame_support::{
+					dispatch::RawOrigin,
+					traits::{preimages::Bounded::Lookup, schedule::DispatchTime},
+				},
+				pallet_preimage::pallet::Call as PreimageCall,
+				pallet_referenda::pallet::Call as ReferendaCall,
+				polkadot_runtime::OriginCaller,
+			};
+
+			let proposal_call_info = CallInfo::from_bytes(&proposal_bytes, Network::Polkadot);
+
+			let public_referendum_dispatch_time = match proposal_details.dispatch {
+				DispatchTimeWrapper::At(block) => DispatchTime::At(block),
+				DispatchTimeWrapper::After(block) => DispatchTime::After(block),
+			};
+
+			let note_proposal_preimage = CallInfo::from_runtime_call(NetworkRuntimeCall::Polkadot(
+				PolkadotRuntimeCall::Preimage(PreimageCall::note_preimage {
+					bytes: proposal_bytes,
+				}),
+			));
+			let public_proposal = CallInfo::from_runtime_call(NetworkRuntimeCall::Polkadot(
+				PolkadotRuntimeCall::Referenda(ReferendaCall::submit {
+					proposal_origin: Box::new(OriginCaller::system(RawOrigin::Root)),
+					proposal: Lookup {
+						hash: sp_core::H256(proposal_call_info.hash),
+						len: proposal_call_info.length,
+					},
+					enactment_moment: public_referendum_dispatch_time,
+				}),
+			));
+			let (preimage_print, preimage_print_len) =
+				note_proposal_preimage.create_print_output(proposal_details.output_len_limit);
+
+			PossibleCallsToSubmit {
+				preimage_for_whitelist_call: None,
+				preimage_for_public_referendum: Some((preimage_print, preimage_print_len)),
+				fellowship_referendum_submission: None,
+				public_referendum_submission: Some(public_proposal.call),
+			}
+		},
+
+		// All other Polkadot origins.
 		NetworkTrack::Polkadot(polkadot_track) => {
 			use polkadot_collectives::runtime_types::{
 				collectives_polkadot_runtime::OriginCaller as CollectivesOriginCaller,
@@ -477,6 +572,8 @@ pub(crate) async fn generate_calls(proposal_details: &ProposalDetails) -> Possib
 						public_referendum_submission: Some(public_proposal.call),
 					}
 				},
+
+				// All other Polkadot origins.
 				_ => {
 					let note_proposal_preimage = CallInfo::from_runtime_call(
 						NetworkRuntimeCall::Polkadot(PolkadotRuntimeCall::Preimage(
@@ -511,6 +608,7 @@ pub(crate) async fn generate_calls(proposal_details: &ProposalDetails) -> Possib
 	}
 }
 
+// Takes all the `calls` needed to submit and logs them according to the user's preferences.
 fn deliver_output(proposal_details: ProposalDetails, calls: PossibleCallsToSubmit) {
 	let mut batch_of_calls = Vec::new();
 
@@ -563,6 +661,8 @@ fn deliver_output(proposal_details: ProposalDetails, calls: PossibleCallsToSubmi
 	}
 }
 
+// Takes a vec of calls, which could be intended for use on different networks, sorts them into the
+// appropriate network, and provides a single batch call for each network.
 fn handle_batch_of_calls(output: &Output, batch: Vec<NetworkRuntimeCall>) {
 	use kusama::runtime_types::pallet_utility::pallet::Call as KusamaUtilityCall;
 	use polkadot_collectives::runtime_types::pallet_utility::pallet::Call as CollectivesUtilityCall;

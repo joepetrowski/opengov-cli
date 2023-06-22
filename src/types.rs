@@ -64,7 +64,9 @@ pub(super) struct ProposalDetails {
 // The network and OpenGov track this proposal should be voted on.
 #[allow(dead_code)]
 pub(super) enum NetworkTrack {
+	KusamaRoot,
 	Kusama(KusamaOpenGovOrigin),
+	PolkadotRoot,
 	Polkadot(PolkadotOpenGovOrigin),
 }
 
