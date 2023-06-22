@@ -7,7 +7,7 @@ pub(super) use subxt::ext::sp_core;
 pub mod kusama {}
 pub(super) use kusama::runtime_types::kusama_runtime::{
 	governance::origins::pallet_custom_origins::Origin as KusamaOpenGovOrigin,
-	RuntimeCall as KusamaRuntimeCall,
+	OriginCaller as KusamaOriginCaller, RuntimeCall as KusamaRuntimeCall,
 };
 
 #[subxt::subxt(
@@ -17,7 +17,7 @@ pub(super) use kusama::runtime_types::kusama_runtime::{
 pub mod polkadot_relay {}
 pub(super) use polkadot_relay::runtime_types::polkadot_runtime::{
 	governance::origins::pallet_custom_origins::Origin as PolkadotOpenGovOrigin,
-	RuntimeCall as PolkadotRuntimeCall,
+	OriginCaller as PolkadotOriginCaller, RuntimeCall as PolkadotRuntimeCall,
 };
 
 #[subxt::subxt(runtime_metadata_url = "wss://polkadot-collectives-rpc.polkadot.io:443")]

@@ -45,6 +45,25 @@ mod tests {
 		}
 	}
 
+	fn polkadot_root_remark_user_input() -> ProposalDetails {
+		use crate::DispatchTimeWrapper::*;
+		use crate::NetworkTrack::*;
+		use crate::Output::*;
+		return ProposalDetails {
+			// `system.remark("opengov-submit test")`
+			proposal: String::from("0x00004c6f70656e676f762d7375626d69742074657374"),
+			track: PolkadotRoot,
+			dispatch: After(10),
+			output: AppsUiLink,
+			output_len_limit: 1_000,
+			print_batch: true,
+			transact_weight_override: Some(Weight {
+				ref_time: 1_000_000_000,
+				proof_size: 1_000_000,
+			}),
+		}
+	}
+
 	fn kusama_whitelist_remark_user_input() -> ProposalDetails {
 		use crate::DispatchTimeWrapper::*;
 		use crate::NetworkTrack::*;
@@ -73,6 +92,25 @@ mod tests {
 			proposal: String::from("0x060ac8"),
 			track: Kusama(KusamaOpenGovOrigin::StakingAdmin),
 			dispatch: At(100_000_000),
+			output: AppsUiLink,
+			output_len_limit: 1_000,
+			print_batch: true,
+			transact_weight_override: Some(Weight {
+				ref_time: 1_000_000_000,
+				proof_size: 1_000_000,
+			}),
+		}
+	}
+
+	fn kusama_root_remark_user_input() -> ProposalDetails {
+		use crate::DispatchTimeWrapper::*;
+		use crate::NetworkTrack::*;
+		use crate::Output::*;
+		return ProposalDetails {
+			// `system.remark("opengov-submit test")`
+			proposal: String::from("0x00004c6f70656e676f762d7375626d69742074657374"),
+			track: KusamaRoot,
+			dispatch: After(10),
 			output: AppsUiLink,
 			output_len_limit: 1_000,
 			print_batch: true,
@@ -233,6 +271,39 @@ mod tests {
 	}
 
 	#[tokio::test]
+	async fn it_starts_polkadot_root_referenda_correctly() {
+		let proposal_details = polkadot_root_remark_user_input();
+		let calls = generate_calls(&proposal_details).await;
+
+		let public_preimage = hex::decode(
+			"0x0a005800004c6f70656e676f762d7375626d69742074657374".trim_start_matches("0x"),
+		)
+		.expect("Valid call");
+		let public_referendum = hex::decode("0x15000000028821e8db19b8e34b62ee8bc618a5ed3eecb9761d7d81349b00aa5ce5dfca253416000000010a000000".trim_start_matches("0x")).expect("Valid call");
+
+		assert!(calls.preimage_for_whitelist_call.is_none(), "it must not generate this call");
+		assert!(calls.fellowship_referendum_submission.is_none(), "it must not generate this call");
+
+		assert!(calls.preimage_for_public_referendum.is_some(), "it must generate this call");
+		if let Some((coh, length)) = calls.preimage_for_public_referendum {
+			match coh {
+				CallOrHash::Call(public_preimage_generated) => {
+					let call_info = CallInfo::from_runtime_call(public_preimage_generated);
+					assert_eq!(call_info.encoded, public_preimage);
+					assert_eq!(length, 25u32);
+				},
+				CallOrHash::Hash(_) => panic!("call length within the limit"),
+			}
+		}
+
+		assert!(calls.public_referendum_submission.is_some(), "it must generate this call");
+		if let Some(public_referendum_generated) = calls.public_referendum_submission {
+			let call_info = CallInfo::from_runtime_call(public_referendum_generated);
+			assert_eq!(call_info.encoded, public_referendum);
+		}
+	}
+
+	#[tokio::test]
 	async fn it_starts_kusama_non_fellowship_referenda_correctly() {
 		let proposal_details = kusama_staking_validator_user_input();
 		let calls = generate_calls(&proposal_details).await;
@@ -308,6 +379,39 @@ mod tests {
 		if let Some(fellowship_referendum_generated) = calls.fellowship_referendum_submission {
 			let call_info = CallInfo::from_runtime_call(fellowship_referendum_generated);
 			assert_eq!(call_info.encoded, fellowship_referendum);
+		}
+
+		assert!(calls.public_referendum_submission.is_some(), "it must generate this call");
+		if let Some(public_referendum_generated) = calls.public_referendum_submission {
+			let call_info = CallInfo::from_runtime_call(public_referendum_generated);
+			assert_eq!(call_info.encoded, public_referendum);
+		}
+	}
+
+	#[tokio::test]
+	async fn it_starts_kusama_root_referenda_correctly() {
+		let proposal_details = kusama_root_remark_user_input();
+		let calls = generate_calls(&proposal_details).await;
+
+		let public_preimage = hex::decode(
+			"0x20005800004c6f70656e676f762d7375626d69742074657374".trim_start_matches("0x"),
+		)
+		.expect("Valid call");
+		let public_referendum = hex::decode("0x15000000028821e8db19b8e34b62ee8bc618a5ed3eecb9761d7d81349b00aa5ce5dfca253416000000010a000000".trim_start_matches("0x")).expect("Valid call");
+
+		assert!(calls.preimage_for_whitelist_call.is_none(), "it must not generate this call");
+		assert!(calls.fellowship_referendum_submission.is_none(), "it must not generate this call");
+
+		assert!(calls.preimage_for_public_referendum.is_some(), "it must generate this call");
+		if let Some((coh, length)) = calls.preimage_for_public_referendum {
+			match coh {
+				CallOrHash::Call(public_preimage_generated) => {
+					let call_info = CallInfo::from_runtime_call(public_preimage_generated);
+					assert_eq!(call_info.encoded, public_preimage);
+					assert_eq!(length, 25u32);
+				},
+				CallOrHash::Hash(_) => panic!("call length within the limit"),
+			}
 		}
 
 		assert!(calls.public_referendum_submission.is_some(), "it must generate this call");
