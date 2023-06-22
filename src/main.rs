@@ -2,48 +2,142 @@ use std::fs;
 mod types;
 use crate::types::*;
 
+use clap::Parser as ClapParser;
+
 #[cfg(test)]
 mod tests;
 
-// This is the thing you need to edit to use this!
-fn get_the_actual_proposed_action() -> ProposalDetails {
-	use DispatchTimeWrapper::*;
-	use NetworkTrack::*;
-	use Output::*;
-	return ProposalDetails {
-		// The encoded proposal that we want to submit. This can either be the call data itself,
-		// e.g. "0x0102...", or a file path that contains the data, e.g. "./my_proposal.call".
-		proposal: "0x0000645468652046656c6c6f777368697020736179732068656c6c6f",
-		// The OpenGov track that it will use.
-		track: Polkadot(PolkadotOpenGovOrigin::WhitelistedCaller),
-		// When do you want this to enact. `At(block)` or `After(blocks)`.
-		dispatch: After(10),
-		// Choose if you just want to see the hex-encoded `CallData`, or get a link to Polkadot JS
-		// Apps UI (`AppsUiLink`).
-		output: AppsUiLink,
-		// Limit the length of calls printed to console. Prevents massive hex dumps for proposals
-		// like runtime upgrades.
-		output_len_limit: 1_000,
-		// Whether or not to print a single `force_batch` call.
-		print_batch: true,
-		// If `None`, will fetch the needed weight from an API. You probably want `None`, unless
-		// you know what you're doing.
-		transact_weight_override: None,
-	}
+#[derive(Debug, ClapParser)]
+enum Command {
+	SubmitReferendum(ReferendumArgs),
 }
 
 #[tokio::main]
 async fn main() {
-	// Find out what the user wants to do.
-	let proposal_details = get_the_actual_proposed_action();
-	// Generate the calls necessary.
-	let calls = generate_calls(&proposal_details).await;
-	// Tell the user what to do.
-	deliver_output(proposal_details, calls);
+	let args = Command::parse();
+	match args {
+		Command::SubmitReferendum(prefs) => {
+			// Find out what the user wants to do.
+			let proposal_details = parse_inputs(prefs);
+			// Generate the calls necessary.
+			let calls = generate_calls(&proposal_details).await;
+			// Tell the user what to do.
+			deliver_output(proposal_details, calls);
+		},
+	}
+}
+
+#[derive(Debug, ClapParser)]
+struct ReferendumArgs {
+	/// The encoded proposal that we want to submit. This can either be the call data itself,
+	/// e.g. "0x0102...", or a file path that contains the data, e.g. "./my_proposal.call".
+	#[clap(long = "proposal", short)]
+	proposal: String,
+
+	/// Network on which to submit the referendum. Polkadot or Kusama.
+	#[clap(long = "network", short)]
+	network: String,
+
+	/// Track on which to submit the referendum.
+	#[clap(long = "track", short)]
+	track: String,
+
+	/// Dispatch `At` or `After`.
+	#[clap(long = "when", short)]
+	when: String,
+
+	/// The number of blocks to fill `At` or `After`.
+	#[clap(long = "blocks", short)]
+	blocks: u32,
+
+	/// Output length limit
+	#[clap(long = "output-len-limit")]
+	output_len_limit: Option<u32>,
+
+	/// Do not print batch calls. Defaults to false.
+	#[clap(long = "no-batch")]
+	no_batch: bool,
+
+	/// Output. `AppsUiLink` or `CallData`.
+	#[clap(long = "output")]
+	output: Option<String>,
+}
+
+fn parse_inputs(prefs: ReferendumArgs) -> ProposalDetails {
+	use DispatchTimeWrapper::*;
+	use NetworkTrack::*;
+	use Output::*;
+
+	let proposal = prefs.proposal;
+
+	let track = match prefs.network.as_str() {
+		"polkadot" => match prefs.track.as_str() {
+			"whitelisted-caller" | "whitelistedcaller" =>
+				Polkadot(PolkadotOpenGovOrigin::WhitelistedCaller),
+			"staking-admin" | "stakingadmin" => Polkadot(PolkadotOpenGovOrigin::StakingAdmin),
+			"treasurer" => Polkadot(PolkadotOpenGovOrigin::Treasurer),
+			"lease-admin" | "leaseadmin" => Polkadot(PolkadotOpenGovOrigin::LeaseAdmin),
+			"fellowship-admin" | "fellowshipadmin" =>
+				Polkadot(PolkadotOpenGovOrigin::FellowshipAdmin),
+			"general-admin" | "generaladmin" => Polkadot(PolkadotOpenGovOrigin::GeneralAdmin),
+			"auction-admin" | "auctionadmin" => Polkadot(PolkadotOpenGovOrigin::AuctionAdmin),
+			"referendum-killer" | "referendumkiller" =>
+				Polkadot(PolkadotOpenGovOrigin::ReferendumKiller),
+			"referendum-canceller" | "referendumcanceller" =>
+				Polkadot(PolkadotOpenGovOrigin::ReferendumCanceller),
+			_ => panic!("Unsupported track! Tracks should be in the form `general-admin` or `generaladmin`. Note: Does not support `root` (yet)."),
+		},
+		"kusama" => match prefs.track.as_str() {
+			"whitelisted-caller" | "whitelistedcaller" =>
+				Kusama(KusamaOpenGovOrigin::WhitelistedCaller),
+			"staking-admin" | "stakingadmin" => Kusama(KusamaOpenGovOrigin::StakingAdmin),
+			"treasurer" => Kusama(KusamaOpenGovOrigin::Treasurer),
+			"lease-admin" | "leaseadmin" => Kusama(KusamaOpenGovOrigin::LeaseAdmin),
+			"fellowship-admin" | "fellowshipadmin" => Kusama(KusamaOpenGovOrigin::FellowshipAdmin),
+			"general-admin" | "generaladmin" => Kusama(KusamaOpenGovOrigin::GeneralAdmin),
+			"auction-admin" | "auctionadmin" => Kusama(KusamaOpenGovOrigin::AuctionAdmin),
+			"referendum-killer" | "referendumkiller" =>
+				Kusama(KusamaOpenGovOrigin::ReferendumKiller),
+			"referendum-canceller" | "referendumcanceller" =>
+				Kusama(KusamaOpenGovOrigin::ReferendumCanceller),
+			_ => panic!("Unsupported track! Tracks should be in the form `general-admin` or `generaladmin`. Note: Does not support `root` (yet)."),
+		},
+		_ => panic!("`network` must be `polkadot` or `kusama`"),
+	};
+
+	let dispatch = match prefs.when.as_str() {
+		"at" | "At" => At(prefs.blocks),
+		"after" | "After" => After(prefs.blocks),
+		_ => panic!("`when` must be `at` or `after`"),
+	};
+
+	let output_len_limit = if let Some(input) = prefs.output_len_limit { input } else { 1_000 };
+
+	let print_batch = !prefs.no_batch;
+
+	let output = if let Some(input) = prefs.output {
+		match input.as_str() {
+			"calldata" | "call-data" => CallData,
+			"appsuilink" | "apps-ui-link" => AppsUiLink,
+			_ => panic!("`output` must be `calldata` or `appsuilink`. If not specified, the default is `appsuilink`."),
+		}
+	} else {
+		AppsUiLink
+	};
+
+	return ProposalDetails {
+		proposal,
+		track,
+		dispatch,
+		output,
+		output_len_limit,
+		print_batch,
+		transact_weight_override: None,
+	}
 }
 
 async fn generate_calls(proposal_details: &ProposalDetails) -> PossibleCallsToSubmit {
-	let proposal_bytes = get_proposal_bytes(proposal_details.proposal);
+	let proposal_bytes = get_proposal_bytes(proposal_details.proposal.clone());
 
 	match &proposal_details.track {
 		NetworkTrack::Kusama(kusama_track) => {
@@ -526,7 +620,8 @@ fn handle_batch_of_calls(output: &Output, batch: Vec<NetworkRuntimeCall>) {
 
 // Check what the user entered for the proposal. If it is just call data, return it back. Otherwise,
 // we expect a path to a file that contains the call data. Read that in and return it.
-fn get_proposal_bytes(proposal: &'static str) -> Vec<u8> {
+fn get_proposal_bytes(proposal: String) -> Vec<u8> {
+	let proposal = proposal.as_str();
 	if proposal.starts_with("0x") {
 		// This is just call data
 		return hex::decode(proposal.trim_start_matches("0x")).expect("Valid proposal")

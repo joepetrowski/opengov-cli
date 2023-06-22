@@ -12,7 +12,7 @@ mod tests {
 		use crate::Output::*;
 		return ProposalDetails {
 			// `system.remark("opengov-submit test")`
-			proposal: "0x00004c6f70656e676f762d7375626d69742074657374",
+			proposal: String::from("0x00004c6f70656e676f762d7375626d69742074657374"),
 			track: Polkadot(PolkadotOpenGovOrigin::WhitelistedCaller),
 			dispatch: After(10),
 			output: AppsUiLink,
@@ -31,7 +31,7 @@ mod tests {
 		use crate::Output::*;
 		return ProposalDetails {
 			// `staking.increase_validator_count(50)`
-			proposal: "0x070ac8",
+			proposal: String::from("0x070ac8"),
 			track: Polkadot(PolkadotOpenGovOrigin::StakingAdmin),
 			dispatch: After(10),
 			output: AppsUiLink,
@@ -50,7 +50,7 @@ mod tests {
 		use crate::Output::*;
 		return ProposalDetails {
 			// `system.remark("opengov-submit test")`
-			proposal: "0x00004c6f70656e676f762d7375626d69742074657374",
+			proposal: String::from("0x00004c6f70656e676f762d7375626d69742074657374"),
 			track: Kusama(KusamaOpenGovOrigin::WhitelistedCaller),
 			dispatch: At(100_000_000),
 			output: AppsUiLink,
@@ -69,7 +69,7 @@ mod tests {
 		use crate::Output::*;
 		return ProposalDetails {
 			// `staking.increase_validator_count(50)`
-			proposal: "0x060ac8",
+			proposal: String::from("0x060ac8"),
 			track: Kusama(KusamaOpenGovOrigin::StakingAdmin),
 			dispatch: At(100_000_000),
 			output: AppsUiLink,
@@ -88,7 +88,7 @@ mod tests {
 		use crate::Output::*;
 		return ProposalDetails {
 			// `system.remark("opengov-submit test")`
-			proposal: "0x00004c6f70656e676f762d7375626d69742074657374",
+			proposal: String::from("0x00004c6f70656e676f762d7375626d69742074657374"),
 			track: Polkadot(PolkadotOpenGovOrigin::StakingAdmin),
 			dispatch: After(10),
 			output: AppsUiLink,

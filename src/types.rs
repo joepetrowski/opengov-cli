@@ -42,7 +42,7 @@ pub(super) enum Network {
 // Info and preferences provided by the user.
 pub(super) struct ProposalDetails {
 	// The proposal, generated elsewhere and pasted here.
-	pub(super) proposal: &'static str,
+	pub(super) proposal: String,
 	// The track to submit on.
 	pub(super) track: NetworkTrack,
 	// When do you want this to enact. `At(block)` or `After(blocks)`.
