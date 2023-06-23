@@ -41,8 +41,12 @@ struct VersionedNetwork {
 	version: String,
 }
 
-pub(crate) fn build_upgrade(prefs: UpgradeArgs) {
-	// 1. Download all the Wasm files needed from the release pages. Probably want to mkdir.
+pub(crate) async fn build_upgrade(prefs: UpgradeArgs) {
+	// 0. Find out what to do.
+	let upgrade_details = parse_inputs(prefs);
+
+	// 1. Download all the Wasm files needed from the release pages.
+	download_runtimes(&upgrade_details).await;
 	//
 	// 2. Construct the `authorize_upgrade` call on each parachain.
 	//
@@ -53,8 +57,6 @@ pub(crate) fn build_upgrade(prefs: UpgradeArgs) {
 	// 5. Construct a `force_batch` call with everything.
 	//
 	// 6. Write this call as a file that can then be passed to `submit_referendum`.
-	let upgrade_details = parse_inputs(prefs);
-	download_runtimes(&upgrade_details);
 }
 
 fn parse_inputs(prefs: UpgradeArgs) -> UpgradeDetails {
@@ -118,7 +120,7 @@ fn make_version_directory(dir_name: &str) {
 	}
 }
 
-fn download_runtimes(upgrade_details: &UpgradeDetails) {
+async fn download_runtimes(upgrade_details: &UpgradeDetails) {
 	// Relay Form
 	// https://github.com/paritytech/polkadot/releases/download/v0.9.43/polkadot_runtime-v9430.compact.compressed.wasm
 	// expect runtime version to be "9430" and correspond to "0.9.43"
@@ -139,6 +141,7 @@ fn download_runtimes(upgrade_details: &UpgradeDetails) {
 			Network::PolkadotBridgeHub => "bridge-hub-polkadot",
 		};
 		let version = chain.version.trim_start_matches("v");
+		let fname = format!("{}_runtime-v{}.compact.compressed.wasm", chain_name, version);
 		let download_url = match chain.network {
 			Network::Kusama | Network::Polkadot => {
 				let semver = if let Some(sv) = upgrade_details.semver_override.clone() {
@@ -155,15 +158,21 @@ fn download_runtimes(upgrade_details: &UpgradeDetails) {
 				};
 				let semver = semver.trim_start_matches("v");
 				format!(
-					"https://github.com/paritytech/polkadot/releases/download/v{}/{}_runtime-v{}.compact.compressed.wasm",
-					semver, chain_name, version
-				)},
+					"https://github.com/paritytech/polkadot/releases/download/v{}/{}",
+					semver, fname
+				)
+			},
 			_ => format!(
-				"https://github.com/paritytech/cumulus/releases/download/parachains-v{}/{}_runtime-v{}.compact.compressed.wasm",
-				version, chain_name, version
-			)
+				"https://github.com/paritytech/cumulus/releases/download/parachains-v{}/{}",
+				version, fname
+			),
 		};
 
-		println!("{}", download_url);
+		let download_url = download_url.as_str();
+		let path_name = format!("{}/{}", upgrade_details.directory, fname);
+		println!("Downloading... {}", fname.as_str());
+		let response = reqwest::get(download_url).await.expect("we need files to work");
+		let runtime = response.bytes().await.expect("need bytes");
+		fs::write(path_name, runtime).expect("we can write");
 	}
 }

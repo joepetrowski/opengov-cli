@@ -19,7 +19,7 @@ enum Command {
 async fn main() {
 	let args = Command::parse();
 	match args {
-		Command::BuildUpgrade(prefs) => build_upgrade(prefs),
+		Command::BuildUpgrade(prefs) => build_upgrade(prefs).await,
 		Command::SubmitReferendum(prefs) => submit_referendum(prefs).await,
 	}
 }
