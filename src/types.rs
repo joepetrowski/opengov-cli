@@ -32,7 +32,6 @@ pub(super) use polkadot_collectives::runtime_types::{
 	sp_weights::weight_v2::Weight,
 };
 
-#[allow(dead_code)]
 pub(super) enum Network {
 	Kusama,
 	Polkadot,
@@ -62,7 +61,6 @@ pub(super) struct ProposalDetails {
 }
 
 // The network and OpenGov track this proposal should be voted on.
-#[allow(dead_code)]
 pub(super) enum NetworkTrack {
 	KusamaRoot,
 	Kusama(KusamaOpenGovOrigin),
@@ -71,7 +69,6 @@ pub(super) enum NetworkTrack {
 }
 
 // A runtime call wrapped in the network it should execute on.
-#[allow(dead_code)]
 pub(super) enum NetworkRuntimeCall {
 	Kusama(KusamaRuntimeCall),
 	Polkadot(PolkadotRuntimeCall),
@@ -79,7 +76,6 @@ pub(super) enum NetworkRuntimeCall {
 }
 
 // How the user would like to see the output of the program.
-#[allow(dead_code)]
 pub(super) enum Output {
 	// Print just the call data (e.g. 0x1234).
 	CallData,
@@ -88,7 +84,6 @@ pub(super) enum Output {
 }
 
 // Local concrete type to use in each runtime's `DispatchTime`
-#[allow(dead_code)]
 pub(super) enum DispatchTimeWrapper {
 	At(u32),
 	After(u32),
