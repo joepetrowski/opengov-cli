@@ -4,11 +4,20 @@ pub(super) use subxt::ext::sp_core;
 	runtime_metadata_url = "wss://kusama-rpc.polkadot.io:443",
 	derive_for_all_types = "PartialEq, Clone"
 )]
-pub mod kusama {}
-pub(super) use kusama::runtime_types::kusama_runtime::{
+pub mod kusama_relay {}
+pub(super) use kusama_relay::runtime_types::kusama_runtime::{
 	governance::origins::pallet_custom_origins::Origin as KusamaOpenGovOrigin,
 	OriginCaller as KusamaOriginCaller, RuntimeCall as KusamaRuntimeCall,
 };
+
+#[subxt::subxt(runtime_metadata_url = "wss://kusama-asset-hub-rpc.polkadot.io:443")]
+pub mod kusama_asset_hub {}
+// pub(super) use kusama_asset_hub::runtime_types::asset_hub_kusama_runtime::RuntimeCall as KusamaAssetHubRuntimeCall;
+pub(super) use kusama_asset_hub::runtime_types::statemine_runtime::RuntimeCall as KusamaAssetHubRuntimeCall;
+
+#[subxt::subxt(runtime_metadata_url = "wss://kusama-bridge-hub-rpc.polkadot.io:443")]
+pub mod kusama_bridge_hub {}
+pub(super) use kusama_bridge_hub::runtime_types::bridge_hub_kusama_runtime::RuntimeCall as KusamaBridgeHubRuntimeCall;
 
 #[subxt::subxt(
 	runtime_metadata_url = "wss://rpc.polkadot.io:443",
@@ -19,6 +28,11 @@ pub(super) use polkadot_relay::runtime_types::polkadot_runtime::{
 	governance::origins::pallet_custom_origins::Origin as PolkadotOpenGovOrigin,
 	OriginCaller as PolkadotOriginCaller, RuntimeCall as PolkadotRuntimeCall,
 };
+
+#[subxt::subxt(runtime_metadata_url = "wss://polkadot-asset-hub-rpc.polkadot.io:443")]
+pub mod polkadot_asset_hub {}
+// pub(super) use polkadot_asset_hub::runtime_types::asset_hub_polkadot_runtime::RuntimeCall as PolkadotAssetHubRuntimeCall;
+pub(super) use polkadot_asset_hub::runtime_types::statemint_runtime::RuntimeCall as PolkadotAssetHubRuntimeCall;
 
 #[subxt::subxt(runtime_metadata_url = "wss://polkadot-collectives-rpc.polkadot.io:443")]
 pub mod polkadot_collectives {}
@@ -32,10 +46,33 @@ pub(super) use polkadot_collectives::runtime_types::{
 	sp_weights::weight_v2::Weight,
 };
 
+#[subxt::subxt(runtime_metadata_url = "wss://polkadot-bridge-hub-rpc.polkadot.io:443")]
+pub mod polkadot_bridge_hub {}
+pub(super) use polkadot_bridge_hub::runtime_types::bridge_hub_polkadot_runtime::RuntimeCall as PolkadotBridgeHubRuntimeCall;
+
 pub(super) enum Network {
 	Kusama,
+	KusamaAssetHub,
+	KusamaBridgeHub,
 	Polkadot,
+	PolkadotAssetHub,
 	PolkadotCollectives,
+	PolkadotBridgeHub,
+}
+
+impl Network {
+	fn get_para_id(&self) -> Result<u32, &'static str> {
+		use Network::*;
+		match &self {
+			Kusama => Err("relay chain"),
+			KusamaAssetHub => Ok(1_000),
+			KusamaBridgeHub => Ok(1_002),
+			Polkadot => Err("relay chain"),
+			PolkadotAssetHub => Ok(1_000),
+			PolkadotCollectives => Ok(1_001),
+			PolkadotBridgeHub => Ok(1_002),
+		}
+	}
 }
 
 // Info and preferences provided by the user.
@@ -136,6 +173,38 @@ impl CallInfo {
 		}
 	}
 
+	// Strip the outer enum and return a Kusama Asset Hub `RuntimeCall`.
+	pub(super) fn get_kusama_asset_hub_call(
+		&self,
+	) -> Result<KusamaAssetHubRuntimeCall, &'static str> {
+		match &self.network {
+			Network::KusamaAssetHub => {
+				let bytes = &self.encoded;
+				Ok(<KusamaAssetHubRuntimeCall as parity_scale_codec::Decode>::decode(
+					&mut &bytes[..],
+				)
+				.unwrap())
+			},
+			_ => return Err("not a kusama asset hub call"),
+		}
+	}
+
+	// Strip the outer enum and return a Kusama Bridge Hub `RuntimeCall`.
+	pub(super) fn get_kusama_bridge_hub_call(
+		&self,
+	) -> Result<KusamaBridgeHubRuntimeCall, &'static str> {
+		match &self.network {
+			Network::KusamaBridgeHub => {
+				let bytes = &self.encoded;
+				Ok(<KusamaBridgeHubRuntimeCall as parity_scale_codec::Decode>::decode(
+					&mut &bytes[..],
+				)
+				.unwrap())
+			},
+			_ => return Err("not a kusama bridge hub call"),
+		}
+	}
+
 	// Strip the outer enum and return a Polkadot Relay `RuntimeCall`.
 	pub(super) fn get_polkadot_call(&self) -> Result<PolkadotRuntimeCall, &'static str> {
 		match &self.network {
@@ -145,6 +214,22 @@ impl CallInfo {
 					.unwrap())
 			},
 			_ => return Err("not a polkadot call"),
+		}
+	}
+
+	// Strip the outer enum and return a Polkadot Asset Hub `RuntimeCall`.
+	pub(super) fn get_polkadot_asset_hub_call(
+		&self,
+	) -> Result<PolkadotAssetHubRuntimeCall, &'static str> {
+		match &self.network {
+			Network::PolkadotAssetHub => {
+				let bytes = &self.encoded;
+				Ok(<PolkadotAssetHubRuntimeCall as parity_scale_codec::Decode>::decode(
+					&mut &bytes[..],
+				)
+				.unwrap())
+			},
+			_ => return Err("not a polkadot asset hub call"),
 		}
 	}
 
@@ -162,13 +247,35 @@ impl CallInfo {
 		}
 	}
 
+	// Strip the outer enum and return a Polkadot Bridge Hub `RuntimeCall`.
+	pub(super) fn get_polkadot_bridge_hub_call(
+		&self,
+	) -> Result<PolkadotBridgeHubRuntimeCall, &'static str> {
+		match &self.network {
+			Network::PolkadotBridgeHub => {
+				let bytes = &self.encoded;
+				Ok(<PolkadotBridgeHubRuntimeCall as parity_scale_codec::Decode>::decode(
+					&mut &bytes[..],
+				)
+				.unwrap())
+			},
+			_ => return Err("not a polkadot bridge hub call"),
+		}
+	}
+
 	pub(super) async fn get_transact_weight_needed(&self, network: Network) -> Weight {
+		// `PolkadotConfig` is a bit confusing. It should work across everything. It contains
+		// basic types like `Nonce`, etc.
 		use subxt::{OnlineClient, PolkadotConfig};
 
 		let url = match network {
 			Network::Kusama => "wss://kusama-rpc.polkadot.io:443",
+			Network::KusamaAssetHub => "wss://kusama-asset-hub-rpc.polkadot.io:443",
+			Network::KusamaBridgeHub => "wss://kusama-bridge-hub-rpc.polkadot.io:443",
 			Network::Polkadot => "wss://rpc.polkadot.io:443",
+			Network::PolkadotAssetHub => "wss://polkadot-asset-hub-rpc.polkadot.io:443",
 			Network::PolkadotCollectives => "wss://polkadot-collectives-rpc.polkadot.io:443",
+			Network::PolkadotBridgeHub => "wss://polkadot-bridge-hub-rpc.polkadot.io:443",
 		};
 
 		let mut args = self.encoded.clone();
@@ -206,6 +313,7 @@ impl CallInfo {
 						self.get_polkadot_collectives_call().expect("collectives");
 					CallOrHash::Call(NetworkRuntimeCall::PolkadotCollectives(collectives_call))
 				},
+				_ => panic!("to do"),
 			};
 		}
 		(print_output, self.length)

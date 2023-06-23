@@ -127,7 +127,7 @@ pub(crate) async fn generate_calls(proposal_details: &ProposalDetails) -> Possib
 		// Kusama Root Origin. Since the Root origin is not part of `OpenGovOrigin`, we match it
 		// specially.
 		NetworkTrack::KusamaRoot => {
-			use kusama::runtime_types::frame_support::dispatch::RawOrigin;
+			use kusama_relay::runtime_types::frame_support::dispatch::RawOrigin;
 			kusama_non_fellowship_referenda(
 				&proposal_details,
 				KusamaOriginCaller::system(RawOrigin::Root),
@@ -175,7 +175,7 @@ pub(crate) async fn generate_calls(proposal_details: &ProposalDetails) -> Possib
 }
 
 fn kusama_fellowship_referenda(proposal_details: &ProposalDetails) -> PossibleCallsToSubmit {
-	use kusama::runtime_types::{
+	use kusama_relay::runtime_types::{
 		frame_support::traits::{preimages::Bounded::Lookup, schedule::DispatchTime},
 		pallet_preimage::pallet::Call as PreimageCall,
 		pallet_referenda::pallet::Call as ReferendaCall,
@@ -274,7 +274,7 @@ fn kusama_non_fellowship_referenda(
 	proposal_details: &ProposalDetails,
 	origin: KusamaOriginCaller,
 ) -> PossibleCallsToSubmit {
-	use kusama::runtime_types::{
+	use kusama_relay::runtime_types::{
 		frame_support::traits::{preimages::Bounded::Lookup, schedule::DispatchTime},
 		pallet_preimage::pallet::Call as PreimageCall,
 		pallet_referenda::pallet::Call as ReferendaCall,
@@ -598,7 +598,7 @@ fn deliver_output(proposal_details: ProposalDetails, calls: PossibleCallsToSubmi
 // Takes a vec of calls, which could be intended for use on different networks, sorts them into the
 // appropriate network, and provides a single batch call for each network.
 fn handle_batch_of_calls(output: &Output, batch: Vec<NetworkRuntimeCall>) {
-	use kusama::runtime_types::pallet_utility::pallet::Call as KusamaUtilityCall;
+	use kusama_relay::runtime_types::pallet_utility::pallet::Call as KusamaUtilityCall;
 	use polkadot_collectives::runtime_types::pallet_utility::pallet::Call as CollectivesUtilityCall;
 	use polkadot_relay::runtime_types::pallet_utility::pallet::Call as PolkadotRelayUtilityCall;
 
