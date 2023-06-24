@@ -61,7 +61,7 @@ pub(super) enum Network {
 }
 
 impl Network {
-	fn get_para_id(&self) -> Result<u32, &'static str> {
+	pub(super) fn get_para_id(&self) -> Result<u32, &'static str> {
 		use Network::*;
 		match &self {
 			Kusama => Err("relay chain"),
@@ -108,8 +108,12 @@ pub(super) enum NetworkTrack {
 // A runtime call wrapped in the network it should execute on.
 pub(super) enum NetworkRuntimeCall {
 	Kusama(KusamaRuntimeCall),
+	KusamaAssetHub(KusamaAssetHubRuntimeCall),
+	KusamaBridgeHub(KusamaBridgeHubRuntimeCall),
 	Polkadot(PolkadotRuntimeCall),
+	PolkadotAssetHub(PolkadotAssetHubRuntimeCall),
 	PolkadotCollectives(CollectivesRuntimeCall),
+	PolkadotBridgeHub(PolkadotBridgeHubRuntimeCall),
 }
 
 // How the user would like to see the output of the program.
@@ -145,9 +149,13 @@ impl CallInfo {
 	pub(super) fn from_runtime_call(call: NetworkRuntimeCall) -> Self {
 		let (network, encoded) = match &call {
 			NetworkRuntimeCall::Kusama(cc) => (Network::Kusama, cc.encode()),
+			NetworkRuntimeCall::KusamaAssetHub(cc) => (Network::KusamaAssetHub, cc.encode()),
+			NetworkRuntimeCall::KusamaBridgeHub(cc) => (Network::KusamaBridgeHub, cc.encode()),
 			NetworkRuntimeCall::Polkadot(cc) => (Network::Polkadot, cc.encode()),
+			NetworkRuntimeCall::PolkadotAssetHub(cc) => (Network::PolkadotAssetHub, cc.encode()),
 			NetworkRuntimeCall::PolkadotCollectives(cc) =>
 				(Network::PolkadotCollectives, cc.encode()),
+			NetworkRuntimeCall::PolkadotBridgeHub(cc) => (Network::PolkadotBridgeHub, cc.encode()),
 		};
 		let hash = sp_core::blake2_256(&encoded);
 		let length: u32 = (*&encoded.len()).try_into().unwrap();
@@ -174,6 +182,7 @@ impl CallInfo {
 	}
 
 	// Strip the outer enum and return a Kusama Asset Hub `RuntimeCall`.
+	#[allow(dead_code)]
 	pub(super) fn get_kusama_asset_hub_call(
 		&self,
 	) -> Result<KusamaAssetHubRuntimeCall, &'static str> {
@@ -190,6 +199,7 @@ impl CallInfo {
 	}
 
 	// Strip the outer enum and return a Kusama Bridge Hub `RuntimeCall`.
+	#[allow(dead_code)]
 	pub(super) fn get_kusama_bridge_hub_call(
 		&self,
 	) -> Result<KusamaBridgeHubRuntimeCall, &'static str> {
@@ -218,6 +228,7 @@ impl CallInfo {
 	}
 
 	// Strip the outer enum and return a Polkadot Asset Hub `RuntimeCall`.
+	#[allow(dead_code)]
 	pub(super) fn get_polkadot_asset_hub_call(
 		&self,
 	) -> Result<PolkadotAssetHubRuntimeCall, &'static str> {
@@ -248,6 +259,7 @@ impl CallInfo {
 	}
 
 	// Strip the outer enum and return a Polkadot Bridge Hub `RuntimeCall`.
+	#[allow(dead_code)]
 	pub(super) fn get_polkadot_bridge_hub_call(
 		&self,
 	) -> Result<PolkadotBridgeHubRuntimeCall, &'static str> {
@@ -263,7 +275,11 @@ impl CallInfo {
 		}
 	}
 
-	pub(super) async fn get_transact_weight_needed(&self, network: Network) -> Weight {
+	pub(super) async fn get_transact_weight_needed(
+		&self,
+		network: &Network,
+		fallback_weight: Weight,
+	) -> Weight {
 		// `PolkadotConfig` is a bit confusing. It should work across everything. It contains
 		// basic types like `Nonce`, etc.
 		use subxt::{OnlineClient, PolkadotConfig};
@@ -286,7 +302,7 @@ impl CallInfo {
 		let (weight_needed, _, _): (Weight, u8, u128) = runtime_apis
 			.call_raw("TransactionPaymentCallApi_query_call_info", Some(&args))
 			.await
-			.expect("response from API");
+			.unwrap_or((fallback_weight, 0u8, 0u128));
 		weight_needed
 	}
 

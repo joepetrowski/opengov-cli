@@ -386,8 +386,10 @@ async fn polkadot_fellowship_referenda(
 			// Do some weight calculation for execution of Transact on the Relay Chain.
 			let max_ref_time: u64 = 2_000_000_000_000 - 1;
 			let max_proof_size: u64 = 5 * 1024 * 1024 - 1;
-			let relay_weight_needed =
-				whitelist_call.get_transact_weight_needed(Network::Polkadot).await;
+			let relay_weight_needed = whitelist_call.get_transact_weight_needed(
+				&Network::Polkadot,
+				Weight { ref_time: 1_000_000_000, proof_size: 10_000 }
+			).await;
 			// Double the weight needed, just to be safe from a runtime upgrade that could change
 			// things during the referendum period.
 			(
@@ -611,6 +613,7 @@ fn handle_batch_of_calls(output: &Output, batch: Vec<NetworkRuntimeCall>) {
 			NetworkRuntimeCall::Kusama(cc) => kusama_relay_batch.push(cc),
 			NetworkRuntimeCall::Polkadot(cc) => polkadot_relay_batch.push(cc),
 			NetworkRuntimeCall::PolkadotCollectives(cc) => polkadot_collectives_batch.push(cc),
+			_ => panic!("no other chains are needed for this"),
 		}
 	}
 	if kusama_relay_batch.len() > 0 {
@@ -686,5 +689,6 @@ fn print_output(output: &Output, network_call: &NetworkRuntimeCall) {
 				),
 			}
 		},
+		_ => panic!("no other chains are needed for this"),
 	}
 }
