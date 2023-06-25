@@ -13,7 +13,7 @@ $ git clone https://github.com/joepetrowski/opengov-cli.git
 $ cd opengov-cli
 $ cargo build
 $ ./target/debug/opengov-cli --help
-Utilities for submiting OpenGov referenda and constructing tedious calls
+Utilities for submitting OpenGov referenda and constructing tedious calls
 
 Usage: opengov-cli <COMMAND>
 

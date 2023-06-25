@@ -9,7 +9,7 @@ use clap::Parser as ClapParser;
 #[cfg(test)]
 mod tests;
 
-/// Utilities for submiting OpenGov referenda and constructing tedious calls.
+/// Utilities for submitting OpenGov referenda and constructing tedious calls.
 #[derive(Debug, ClapParser)]
 enum Command {
 	BuildUpgrade(UpgradeArgs),
