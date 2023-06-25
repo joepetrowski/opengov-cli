@@ -41,8 +41,6 @@ pub(super) use polkadot_collectives::runtime_types::{
 		fellowship::origins::pallet_origins::Origin as FellowshipOrigins,
 		RuntimeCall as CollectivesRuntimeCall,
 	},
-	// We'll use Collectives `Weight` throughout. It sort of needs to be consistent across chains
-	// for anything to work anyway.
 	sp_weights::weight_v2::Weight,
 };
 
@@ -75,7 +73,7 @@ impl Network {
 	}
 }
 
-// Info and preferences provided by the user.
+// Info and preferences provided by the user for proposal submission.
 pub(super) struct ProposalDetails {
 	// The proposal, generated elsewhere and pasted here.
 	pub(super) proposal: String,
@@ -95,6 +93,29 @@ pub(super) struct ProposalDetails {
 	// `Transact` instruction. If `None`, then the program will fetch the required weight (plus a 2x
 	// factor of safety) and construct the instruction with that.
 	pub(super) transact_weight_override: Option<Weight>,
+}
+
+// Info and preferences provided by the user for runtime upgrade construction.
+pub(super) struct UpgradeDetails {
+	// The Relay Network for this upgrade, Polkadot or Kusama.
+	pub(super) relay: VersionedNetwork,
+	// All networks to upgrade.
+	pub(super) networks: Vec<VersionedNetwork>,
+	// The directory into which to write information needed.
+	pub(super) directory: String,
+	// The filename of the output.
+	pub(super) output_file: String,
+	// Possible override of the Polkadot semver parsing. For example, the program will parse "9430"
+	// as "0.9.43", but sometimes there are releases like "0.9.43-1" or "0.9.43-rc6".
+	pub(super) semver_override: Option<String>,
+}
+
+// A network and the version to which it will upgrade.
+pub(super) struct VersionedNetwork {
+	// A network identifier.
+	pub(super) network: Network,
+	// A runtime version number (i.e. "9430", not "0.9.43").
+	pub(super) version: String,
 }
 
 // The network and OpenGov track this proposal should be voted on.

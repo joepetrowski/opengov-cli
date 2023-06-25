@@ -2,6 +2,7 @@ use crate::*;
 use clap::Parser as ClapParser;
 use std::fs;
 
+/// Generate all the calls needed to submit a proposal as a referendum in OpenGov.
 #[derive(Debug, ClapParser)]
 pub(crate) struct ReferendumArgs {
 	/// The encoded proposal that we want to submit. This can either be the call data itself,
@@ -38,6 +39,7 @@ pub(crate) struct ReferendumArgs {
 	output: Option<String>,
 }
 
+// The sub-command's "main" function.
 pub(crate) async fn submit_referendum(prefs: ReferendumArgs) {
 	// Find out what the user wants to do.
 	let proposal_details = parse_inputs(prefs);
@@ -47,6 +49,7 @@ pub(crate) async fn submit_referendum(prefs: ReferendumArgs) {
 	deliver_output(proposal_details, calls);
 }
 
+// Parse the CLI inputs and return a typed struct with all the details needed.
 fn parse_inputs(prefs: ReferendumArgs) -> ProposalDetails {
 	use DispatchTimeWrapper::*;
 	use NetworkTrack::*;
@@ -122,6 +125,7 @@ fn parse_inputs(prefs: ReferendumArgs) -> ProposalDetails {
 	}
 }
 
+// Generate all the calls needed.
 pub(crate) async fn generate_calls(proposal_details: &ProposalDetails) -> PossibleCallsToSubmit {
 	match &proposal_details.track {
 		// Kusama Root Origin. Since the Root origin is not part of `OpenGovOrigin`, we match it
@@ -174,6 +178,7 @@ pub(crate) async fn generate_calls(proposal_details: &ProposalDetails) -> Possib
 	}
 }
 
+// Generate the calls needed for a proposal to pass through the Kusama Fellowship.
 fn kusama_fellowship_referenda(proposal_details: &ProposalDetails) -> PossibleCallsToSubmit {
 	use kusama_relay::runtime_types::{
 		frame_support::traits::{preimages::Bounded::Lookup, schedule::DispatchTime},
@@ -270,6 +275,7 @@ fn kusama_fellowship_referenda(proposal_details: &ProposalDetails) -> PossibleCa
 	}
 }
 
+// Generate the calls needed for a proposal to pass on Kusama without the Fellowship.
 fn kusama_non_fellowship_referenda(
 	proposal_details: &ProposalDetails,
 	origin: KusamaOriginCaller,
@@ -314,6 +320,7 @@ fn kusama_non_fellowship_referenda(
 	}
 }
 
+// Generate the calls needed for a proposal to pass through the Polkadot Fellowship.
 async fn polkadot_fellowship_referenda(
 	proposal_details: &ProposalDetails,
 ) -> PossibleCallsToSubmit {
@@ -500,6 +507,7 @@ async fn polkadot_fellowship_referenda(
 	}
 }
 
+// Generate the calls needed for a proposal to pass on Polkadot without the Fellowship.
 fn polkadot_non_fellowship_referenda(
 	proposal_details: &ProposalDetails,
 	origin: PolkadotOriginCaller,
