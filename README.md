@@ -9,8 +9,8 @@ It also provides a utility to construct a runtime upgrade call that will batch t
 This is a CLI program. To get started:
 
 ```
-$ git clone https://github.com/joepetrowski/opengov-submit.git
-$ cd opengov-submit
+$ git clone https://github.com/joepetrowski/opengov-cli.git
+$ cd opengov-cli
 $ cargo build
 $ ./target/debug/opengov-cli --help
 Utilities for submiting OpenGov referenda and constructing tedious calls
