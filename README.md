@@ -1,20 +1,38 @@
-# OpenGov Call Constructor
+# OpenGov CLI
 
-This script will construct the calls needed to submit a proposal to OpenGov on Kusama or Polkadot. It assumes that you construct the proposal (i.e., the privileged call you want to execute) elsewhere (e.g. Polkadot JS Apps UI Extrinsics tab). It will return all the calls that you will need to sign and submit (also using, e.g., the Apps UI Extrinsics tab). Note that you may need to submit calls on multiple chains.
+This program's primary purpose is to construct all the needed calls to submit a proposal as an OpenGov referendum on Kusama or Polkadot. It assumes that you construct the proposal (i.e., the privileged call you want to execute) elsewhere (e.g. Polkadot JS Apps UI Extrinsics tab). It will return all the calls that you will need to sign and submit (also using, e.g., the Apps UI Extrinsics tab). Note that you may need to submit calls on multiple chains.
 
-## Notes
-
-1. This returns up to four calls, but they can actually be submitted in any order. However, if dispatching a whitelisted call, the Fellowship referendum will have to _enact_ (whitelisting the call) before the public one does. The preimages do not need to be submitted in order to start the referenda, but they will eventually in order to enact.
+It also provides a utility to construct a runtime upgrade call that will batch the upgrades of the Kusama or Polkadot Relay Chain with the upgrades of all their respective system parachains.
 
 ## CLI
 
-This is a CLI program. Currently it only has one subcommand, `submit-referendum`.
+This is a CLI program. To get started:
 
 ```
 $ git clone https://github.com/joepetrowski/opengov-submit.git
 $ cd opengov-submit
 $ cargo build
+$ ./target/debug/opengov-cli --help
+Utilities for submiting OpenGov referenda and constructing tedious calls
+
+Usage: opengov-cli <COMMAND>
+
+Commands:
+  build-upgrade      Generate a single call that will upgrade a Relay Chain and all of its system parachains
+  submit-referendum  Generate all the calls needed to submit a proposal as a referendum in OpenGov
+  help               Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help  Print help
+```
+
+### Submit Referendum
+
+The `submit-referendum` subcommand will take a proposal and some parameters and create all the necessary calls. Note that they can actually be submitted in any order. The preimages do not need to be submitted in order to start the referenda, but they will eventually in order to enact.
+
+```
 $ ./target/debug/opengov-cli submit-referendum --help
+Generate all the calls needed to submit a proposal as a referendum in OpenGov
 
 Usage: opengov-cli submit-referendum [OPTIONS] --proposal <PROPOSAL> --network <NETWORK> --track <TRACK> --when <WHEN> --blocks <BLOCKS>
 
@@ -39,11 +57,69 @@ Options:
           Print help
 ```
 
-## Example
+### Build Upgrade
 
-### Proposal
+The `build-upgrade` subcommand will take a Relay Chain name and version and construct a single call to upgrade the Relay Chain and all of its system parachains.
 
-Send an [XCM to Statemine](https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Fkusama-rpc.polkadot.io#/extrinsics/decode/0x630001000100a10f0204060202286bee880102957f0c9b47bc84d11116aef273e61565cf893801e7db0223aeea112e53922a4a) to authorize an upgrade.
+```
+$ ./target/debug/opengov-cli build-upgrade --help
+Generate a single call that will upgrade a Relay Chain and all of its system parachains
+
+Usage: opengov-cli build-upgrade [OPTIONS] --network <NETWORK> --relay-version <RELAY_VERSION>
+
+Options:
+  -n, --network <NETWORK>
+          Network on which to submit the referendum. `polkadot` or `kusama`
+      --relay-version <RELAY_VERSION>
+          The runtime version of the Relay Chain to which to upgrade. E.g. "9430" or "latest"
+      --parachain-version <PARACHAIN_VERSION>
+          Optional. The runtime version of the system parachains to which to upgrade. E.g. "9430" or "latest". If not provided, it will use the Relay Chain's version
+      --filename <FILENAME>
+          Name of the file to which to write the output. If not provided, a default will be constructed
+      --relay-semver <RELAY_SEMVER>
+          Override the conversion of runtime version to semver. For example the release 9430 mapping to v0.9.43. Use this if the program fails to download the Relay Chain runtime
+  -h, --help
+          Print help
+```
+
+## Examples
+
+### Build Upgrade
+
+```
+$ ./target/debug/opengov-cli build-upgrade --network "polkadot" --relay-version "9430"
+
+Downloading runtimes.
+
+Downloading... polkadot_runtime-v9430.compact.compressed.wasm
+Downloading... statemint_runtime-v9430.compact.compressed.wasm
+Downloading... collectives-polkadot_runtime-v9430.compact.compressed.wasm
+Downloading... bridge-hub-polkadot_runtime-v9430.compact.compressed.wasm
+
+Generating parachain authorization calls. The runtime hashes are logged if you would like to verify them with srtool.
+
+Polkadot Asset Hub Runtime Hash:   0xc90110c215c22fbdbc9ad6dad96b04622672e7107e272f99b1d8087d886bcb91
+Polkadot Collectives Runtime Hash: 0xf626bf4b4a80fba4c6b21fda0c8b49c44a2115dfc5320d0a67a6e6c17e87a3ed
+Polkadot Bridge Hub Runtime Hash:  0x1cbac9d27448dc0777f7253fb8b976bc60c6077178a4cec9c8582d12199490bd
+
+Generating Relay Chain upgrade call. The runtime hash is logged if you would like to verify it with srtool.
+
+Polkadot Relay Chain Runtime Hash: 0x8500f322de7d01ce9e51593fc3187341e04b647bcb325ab3d20b362dcfb811d2
+
+Batching calls.
+
+Success! The call data was written to ./upgrade-polkadot-9430/polkadot-9430.call
+To submit this as a referendum in OpenGov, run:
+
+opengov-cli submit-referendum \
+    --proposal "./upgrade-polkadot-9430/polkadot-9430.call" \
+    --network "polkadot" --track <"root" or "whitelistedcaller"> \
+    --when <"at" or "after"> --blocks <number>
+```
+
+### Submit a Referendum on Kusama
+
+As a proposal, send an [XCM to Statemine](https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Fkusama-rpc.polkadot.io#/extrinsics/decode/0x630001000100a10f0204060202286bee880102957f0c9b47bc84d11116aef273e61565cf893801e7db0223aeea112e53922a4a) to authorize an upgrade.
 
 Call data:
 ```
@@ -51,10 +127,6 @@ Call data:
 ```
 
 This has a call hash of `0x4149bf15976cd3c0c244ca0cd43d59fed76f4bb936b186cc18bd88dee6edd986`.
-
-### Run the Script
-
-#### Kusama
 
 ```
 $ ./target/debug/opengov-cli submit-referendum \
@@ -80,11 +152,11 @@ https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Fkusama-rpc.polkadot.io#/extrinsics
 
 This will return either two or four calls, the latter if the origin is `WhitelistedCaller`, which will require a preimage and referendum for the Fellowship. It also returns a batch call if you want to submit them all at once (you can hide this with `--no-batch "true"`).
 
-#### Polkadot
+#### Submit a Referendum on Polkadot
 
 For Polkadot, we will use a proposal of `0x0000645468652046656c6c6f777368697020736179732068656c6c6f`, which is a `system.remark` call. We will use the Fellowship to whitelist it.
 
-The Fellowship is on the Collectives parachain, so this will require a referendum on the Collectives chain for the Fellowship to whitelist a call, and then a referendum on the Relay Chain for it to pass public vote. Notice the WSS nodes pointing to different chains in the output.
+The Fellowship is on the Collectives parachain, so this will require a referendum on the Collectives chain for the Fellowship to whitelist a call, and a referendum on the Relay Chain for it to pass public vote. Notice the WSS nodes pointing to different chains in the output.
 
 ```
 $ ./target/debug/opengov-cli submit-referendum \
@@ -113,7 +185,7 @@ https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Fpolkadot-collectives-rpc.polkadot.
 
 ### Checking the Results
 
-Let's check each of these calls and ensure they match our expectations.
+We will use the Kusama referendum example to check the output. Let's check each of these calls and ensure they match our expectations.
 
 The **first one** just gives us some bytes wrapped in a `note_preimage` call:
 

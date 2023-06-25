@@ -4,11 +4,20 @@ pub(super) use subxt::ext::sp_core;
 	runtime_metadata_url = "wss://kusama-rpc.polkadot.io:443",
 	derive_for_all_types = "PartialEq, Clone"
 )]
-pub mod kusama {}
-pub(super) use kusama::runtime_types::kusama_runtime::{
+pub mod kusama_relay {}
+pub(super) use kusama_relay::runtime_types::kusama_runtime::{
 	governance::origins::pallet_custom_origins::Origin as KusamaOpenGovOrigin,
 	OriginCaller as KusamaOriginCaller, RuntimeCall as KusamaRuntimeCall,
 };
+
+#[subxt::subxt(runtime_metadata_url = "wss://kusama-asset-hub-rpc.polkadot.io:443")]
+pub mod kusama_asset_hub {}
+// pub(super) use kusama_asset_hub::runtime_types::asset_hub_kusama_runtime::RuntimeCall as KusamaAssetHubRuntimeCall;
+pub(super) use kusama_asset_hub::runtime_types::statemine_runtime::RuntimeCall as KusamaAssetHubRuntimeCall;
+
+#[subxt::subxt(runtime_metadata_url = "wss://kusama-bridge-hub-rpc.polkadot.io:443")]
+pub mod kusama_bridge_hub {}
+pub(super) use kusama_bridge_hub::runtime_types::bridge_hub_kusama_runtime::RuntimeCall as KusamaBridgeHubRuntimeCall;
 
 #[subxt::subxt(
 	runtime_metadata_url = "wss://rpc.polkadot.io:443",
@@ -20,6 +29,11 @@ pub(super) use polkadot_relay::runtime_types::polkadot_runtime::{
 	OriginCaller as PolkadotOriginCaller, RuntimeCall as PolkadotRuntimeCall,
 };
 
+#[subxt::subxt(runtime_metadata_url = "wss://polkadot-asset-hub-rpc.polkadot.io:443")]
+pub mod polkadot_asset_hub {}
+// pub(super) use polkadot_asset_hub::runtime_types::asset_hub_polkadot_runtime::RuntimeCall as PolkadotAssetHubRuntimeCall;
+pub(super) use polkadot_asset_hub::runtime_types::statemint_runtime::RuntimeCall as PolkadotAssetHubRuntimeCall;
+
 #[subxt::subxt(runtime_metadata_url = "wss://polkadot-collectives-rpc.polkadot.io:443")]
 pub mod polkadot_collectives {}
 pub(super) use polkadot_collectives::runtime_types::{
@@ -27,18 +41,39 @@ pub(super) use polkadot_collectives::runtime_types::{
 		fellowship::origins::pallet_origins::Origin as FellowshipOrigins,
 		RuntimeCall as CollectivesRuntimeCall,
 	},
-	// We'll use Collectives `Weight` throughout. It sort of needs to be consistent across chains
-	// for anything to work anyway.
 	sp_weights::weight_v2::Weight,
 };
 
+#[subxt::subxt(runtime_metadata_url = "wss://polkadot-bridge-hub-rpc.polkadot.io:443")]
+pub mod polkadot_bridge_hub {}
+pub(super) use polkadot_bridge_hub::runtime_types::bridge_hub_polkadot_runtime::RuntimeCall as PolkadotBridgeHubRuntimeCall;
+
 pub(super) enum Network {
 	Kusama,
+	KusamaAssetHub,
+	KusamaBridgeHub,
 	Polkadot,
+	PolkadotAssetHub,
 	PolkadotCollectives,
+	PolkadotBridgeHub,
 }
 
-// Info and preferences provided by the user.
+impl Network {
+	pub(super) fn get_para_id(&self) -> Result<u32, &'static str> {
+		use Network::*;
+		match &self {
+			Kusama => Err("relay chain"),
+			KusamaAssetHub => Ok(1_000),
+			KusamaBridgeHub => Ok(1_002),
+			Polkadot => Err("relay chain"),
+			PolkadotAssetHub => Ok(1_000),
+			PolkadotCollectives => Ok(1_001),
+			PolkadotBridgeHub => Ok(1_002),
+		}
+	}
+}
+
+// Info and preferences provided by the user for proposal submission.
 pub(super) struct ProposalDetails {
 	// The proposal, generated elsewhere and pasted here.
 	pub(super) proposal: String,
@@ -60,6 +95,29 @@ pub(super) struct ProposalDetails {
 	pub(super) transact_weight_override: Option<Weight>,
 }
 
+// Info and preferences provided by the user for runtime upgrade construction.
+pub(super) struct UpgradeDetails {
+	// The Relay Network for this upgrade, Polkadot or Kusama.
+	pub(super) relay: VersionedNetwork,
+	// All networks to upgrade.
+	pub(super) networks: Vec<VersionedNetwork>,
+	// The directory into which to write information needed.
+	pub(super) directory: String,
+	// The filename of the output.
+	pub(super) output_file: String,
+	// Possible override of the Polkadot semver parsing. For example, the program will parse "9430"
+	// as "0.9.43", but sometimes there are releases like "0.9.43-1" or "0.9.43-rc6".
+	pub(super) semver_override: Option<String>,
+}
+
+// A network and the version to which it will upgrade.
+pub(super) struct VersionedNetwork {
+	// A network identifier.
+	pub(super) network: Network,
+	// A runtime version number (i.e. "9430", not "0.9.43").
+	pub(super) version: String,
+}
+
 // The network and OpenGov track this proposal should be voted on.
 pub(super) enum NetworkTrack {
 	KusamaRoot,
@@ -71,8 +129,12 @@ pub(super) enum NetworkTrack {
 // A runtime call wrapped in the network it should execute on.
 pub(super) enum NetworkRuntimeCall {
 	Kusama(KusamaRuntimeCall),
+	KusamaAssetHub(KusamaAssetHubRuntimeCall),
+	KusamaBridgeHub(KusamaBridgeHubRuntimeCall),
 	Polkadot(PolkadotRuntimeCall),
+	PolkadotAssetHub(PolkadotAssetHubRuntimeCall),
 	PolkadotCollectives(CollectivesRuntimeCall),
+	PolkadotBridgeHub(PolkadotBridgeHubRuntimeCall),
 }
 
 // How the user would like to see the output of the program.
@@ -108,9 +170,13 @@ impl CallInfo {
 	pub(super) fn from_runtime_call(call: NetworkRuntimeCall) -> Self {
 		let (network, encoded) = match &call {
 			NetworkRuntimeCall::Kusama(cc) => (Network::Kusama, cc.encode()),
+			NetworkRuntimeCall::KusamaAssetHub(cc) => (Network::KusamaAssetHub, cc.encode()),
+			NetworkRuntimeCall::KusamaBridgeHub(cc) => (Network::KusamaBridgeHub, cc.encode()),
 			NetworkRuntimeCall::Polkadot(cc) => (Network::Polkadot, cc.encode()),
+			NetworkRuntimeCall::PolkadotAssetHub(cc) => (Network::PolkadotAssetHub, cc.encode()),
 			NetworkRuntimeCall::PolkadotCollectives(cc) =>
 				(Network::PolkadotCollectives, cc.encode()),
+			NetworkRuntimeCall::PolkadotBridgeHub(cc) => (Network::PolkadotBridgeHub, cc.encode()),
 		};
 		let hash = sp_core::blake2_256(&encoded);
 		let length: u32 = (*&encoded.len()).try_into().unwrap();
@@ -136,6 +202,40 @@ impl CallInfo {
 		}
 	}
 
+	// Strip the outer enum and return a Kusama Asset Hub `RuntimeCall`.
+	#[allow(dead_code)]
+	pub(super) fn get_kusama_asset_hub_call(
+		&self,
+	) -> Result<KusamaAssetHubRuntimeCall, &'static str> {
+		match &self.network {
+			Network::KusamaAssetHub => {
+				let bytes = &self.encoded;
+				Ok(<KusamaAssetHubRuntimeCall as parity_scale_codec::Decode>::decode(
+					&mut &bytes[..],
+				)
+				.unwrap())
+			},
+			_ => return Err("not a kusama asset hub call"),
+		}
+	}
+
+	// Strip the outer enum and return a Kusama Bridge Hub `RuntimeCall`.
+	#[allow(dead_code)]
+	pub(super) fn get_kusama_bridge_hub_call(
+		&self,
+	) -> Result<KusamaBridgeHubRuntimeCall, &'static str> {
+		match &self.network {
+			Network::KusamaBridgeHub => {
+				let bytes = &self.encoded;
+				Ok(<KusamaBridgeHubRuntimeCall as parity_scale_codec::Decode>::decode(
+					&mut &bytes[..],
+				)
+				.unwrap())
+			},
+			_ => return Err("not a kusama bridge hub call"),
+		}
+	}
+
 	// Strip the outer enum and return a Polkadot Relay `RuntimeCall`.
 	pub(super) fn get_polkadot_call(&self) -> Result<PolkadotRuntimeCall, &'static str> {
 		match &self.network {
@@ -145,6 +245,23 @@ impl CallInfo {
 					.unwrap())
 			},
 			_ => return Err("not a polkadot call"),
+		}
+	}
+
+	// Strip the outer enum and return a Polkadot Asset Hub `RuntimeCall`.
+	#[allow(dead_code)]
+	pub(super) fn get_polkadot_asset_hub_call(
+		&self,
+	) -> Result<PolkadotAssetHubRuntimeCall, &'static str> {
+		match &self.network {
+			Network::PolkadotAssetHub => {
+				let bytes = &self.encoded;
+				Ok(<PolkadotAssetHubRuntimeCall as parity_scale_codec::Decode>::decode(
+					&mut &bytes[..],
+				)
+				.unwrap())
+			},
+			_ => return Err("not a polkadot asset hub call"),
 		}
 	}
 
@@ -162,13 +279,40 @@ impl CallInfo {
 		}
 	}
 
-	pub(super) async fn get_transact_weight_needed(&self, network: Network) -> Weight {
+	// Strip the outer enum and return a Polkadot Bridge Hub `RuntimeCall`.
+	#[allow(dead_code)]
+	pub(super) fn get_polkadot_bridge_hub_call(
+		&self,
+	) -> Result<PolkadotBridgeHubRuntimeCall, &'static str> {
+		match &self.network {
+			Network::PolkadotBridgeHub => {
+				let bytes = &self.encoded;
+				Ok(<PolkadotBridgeHubRuntimeCall as parity_scale_codec::Decode>::decode(
+					&mut &bytes[..],
+				)
+				.unwrap())
+			},
+			_ => return Err("not a polkadot bridge hub call"),
+		}
+	}
+
+	pub(super) async fn get_transact_weight_needed(
+		&self,
+		network: &Network,
+		fallback_weight: Weight,
+	) -> Weight {
+		// `PolkadotConfig` is a bit confusing. It should work across everything. It contains
+		// basic types like `Nonce`, etc.
 		use subxt::{OnlineClient, PolkadotConfig};
 
 		let url = match network {
 			Network::Kusama => "wss://kusama-rpc.polkadot.io:443",
+			Network::KusamaAssetHub => "wss://kusama-asset-hub-rpc.polkadot.io:443",
+			Network::KusamaBridgeHub => "wss://kusama-bridge-hub-rpc.polkadot.io:443",
 			Network::Polkadot => "wss://rpc.polkadot.io:443",
+			Network::PolkadotAssetHub => "wss://polkadot-asset-hub-rpc.polkadot.io:443",
 			Network::PolkadotCollectives => "wss://polkadot-collectives-rpc.polkadot.io:443",
+			Network::PolkadotBridgeHub => "wss://polkadot-bridge-hub-rpc.polkadot.io:443",
 		};
 
 		let mut args = self.encoded.clone();
@@ -179,7 +323,7 @@ impl CallInfo {
 		let (weight_needed, _, _): (Weight, u8, u128) = runtime_apis
 			.call_raw("TransactionPaymentCallApi_query_call_info", Some(&args))
 			.await
-			.expect("response from API");
+			.unwrap_or((fallback_weight, 0u8, 0u128));
 		weight_needed
 	}
 
@@ -206,6 +350,7 @@ impl CallInfo {
 						self.get_polkadot_collectives_call().expect("collectives");
 					CallOrHash::Call(NetworkRuntimeCall::PolkadotCollectives(collectives_call))
 				},
+				_ => panic!("to do"),
 			};
 		}
 		(print_output, self.length)

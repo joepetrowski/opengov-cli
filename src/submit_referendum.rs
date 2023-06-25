@@ -2,6 +2,7 @@ use crate::*;
 use clap::Parser as ClapParser;
 use std::fs;
 
+/// Generate all the calls needed to submit a proposal as a referendum in OpenGov.
 #[derive(Debug, ClapParser)]
 pub(crate) struct ReferendumArgs {
 	/// The encoded proposal that we want to submit. This can either be the call data itself,
@@ -38,6 +39,7 @@ pub(crate) struct ReferendumArgs {
 	output: Option<String>,
 }
 
+// The sub-command's "main" function.
 pub(crate) async fn submit_referendum(prefs: ReferendumArgs) {
 	// Find out what the user wants to do.
 	let proposal_details = parse_inputs(prefs);
@@ -47,6 +49,7 @@ pub(crate) async fn submit_referendum(prefs: ReferendumArgs) {
 	deliver_output(proposal_details, calls);
 }
 
+// Parse the CLI inputs and return a typed struct with all the details needed.
 fn parse_inputs(prefs: ReferendumArgs) -> ProposalDetails {
 	use DispatchTimeWrapper::*;
 	use NetworkTrack::*;
@@ -122,12 +125,13 @@ fn parse_inputs(prefs: ReferendumArgs) -> ProposalDetails {
 	}
 }
 
+// Generate all the calls needed.
 pub(crate) async fn generate_calls(proposal_details: &ProposalDetails) -> PossibleCallsToSubmit {
 	match &proposal_details.track {
 		// Kusama Root Origin. Since the Root origin is not part of `OpenGovOrigin`, we match it
 		// specially.
 		NetworkTrack::KusamaRoot => {
-			use kusama::runtime_types::frame_support::dispatch::RawOrigin;
+			use kusama_relay::runtime_types::frame_support::dispatch::RawOrigin;
 			kusama_non_fellowship_referenda(
 				&proposal_details,
 				KusamaOriginCaller::system(RawOrigin::Root),
@@ -174,8 +178,9 @@ pub(crate) async fn generate_calls(proposal_details: &ProposalDetails) -> Possib
 	}
 }
 
+// Generate the calls needed for a proposal to pass through the Kusama Fellowship.
 fn kusama_fellowship_referenda(proposal_details: &ProposalDetails) -> PossibleCallsToSubmit {
-	use kusama::runtime_types::{
+	use kusama_relay::runtime_types::{
 		frame_support::traits::{preimages::Bounded::Lookup, schedule::DispatchTime},
 		pallet_preimage::pallet::Call as PreimageCall,
 		pallet_referenda::pallet::Call as ReferendaCall,
@@ -270,11 +275,12 @@ fn kusama_fellowship_referenda(proposal_details: &ProposalDetails) -> PossibleCa
 	}
 }
 
+// Generate the calls needed for a proposal to pass on Kusama without the Fellowship.
 fn kusama_non_fellowship_referenda(
 	proposal_details: &ProposalDetails,
 	origin: KusamaOriginCaller,
 ) -> PossibleCallsToSubmit {
-	use kusama::runtime_types::{
+	use kusama_relay::runtime_types::{
 		frame_support::traits::{preimages::Bounded::Lookup, schedule::DispatchTime},
 		pallet_preimage::pallet::Call as PreimageCall,
 		pallet_referenda::pallet::Call as ReferendaCall,
@@ -314,6 +320,7 @@ fn kusama_non_fellowship_referenda(
 	}
 }
 
+// Generate the calls needed for a proposal to pass through the Polkadot Fellowship.
 async fn polkadot_fellowship_referenda(
 	proposal_details: &ProposalDetails,
 ) -> PossibleCallsToSubmit {
@@ -386,8 +393,10 @@ async fn polkadot_fellowship_referenda(
 			// Do some weight calculation for execution of Transact on the Relay Chain.
 			let max_ref_time: u64 = 2_000_000_000_000 - 1;
 			let max_proof_size: u64 = 5 * 1024 * 1024 - 1;
-			let relay_weight_needed =
-				whitelist_call.get_transact_weight_needed(Network::Polkadot).await;
+			let relay_weight_needed = whitelist_call.get_transact_weight_needed(
+				&Network::Polkadot,
+				Weight { ref_time: 1_000_000_000, proof_size: 10_000 }
+			).await;
 			// Double the weight needed, just to be safe from a runtime upgrade that could change
 			// things during the referendum period.
 			(
@@ -498,6 +507,7 @@ async fn polkadot_fellowship_referenda(
 	}
 }
 
+// Generate the calls needed for a proposal to pass on Polkadot without the Fellowship.
 fn polkadot_non_fellowship_referenda(
 	proposal_details: &ProposalDetails,
 	origin: PolkadotOriginCaller,
@@ -598,7 +608,7 @@ fn deliver_output(proposal_details: ProposalDetails, calls: PossibleCallsToSubmi
 // Takes a vec of calls, which could be intended for use on different networks, sorts them into the
 // appropriate network, and provides a single batch call for each network.
 fn handle_batch_of_calls(output: &Output, batch: Vec<NetworkRuntimeCall>) {
-	use kusama::runtime_types::pallet_utility::pallet::Call as KusamaUtilityCall;
+	use kusama_relay::runtime_types::pallet_utility::pallet::Call as KusamaUtilityCall;
 	use polkadot_collectives::runtime_types::pallet_utility::pallet::Call as CollectivesUtilityCall;
 	use polkadot_relay::runtime_types::pallet_utility::pallet::Call as PolkadotRelayUtilityCall;
 
@@ -611,6 +621,7 @@ fn handle_batch_of_calls(output: &Output, batch: Vec<NetworkRuntimeCall>) {
 			NetworkRuntimeCall::Kusama(cc) => kusama_relay_batch.push(cc),
 			NetworkRuntimeCall::Polkadot(cc) => polkadot_relay_batch.push(cc),
 			NetworkRuntimeCall::PolkadotCollectives(cc) => polkadot_collectives_batch.push(cc),
+			_ => panic!("no other chains are needed for this"),
 		}
 	}
 	if kusama_relay_batch.len() > 0 {
@@ -686,5 +697,6 @@ fn print_output(output: &Output, network_call: &NetworkRuntimeCall) {
 				),
 			}
 		},
+		_ => panic!("no other chains are needed for this"),
 	}
 }
