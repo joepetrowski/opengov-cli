@@ -549,6 +549,5 @@ fn write_batch(upgrade_details: &UpgradeDetails, batch: CallInfo) {
 	};
 	println!("\nopengov-cli submit-referendum \\");
 	println!("    --proposal \"{}\" \\", fname);
-	println!("    --network \"{}\" --track <\"root\" or \"whitelistedcaller\"> \\", network);
-	println!("    --when <\"at\" or \"after\"> --blocks <number>\n");
+	println!("    --network \"{}\" --track <\"root\" or \"whitelistedcaller\">", network);
 }

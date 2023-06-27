@@ -34,7 +34,7 @@ The `submit-referendum` subcommand will take a proposal and some parameters and 
 $ ./target/debug/opengov-cli submit-referendum --help
 Generate all the calls needed to submit a proposal as a referendum in OpenGov
 
-Usage: opengov-cli submit-referendum [OPTIONS] --proposal <PROPOSAL> --network <NETWORK> --track <TRACK> --when <WHEN> --blocks <BLOCKS>
+Usage: opengov-cli submit-referendum [OPTIONS] --proposal <PROPOSAL> --network <NETWORK> --track <TRACK>
 
 Options:
   -p, --proposal <PROPOSAL>
@@ -43,10 +43,10 @@ Options:
           Network on which to submit the referendum. `polkadot` or `kusama`
   -t, --track <TRACK>
           Track on which to submit the referendum
-  -w, --when <WHEN>
-          Dispatch `At` or `After`
-  -b, --blocks <BLOCKS>
-          The number of blocks to fill `At` or `After`
+      --at <AT>
+          Optional: Enact at a particular block number
+      --after <AFTER>
+          Optional: Enact after a given number of blocks
       --output-len-limit <OUTPUT_LEN_LIMIT>
           Output length limit. Defaults to 1,000
       --no-batch
@@ -113,8 +113,7 @@ To submit this as a referendum in OpenGov, run:
 
 opengov-cli submit-referendum \
     --proposal "./upgrade-polkadot-9430/polkadot-9430.call" \
-    --network "polkadot" --track <"root" or "whitelistedcaller"> \
-    --when <"at" or "after"> --blocks <number>
+    --network "polkadot" --track <"root" or "whitelistedcaller">
 ```
 
 ### Submit a Referendum on Kusama
@@ -132,7 +131,7 @@ This has a call hash of `0x4149bf15976cd3c0c244ca0cd43d59fed76f4bb936b186cc18bd8
 $ ./target/debug/opengov-cli submit-referendum \
 	--proposal "0x630001000100a10f0204060202286bee880102957f0c9b47bc84d11116aef273e61565cf893801e7db0223aeea112e53922a4a" \
 	--network "kusama" --track "whitelistedcaller" \
-	--when "after" --blocks "10"
+	--after "10"
 
 Submit the preimage for the Fellowship referendum:
 https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Fkusama-rpc.polkadot.io#/extrinsics/decode/0x2000882c004149bf15976cd3c0c244ca0cd43d59fed76f4bb936b186cc18bd88dee6edd986
@@ -162,7 +161,7 @@ The Fellowship is on the Collectives parachain, so this will require a referendu
 $ ./target/debug/opengov-cli submit-referendum \
 	--proposal "0x0000645468652046656c6c6f777368697020736179732068656c6c6f" \
 	--network "polkadot" --track "whitelistedcaller" \
-	--when "after" --blocks "10"
+	--after "10"
 
 Submit the preimage for the Fellowship referendum:
 https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Fpolkadot-collectives-rpc.polkadot.io#/extrinsics/decode/0x2b00d41f0003010003082f00000603c2695e6d216f8817000363631d09c4ac33f2960d5d26b02f8ec89ac7a986c0bdab2a3a9f354acb6167

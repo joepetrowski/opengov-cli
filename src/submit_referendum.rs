@@ -18,13 +18,13 @@ pub(crate) struct ReferendumArgs {
 	#[clap(long = "track", short)]
 	track: String,
 
-	/// Dispatch `At` or `After`.
-	#[clap(long = "when", short)]
-	when: String,
+	/// Optional: Enact at a particular block number.
+	#[clap(long = "at")]
+	at: Option<u32>,
 
-	/// The number of blocks to fill `At` or `After`.
-	#[clap(long = "blocks", short)]
-	blocks: u32,
+	/// Optional: Enact after a given number of blocks.
+	#[clap(long = "after")]
+	after: Option<u32>,
 
 	/// Output length limit. Defaults to 1,000.
 	#[clap(long = "output-len-limit")]
@@ -94,10 +94,17 @@ fn parse_inputs(prefs: ReferendumArgs) -> ProposalDetails {
 		_ => panic!("`network` must be `polkadot` or `kusama`"),
 	};
 
-	let dispatch = match prefs.when.to_ascii_lowercase().as_str() {
-		"at" => At(prefs.blocks),
-		"after" => After(prefs.blocks),
-		_ => panic!("`when` must be `at` or `after`"),
+	let dispatch = match (prefs.at, prefs.after) {
+		(None, None) => {
+			println!("\nNo enactment time specified. Defaulting to `After(10)`.");
+			println!("Specify an enactment time with `--at <block>` or `--after <blocks>`.\n");
+			After(10)
+		},
+		(Some(_), Some(_)) => {
+			panic!("\nBoth `At` and `After` dispatch times provided. You can only use one.\n");
+		},
+		(Some(at), None) => At(at),
+		(None, Some(after)) => After(after),
 	};
 
 	let output_len_limit = if let Some(input) = prefs.output_len_limit { input } else { 1_000 };
