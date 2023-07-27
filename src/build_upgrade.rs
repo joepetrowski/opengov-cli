@@ -206,12 +206,12 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 					upgrade_details.directory, version
 				);
 				let runtime = fs::read(path).expect("Should give a valid file path");
-				let runtime_hash = sp_core::blake2_256(&runtime);
+				let runtime_hash = blake2_256(&runtime);
 				println!("Kusama Asset Hub Runtime Hash:   0x{}", hex::encode(&runtime_hash));
 
 				let call = CallInfo::from_runtime_call(NetworkRuntimeCall::KusamaAssetHub(
 					KusamaAssetHubRuntimeCall::ParachainSystem(Call::authorize_upgrade {
-						code_hash: sp_core::H256(runtime_hash),
+						code_hash: H256(runtime_hash),
 						check_version: true,
 					}),
 				));
@@ -224,12 +224,12 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 					upgrade_details.directory, version
 				);
 				let runtime = fs::read(path).expect("Should give a valid file path");
-				let runtime_hash = sp_core::blake2_256(&runtime);
+				let runtime_hash = blake2_256(&runtime);
 				println!("Kusama Bridge Hub Runtime Hash:  0x{}", hex::encode(&runtime_hash));
 
 				let call = CallInfo::from_runtime_call(NetworkRuntimeCall::KusamaBridgeHub(
 					KusamaBridgeHubRuntimeCall::ParachainSystem(Call::authorize_upgrade {
-						code_hash: sp_core::H256(runtime_hash),
+						code_hash: H256(runtime_hash),
 						check_version: true,
 					}),
 				));
@@ -242,12 +242,12 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 					upgrade_details.directory, version
 				);
 				let runtime = fs::read(path).expect("Should give a valid file path");
-				let runtime_hash = sp_core::blake2_256(&runtime);
+				let runtime_hash = blake2_256(&runtime);
 				println!("Polkadot Asset Hub Runtime Hash:   0x{}", hex::encode(&runtime_hash));
 
 				let call = CallInfo::from_runtime_call(NetworkRuntimeCall::PolkadotAssetHub(
 					PolkadotAssetHubRuntimeCall::ParachainSystem(Call::authorize_upgrade {
-						code_hash: sp_core::H256(runtime_hash),
+						code_hash: H256(runtime_hash),
 						check_version: true,
 					}),
 				));
@@ -260,12 +260,12 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 					upgrade_details.directory, version
 				);
 				let runtime = fs::read(path).expect("Should give a valid file path");
-				let runtime_hash = sp_core::blake2_256(&runtime);
+				let runtime_hash = blake2_256(&runtime);
 				println!("Polkadot Collectives Runtime Hash: 0x{}", hex::encode(&runtime_hash));
 
 				let call = CallInfo::from_runtime_call(NetworkRuntimeCall::PolkadotCollectives(
 					CollectivesRuntimeCall::ParachainSystem(Call::authorize_upgrade {
-						code_hash: sp_core::H256(runtime_hash),
+						code_hash: H256(runtime_hash),
 						check_version: true,
 					}),
 				));
@@ -278,12 +278,12 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 					upgrade_details.directory, version
 				);
 				let runtime = fs::read(path).expect("Should give a valid file path");
-				let runtime_hash = sp_core::blake2_256(&runtime);
+				let runtime_hash = blake2_256(&runtime);
 				println!("Polkadot Bridge Hub Runtime Hash:  0x{}", hex::encode(&runtime_hash));
 
 				let call = CallInfo::from_runtime_call(NetworkRuntimeCall::PolkadotBridgeHub(
 					PolkadotBridgeHubRuntimeCall::ParachainSystem(Call::authorize_upgrade {
-						code_hash: sp_core::H256(runtime_hash),
+						code_hash: H256(runtime_hash),
 						check_version: true,
 					}),
 				));
@@ -310,7 +310,7 @@ fn generate_relay_upgrade_call(upgrade_details: &UpgradeDetails) -> CallInfo {
 				upgrade_details.directory, version
 			);
 			let runtime = fs::read(path).expect("Should give a valid file path");
-			let runtime_hash = sp_core::blake2_256(&runtime);
+			let runtime_hash = blake2_256(&runtime);
 			println!("Kusama Relay Chain Runtime Hash: 0x{}", hex::encode(&runtime_hash));
 
 			let set_code_call = CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(
@@ -337,7 +337,7 @@ fn generate_relay_upgrade_call(upgrade_details: &UpgradeDetails) -> CallInfo {
 				upgrade_details.directory, version
 			);
 			let runtime = fs::read(path).expect("Should give a valid file path");
-			let runtime_hash = sp_core::blake2_256(&runtime);
+			let runtime_hash = blake2_256(&runtime);
 			println!("Polkadot Relay Chain Runtime Hash: 0x{}", hex::encode(&runtime_hash));
 
 			let set_code_call = CallInfo::from_runtime_call(NetworkRuntimeCall::Polkadot(
