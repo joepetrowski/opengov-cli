@@ -8,7 +8,8 @@ authors = ["joepetrowski"]
 
 [dependencies]
 parity-scale-codec = "3.2.1"
-subxt = "0.30.0"
+sp-core = { git = "https://github.com/paritytech/substrate", branch = "master" }
+subxt = "0.30.1"
 hex = "0.4.3"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 clap = { version = "4.3.4", features = ["derive", "cargo"] }

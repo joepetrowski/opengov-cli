@@ -1,5 +1,5 @@
 pub(super) use parity_scale_codec::Encode as _;
-pub(super) use subxt::ext::sp_core;
+pub(super) use sp_core::{blake2_256, H256};
 #[subxt::subxt(
 	runtime_metadata_url = "wss://kusama-rpc.polkadot.io:443",
 	derive_for_all_types = "PartialEq, Clone"
@@ -178,14 +178,14 @@ impl CallInfo {
 				(Network::PolkadotCollectives, cc.encode()),
 			NetworkRuntimeCall::PolkadotBridgeHub(cc) => (Network::PolkadotBridgeHub, cc.encode()),
 		};
-		let hash = sp_core::blake2_256(&encoded);
+		let hash = blake2_256(&encoded);
 		let length: u32 = (*&encoded.len()).try_into().unwrap();
 		Self { network, encoded: encoded.to_vec(), hash, length }
 	}
 
 	// Construct `Self` for some `network` given some `encoded` bytes.
 	pub(super) fn from_bytes(encoded: &Vec<u8>, network: Network) -> Self {
-		let hash = sp_core::blake2_256(&encoded);
+		let hash = blake2_256(&encoded);
 		let length = (*&encoded.len()).try_into().unwrap();
 		Self { network, encoded: encoded.to_vec(), hash, length }
 	}

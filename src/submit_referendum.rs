@@ -207,7 +207,7 @@ fn kusama_fellowship_referenda(proposal_details: &ProposalDetails) -> PossibleCa
 
 	let whitelist_call =
 		CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(KusamaRuntimeCall::Whitelist(
-			WhitelistCall::whitelist_call { call_hash: sp_core::H256(proposal_call_info.hash) },
+			WhitelistCall::whitelist_call { call_hash: H256(proposal_call_info.hash) },
 		)));
 	let preimage_for_whitelist_call = CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(
 		KusamaRuntimeCall::Preimage(PreimageCall::note_preimage { bytes: whitelist_call.encoded }),
@@ -216,10 +216,7 @@ fn kusama_fellowship_referenda(proposal_details: &ProposalDetails) -> PossibleCa
 	let fellowship_proposal = CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(
 		KusamaRuntimeCall::FellowshipReferenda(FellowshipReferendaCall::submit {
 			proposal_origin: Box::new(KusamaOriginCaller::Origins(KusamaOpenGovOrigin::Fellows)),
-			proposal: Lookup {
-				hash: sp_core::H256(whitelist_call.hash),
-				len: whitelist_call.length,
-			},
+			proposal: Lookup { hash: H256(whitelist_call.hash), len: whitelist_call.length },
 			enactment_moment: DispatchTime::After(10),
 		}),
 	));
@@ -242,7 +239,7 @@ fn kusama_fellowship_referenda(proposal_details: &ProposalDetails) -> PossibleCa
 				KusamaOpenGovOrigin::WhitelistedCaller,
 			)),
 			proposal: Lookup {
-				hash: sp_core::H256(dispatch_whitelisted_call.hash),
+				hash: H256(dispatch_whitelisted_call.hash),
 				len: dispatch_whitelisted_call.length,
 			},
 			enactment_moment: public_referendum_dispatch_time,
@@ -308,7 +305,7 @@ fn kusama_non_fellowship_referenda(
 		KusamaRuntimeCall::Referenda(ReferendaCall::submit {
 			proposal_origin: Box::new(origin),
 			proposal: Lookup {
-				hash: sp_core::H256(proposal_call_info.hash),
+				hash: H256(proposal_call_info.hash),
 				len: proposal_call_info.length,
 			},
 			enactment_moment: public_referendum_dispatch_time,
@@ -363,7 +360,7 @@ async fn polkadot_fellowship_referenda(
 	//
 	//    let whitelist_call =
 	//     	  PolkadotRuntimeCall::Whitelist(WhitelistCall::whitelist_call {
-	// 		      call_hash: sp_core::H256(proposal_hash),
+	// 		      call_hash: H256(proposal_hash),
 	// 	      });
 	//
 	// 2. Create an XCM send call on the Collectives chain to Transact this on the Relay Chain:
@@ -388,7 +385,7 @@ async fn polkadot_fellowship_referenda(
 	// Whitelist the call on the Relay Chain.
 	let whitelist_call =
 		CallInfo::from_runtime_call(NetworkRuntimeCall::Polkadot(PolkadotRuntimeCall::Whitelist(
-			WhitelistCall::whitelist_call { call_hash: sp_core::H256(proposal_call_info.hash) },
+			WhitelistCall::whitelist_call { call_hash: H256(proposal_call_info.hash) },
 		)));
 
 	let (ref_time, proof_size) =
@@ -446,7 +443,7 @@ async fn polkadot_fellowship_referenda(
 				FellowshipOrigins::Fellows,
 			)),
 			proposal: CollectivesLookup {
-				hash: sp_core::H256(whitelist_over_xcm.hash),
+				hash: H256(whitelist_over_xcm.hash),
 				len: whitelist_over_xcm.length,
 			},
 			enactment_moment: CollectivesDispatchTime::After(10u32),
@@ -471,7 +468,7 @@ async fn polkadot_fellowship_referenda(
 				PolkadotOpenGovOrigin::WhitelistedCaller,
 			)),
 			proposal: Lookup {
-				hash: sp_core::H256(dispatch_whitelisted_call.hash),
+				hash: H256(dispatch_whitelisted_call.hash),
 				len: dispatch_whitelisted_call.length,
 			},
 			enactment_moment: public_referendum_dispatch_time,
@@ -540,7 +537,7 @@ fn polkadot_non_fellowship_referenda(
 		PolkadotRuntimeCall::Referenda(ReferendaCall::submit {
 			proposal_origin: Box::new(origin),
 			proposal: Lookup {
-				hash: sp_core::H256(proposal_call_info.hash),
+				hash: H256(proposal_call_info.hash),
 				len: proposal_call_info.length,
 			},
 			enactment_moment: public_referendum_dispatch_time,
