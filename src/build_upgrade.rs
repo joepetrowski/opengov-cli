@@ -10,12 +10,12 @@ pub(crate) struct UpgradeArgs {
 	#[clap(long = "network", short)]
 	network: String,
 
-	/// The runtime version of the Relay Chain to which to upgrade. E.g. "9430" or "latest".
+	/// The Fellowship release version. Should be semver and correspond to the release published.
 	#[clap(long = "relay-version")]
 	relay_version: String,
 
-	/// Optional. The runtime version of the system parachains to which to upgrade. E.g. "9430" or
-	/// "latest". If not provided, it will use the Relay Chain's version.
+	/// Optional. The runtime version of the system parachains to which to upgrade. If not provided,
+	/// it will use the Relay Chain's version.
 	#[clap(long = "parachain-version")]
 	parachain_version: Option<String>,
 
@@ -23,12 +23,6 @@ pub(crate) struct UpgradeArgs {
 	/// constructed.
 	#[clap(long = "filename")]
 	filename: Option<String>,
-
-	/// Override the conversion of runtime version to semver. For example the release 9430 mapping
-	/// to v0.9.43. Use this if the program fails to download the Relay Chain runtime.
-	#[clap(long = "relay-semver")]
-	relay_semver: Option<String>,
-	// todo: add input for repo to not default to parity releases / wait for fellowship
 }
 
 // The sub-command's "main" function.
@@ -112,13 +106,7 @@ fn parse_inputs(prefs: UpgradeArgs) -> UpgradeDetails {
 
 	make_version_directory(directory.as_str());
 
-	return UpgradeDetails {
-		relay,
-		networks,
-		directory,
-		output_file,
-		semver_override: prefs.relay_semver,
-	}
+	return UpgradeDetails { relay, networks, directory, output_file }
 }
 
 // Create a directory into which to place runtime blobs and the final call data.
@@ -128,56 +116,47 @@ fn make_version_directory(dir_name: &str) {
 	}
 }
 
-// Fetch all the runtime Wasm blobs from a Parity release.
+// Convert a semver version (e.g. "1.2.3") to an integer runtime version (e.g. 1002003).
+fn semver_to_intver(semver: &String) -> String {
+	// M.m.p => M_mmm_ppp
+	let points =
+		semver.bytes().enumerate().filter(|(_, b)| *b == b'.').map(|(i, _)| i).collect::<Vec<_>>();
+
+	assert!(points.len() == 2, "not semver");
+
+	let major = &semver[..points[0]];
+	let minor = &semver[points[0] + 1..points[1]];
+	let patch = &semver[points[1] + 1..];
+
+	format!("{}{:0>3}{:0>3}", major, minor, patch)
+}
+
+// Fetch all the runtime Wasm blobs from a Fellowship release.
 async fn download_runtimes(upgrade_details: &UpgradeDetails) {
 	// Relay Form
-	// https://github.com/paritytech/polkadot/releases/download/v0.9.43/polkadot_runtime-v9430.compact.compressed.wasm
-	// expect runtime version to be "9430" and correspond to "0.9.43"
+	// https://github.com/polkadot-fellows/runtimes/releases/download/v1.0.0/polkadot_runtime-v1000000.compact.compressed.wasm
 	//
 	// Parachains Form
-	// https://github.com/paritytech/cumulus/releases/download/parachains-v9430/statemint_runtime-v9430.compact.compressed.wasm
-	// https://github.com/paritytech/cumulus/releases/download/parachains-v9430/collectives-polkadot_runtime-v9430.compact.compressed.wasm
-	// https://github.com/paritytech/cumulus/releases/download/parachains-v9430/bridge-hub-polkadot_runtime-v9430.compact.compressed.wasm
+	// https://github.com/polkadot-fellows/runtimes/releases/download/v1.0.0/asset_hub_kusama_runtime-v1000000.compact.compressed.wasm
 
 	println!("\nDownloading runtimes.\n");
 	for chain in &upgrade_details.networks {
 		let chain_name = match chain.network {
 			Network::Kusama => "kusama",
 			Network::Polkadot => "polkadot",
-			Network::KusamaAssetHub => "statemine", // grumble
-			Network::KusamaBridgeHub => "bridge-hub-kusama",
-			Network::PolkadotAssetHub => "statemint", // grumble
-			Network::PolkadotCollectives => "collectives-polkadot",
-			Network::PolkadotBridgeHub => "bridge-hub-polkadot",
+			Network::KusamaAssetHub => "asset_hub_kusama",
+			Network::KusamaBridgeHub => "bridge_hub_kusama",
+			Network::PolkadotAssetHub => "asset_hub_polkadot",
+			Network::PolkadotCollectives => "collectives_polkadot",
+			Network::PolkadotBridgeHub => "bridge_hub_polkadot",
 		};
-		let version = chain.version.trim_start_matches("v");
-		let fname = format!("{}_runtime-v{}.compact.compressed.wasm", chain_name, version);
-		// TODO: This probably all changes once after 1.0.0 and the runtimes move to Fellowship.
-		let download_url = match chain.network {
-			Network::Kusama | Network::Polkadot => {
-				let semver = if let Some(sv) = upgrade_details.semver_override.clone() {
-					sv
-				} else {
-					let mut chars = version.chars();
-					let first = chars.next().unwrap(); // 9
-					let second = chars.next().unwrap(); // 4
-					let third = chars.next().unwrap(); // 3
-					if chars.last() != Some('0') {
-						println!("\n    You probably need to use `--relay-semver X.Y.Z` since this was not a normal release!\n")
-					}
-					format!("0.{}.{}{}", first, second, third)
-				};
-				let semver = semver.trim_start_matches("v");
-				format!(
-					"https://github.com/paritytech/polkadot/releases/download/v{}/{}",
-					semver, fname
-				)
-			},
-			_ => format!(
-				"https://github.com/paritytech/cumulus/releases/download/parachains-v{}/{}",
-				version, fname
-			),
-		};
+		let runtime_version = semver_to_intver(&chain.version);
+		let fname = format!("{}_runtime-v{}.compact.compressed.wasm", chain_name, runtime_version);
+
+		let download_url = format!(
+			"https://github.com/polkadot-fellows/runtimes/releases/download/v{}/{}",
+			&chain.version, fname
+		);
 
 		let download_url = download_url.as_str();
 		let path_name = format!("{}{}", upgrade_details.directory, fname);
@@ -196,14 +175,14 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 	println!("\nGenerating parachain authorization calls. The runtime hashes are logged if you would like to verify them with srtool.\n");
 	let mut authorization_calls = Vec::new();
 	for chain in &upgrade_details.networks {
-		let version = chain.version.trim_start_matches("v");
+		let runtime_version = semver_to_intver(&chain.version);
 		match chain.network {
 			Network::Kusama | Network::Polkadot => continue, // do relay chain separately
 			Network::KusamaAssetHub => {
 				use kusama_asset_hub::runtime_types::cumulus_pallet_parachain_system::pallet::Call;
 				let path = format!(
-					"{}statemine_runtime-v{}.compact.compressed.wasm",
-					upgrade_details.directory, version
+					"{}asset_hub_kusama_runtime-v{}.compact.compressed.wasm",
+					upgrade_details.directory, runtime_version
 				);
 				let runtime = fs::read(path).expect("Should give a valid file path");
 				let runtime_hash = blake2_256(&runtime);
@@ -220,8 +199,8 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 			Network::KusamaBridgeHub => {
 				use kusama_bridge_hub::runtime_types::cumulus_pallet_parachain_system::pallet::Call;
 				let path = format!(
-					"{}bridge-hub-kusama_runtime-v{}.compact.compressed.wasm",
-					upgrade_details.directory, version
+					"{}bridge_hub_kusama_runtime-v{}.compact.compressed.wasm",
+					upgrade_details.directory, runtime_version
 				);
 				let runtime = fs::read(path).expect("Should give a valid file path");
 				let runtime_hash = blake2_256(&runtime);
@@ -238,8 +217,8 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 			Network::PolkadotAssetHub => {
 				use polkadot_asset_hub::runtime_types::cumulus_pallet_parachain_system::pallet::Call;
 				let path = format!(
-					"{}statemint_runtime-v{}.compact.compressed.wasm",
-					upgrade_details.directory, version
+					"{}asset_hub_polkadot_runtime-v{}.compact.compressed.wasm",
+					upgrade_details.directory, runtime_version
 				);
 				let runtime = fs::read(path).expect("Should give a valid file path");
 				let runtime_hash = blake2_256(&runtime);
@@ -256,8 +235,8 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 			Network::PolkadotCollectives => {
 				use polkadot_collectives::runtime_types::cumulus_pallet_parachain_system::pallet::Call;
 				let path = format!(
-					"{}collectives-polkadot_runtime-v{}.compact.compressed.wasm",
-					upgrade_details.directory, version
+					"{}collectives_polkadot_runtime-v{}.compact.compressed.wasm",
+					upgrade_details.directory, runtime_version
 				);
 				let runtime = fs::read(path).expect("Should give a valid file path");
 				let runtime_hash = blake2_256(&runtime);
@@ -274,8 +253,8 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 			Network::PolkadotBridgeHub => {
 				use polkadot_bridge_hub::runtime_types::cumulus_pallet_parachain_system::pallet::Call;
 				let path = format!(
-					"{}bridge-hub-polkadot_runtime-v{}.compact.compressed.wasm",
-					upgrade_details.directory, version
+					"{}bridge_hub_polkadot_runtime-v{}.compact.compressed.wasm",
+					upgrade_details.directory, runtime_version
 				);
 				let runtime = fs::read(path).expect("Should give a valid file path");
 				let runtime_hash = blake2_256(&runtime);
@@ -298,7 +277,7 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 // Relay Chain.
 fn generate_relay_upgrade_call(upgrade_details: &UpgradeDetails) -> CallInfo {
 	println!("\nGenerating Relay Chain upgrade call. The runtime hash is logged if you would like to verify it with srtool.\n");
-	let version = upgrade_details.relay.version.as_str();
+	let runtime_version = semver_to_intver(&upgrade_details.relay.version);
 	let upgrade_call = match upgrade_details.relay.network {
 		Network::Kusama => {
 			use kusama_relay::runtime_types::frame_system::pallet::Call as SystemCall;
@@ -307,7 +286,7 @@ fn generate_relay_upgrade_call(upgrade_details: &UpgradeDetails) -> CallInfo {
 
 			let path = format!(
 				"{}kusama_runtime-v{}.compact.compressed.wasm",
-				upgrade_details.directory, version
+				upgrade_details.directory, runtime_version
 			);
 			let runtime = fs::read(path).expect("Should give a valid file path");
 			let runtime_hash = blake2_256(&runtime);
@@ -334,7 +313,7 @@ fn generate_relay_upgrade_call(upgrade_details: &UpgradeDetails) -> CallInfo {
 
 			let path = format!(
 				"{}polkadot_runtime-v{}.compact.compressed.wasm",
-				upgrade_details.directory, version
+				upgrade_details.directory, runtime_version
 			);
 			let runtime = fs::read(path).expect("Should give a valid file path");
 			let runtime_hash = blake2_256(&runtime);

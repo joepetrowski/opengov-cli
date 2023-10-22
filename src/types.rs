@@ -105,9 +105,6 @@ pub(super) struct UpgradeDetails {
 	pub(super) directory: String,
 	// The filename of the output.
 	pub(super) output_file: String,
-	// Possible override of the Polkadot semver parsing. For example, the program will parse "9430"
-	// as "0.9.43", but sometimes there are releases like "0.9.43-1" or "0.9.43-rc6".
-	pub(super) semver_override: Option<String>,
 }
 
 // A network and the version to which it will upgrade.
