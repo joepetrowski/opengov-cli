@@ -71,13 +71,11 @@ Options:
   -n, --network <NETWORK>
           Network on which to submit the referendum. `polkadot` or `kusama`
       --relay-version <RELAY_VERSION>
-          The runtime version of the Relay Chain to which to upgrade. E.g. "9430" or "latest"
+          The Fellowship release version. Should be semver and correspond to the release published
       --parachain-version <PARACHAIN_VERSION>
-          Optional. The runtime version of the system parachains to which to upgrade. E.g. "9430" or "latest". If not provided, it will use the Relay Chain's version
+          Optional. The runtime version of the system parachains to which to upgrade. If not provided, it will use the Relay Chain's version
       --filename <FILENAME>
           Name of the file to which to write the output. If not provided, a default will be constructed
-      --relay-semver <RELAY_SEMVER>
-          Override the conversion of runtime version to semver. For example the release 9430 mapping to v0.9.43. Use this if the program fails to download the Relay Chain runtime
   -h, --help
           Print help
 ```
@@ -87,32 +85,32 @@ Options:
 ### Build Upgrade
 
 ```
-$ ./target/debug/opengov-cli build-upgrade --network "polkadot" --relay-version "9430"
+$ ./target/release/opengov-cli build-upgrade --network polkadot --relay-version "1.0.0"
 
 Downloading runtimes.
 
-Downloading... polkadot_runtime-v9430.compact.compressed.wasm
-Downloading... statemint_runtime-v9430.compact.compressed.wasm
-Downloading... collectives-polkadot_runtime-v9430.compact.compressed.wasm
-Downloading... bridge-hub-polkadot_runtime-v9430.compact.compressed.wasm
+Downloading... polkadot_runtime-v1000000.compact.compressed.wasm
+Downloading... asset_hub_polkadot_runtime-v1000000.compact.compressed.wasm
+Downloading... collectives_polkadot_runtime-v1000000.compact.compressed.wasm
+Downloading... bridge_hub_polkadot_runtime-v1000000.compact.compressed.wasm
 
 Generating parachain authorization calls. The runtime hashes are logged if you would like to verify them with srtool.
 
-Polkadot Asset Hub Runtime Hash:   0xc90110c215c22fbdbc9ad6dad96b04622672e7107e272f99b1d8087d886bcb91
-Polkadot Collectives Runtime Hash: 0xf626bf4b4a80fba4c6b21fda0c8b49c44a2115dfc5320d0a67a6e6c17e87a3ed
-Polkadot Bridge Hub Runtime Hash:  0x1cbac9d27448dc0777f7253fb8b976bc60c6077178a4cec9c8582d12199490bd
+Polkadot Asset Hub Runtime Hash:   0x52c2f520914514a196059fc8cc74f516a004f2463ba11d7385b5241bb5d50ee4
+Polkadot Collectives Runtime Hash: 0xb061815642328374a62b3282c78fa8bef5a27cd313d4ac79cbd49e43e0a4b879
+Polkadot Bridge Hub Runtime Hash:  0xf43e890a5eca0230a7eaaf88a60b8cc5ccb0ef157986f628650b071e47f7d323
 
 Generating Relay Chain upgrade call. The runtime hash is logged if you would like to verify it with srtool.
 
-Polkadot Relay Chain Runtime Hash: 0x8500f322de7d01ce9e51593fc3187341e04b647bcb325ab3d20b362dcfb811d2
+Polkadot Relay Chain Runtime Hash: 0x17e1c7023134c196678f202daf8071a25f63f3e7b3937d8632a7474c618dc9a4
 
 Batching calls.
 
-Success! The call data was written to ./upgrade-polkadot-9430/polkadot-9430.call
+Success! The call data was written to ./upgrade-polkadot-1.0.0/polkadot-1.0.0.call
 To submit this as a referendum in OpenGov, run:
 
 opengov-cli submit-referendum \
-    --proposal "./upgrade-polkadot-9430/polkadot-9430.call" \
+    --proposal "./upgrade-polkadot-1.0.0/polkadot-1.0.0.call" \
     --network "polkadot" --track <"root" or "whitelistedcaller">
 ```
 
