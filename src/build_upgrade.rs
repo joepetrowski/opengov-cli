@@ -292,19 +292,9 @@ fn generate_relay_upgrade_call(upgrade_details: &UpgradeDetails) -> CallInfo {
 			let runtime_hash = blake2_256(&runtime);
 			println!("Kusama Relay Chain Runtime Hash: 0x{}", hex::encode(&runtime_hash));
 
-			let set_code_call = CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(
+			CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(
 				KusamaRuntimeCall::System(SystemCall::set_code { code: runtime }),
-			));
-
-			CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(KusamaRuntimeCall::Utility(
-				UtilityCall::with_weight {
-					call: Box::new(set_code_call.get_kusama_call().expect("kusama call")),
-					weight: KusamaWeight {
-						ref_time: 3_000_000_000_000,
-						proof_size: 3 * 1024 * 1024,
-					},
-				},
-			)))
+			))
 		},
 		Network::Polkadot => {
 			use polkadot_relay::runtime_types::frame_system::pallet::Call as SystemCall;
@@ -319,19 +309,9 @@ fn generate_relay_upgrade_call(upgrade_details: &UpgradeDetails) -> CallInfo {
 			let runtime_hash = blake2_256(&runtime);
 			println!("Polkadot Relay Chain Runtime Hash: 0x{}", hex::encode(&runtime_hash));
 
-			let set_code_call = CallInfo::from_runtime_call(NetworkRuntimeCall::Polkadot(
+			CallInfo::from_runtime_call(NetworkRuntimeCall::Polkadot(
 				PolkadotRuntimeCall::System(SystemCall::set_code { code: runtime }),
-			));
-
-			CallInfo::from_runtime_call(NetworkRuntimeCall::Polkadot(PolkadotRuntimeCall::Utility(
-				UtilityCall::with_weight {
-					call: Box::new(set_code_call.get_polkadot_call().expect("polkadot call")),
-					weight: PolkadotWeight {
-						ref_time: 3_000_000_000_000,
-						proof_size: 3 * 1024 * 1024,
-					},
-				},
-			)))
+			))
 		},
 		_ => panic!("Not a Relay Chain"),
 	};
