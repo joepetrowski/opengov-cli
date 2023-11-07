@@ -121,7 +121,7 @@ fn parse_inputs(prefs: ReferendumArgs) -> ProposalDetails {
 		AppsUiLink
 	};
 
-	return ProposalDetails {
+	ProposalDetails {
 		proposal,
 		track,
 		dispatch,
@@ -140,7 +140,7 @@ pub(crate) async fn generate_calls(proposal_details: &ProposalDetails) -> Possib
 		NetworkTrack::KusamaRoot => {
 			use kusama_relay::runtime_types::frame_support::dispatch::RawOrigin;
 			kusama_non_fellowship_referenda(
-				&proposal_details,
+				proposal_details,
 				KusamaOriginCaller::system(RawOrigin::Root),
 			)
 		},
@@ -150,11 +150,11 @@ pub(crate) async fn generate_calls(proposal_details: &ProposalDetails) -> Possib
 			match kusama_track {
 				// Whitelisted calls are special.
 				KusamaOpenGovOrigin::WhitelistedCaller =>
-					kusama_fellowship_referenda(&proposal_details),
+					kusama_fellowship_referenda(proposal_details),
 
 				// All other Kusama origins.
 				_ => kusama_non_fellowship_referenda(
-					&proposal_details,
+					proposal_details,
 					KusamaOriginCaller::Origins(kusama_track.clone()),
 				),
 			}
@@ -164,7 +164,7 @@ pub(crate) async fn generate_calls(proposal_details: &ProposalDetails) -> Possib
 		NetworkTrack::PolkadotRoot => {
 			use polkadot_relay::runtime_types::frame_support::dispatch::RawOrigin;
 			polkadot_non_fellowship_referenda(
-				&proposal_details,
+				proposal_details,
 				PolkadotOriginCaller::system(RawOrigin::Root),
 			)
 		},
@@ -173,11 +173,11 @@ pub(crate) async fn generate_calls(proposal_details: &ProposalDetails) -> Possib
 		NetworkTrack::Polkadot(polkadot_track) => {
 			match polkadot_track {
 				PolkadotOpenGovOrigin::WhitelistedCaller =>
-					polkadot_fellowship_referenda(&proposal_details).await,
+					polkadot_fellowship_referenda(proposal_details).await,
 
 				// All other Polkadot origins.
 				_ => polkadot_non_fellowship_referenda(
-					&proposal_details,
+					proposal_details,
 					PolkadotOriginCaller::Origins(polkadot_track.clone()),
 				),
 			}
@@ -628,21 +628,21 @@ fn handle_batch_of_calls(output: &Output, batch: Vec<NetworkRuntimeCall>) {
 			_ => panic!("no other chains are needed for this"),
 		}
 	}
-	if kusama_relay_batch.len() > 0 {
+	if !kusama_relay_batch.is_empty() {
 		let batch = KusamaRuntimeCall::Utility(KusamaUtilityCall::force_batch {
 			calls: kusama_relay_batch,
 		});
 		println!("\nBatch to submit on Kusama Relay Chain:");
 		print_output(output, &NetworkRuntimeCall::Kusama(batch));
 	}
-	if polkadot_relay_batch.len() > 0 {
+	if !polkadot_relay_batch.is_empty() {
 		let batch = PolkadotRuntimeCall::Utility(PolkadotRelayUtilityCall::force_batch {
 			calls: polkadot_relay_batch,
 		});
 		println!("\nBatch to submit on Polkadot Relay Chain:");
 		print_output(output, &NetworkRuntimeCall::Polkadot(batch));
 	}
-	if polkadot_collectives_batch.len() > 0 {
+	if !polkadot_collectives_batch.is_empty() {
 		let batch = CollectivesRuntimeCall::Utility(CollectivesUtilityCall::force_batch {
 			calls: polkadot_collectives_batch,
 		});
