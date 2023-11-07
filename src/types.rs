@@ -176,14 +176,14 @@ impl CallInfo {
 			NetworkRuntimeCall::PolkadotBridgeHub(cc) => (Network::PolkadotBridgeHub, cc.encode()),
 		};
 		let hash = blake2_256(&encoded);
-		let length: u32 = (*&encoded.len()).try_into().unwrap();
+		let length: u32 = (encoded.len()).try_into().unwrap();
 		Self { network, encoded: encoded.to_vec(), hash, length }
 	}
 
 	// Construct `Self` for some `network` given some `encoded` bytes.
 	pub(super) fn from_bytes(encoded: &Vec<u8>, network: Network) -> Self {
 		let hash = blake2_256(&encoded);
-		let length = (*&encoded.len()).try_into().unwrap();
+		let length = (encoded.len()).try_into().unwrap();
 		Self { network, encoded: encoded.to_vec(), hash, length }
 	}
 

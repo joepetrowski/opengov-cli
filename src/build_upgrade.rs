@@ -281,8 +281,6 @@ fn generate_relay_upgrade_call(upgrade_details: &UpgradeDetails) -> CallInfo {
 	let upgrade_call = match upgrade_details.relay.network {
 		Network::Kusama => {
 			use kusama_relay::runtime_types::frame_system::pallet::Call as SystemCall;
-			use kusama_relay::runtime_types::pallet_utility::pallet::Call as UtilityCall;
-			use kusama_relay::runtime_types::sp_weights::weight_v2::Weight as KusamaWeight;
 
 			let path = format!(
 				"{}kusama_runtime-v{}.compact.compressed.wasm",
@@ -298,8 +296,6 @@ fn generate_relay_upgrade_call(upgrade_details: &UpgradeDetails) -> CallInfo {
 		},
 		Network::Polkadot => {
 			use polkadot_relay::runtime_types::frame_system::pallet::Call as SystemCall;
-			use polkadot_relay::runtime_types::pallet_utility::pallet::Call as UtilityCall;
-			use polkadot_relay::runtime_types::sp_weights::weight_v2::Weight as PolkadotWeight;
 
 			let path = format!(
 				"{}polkadot_runtime-v{}.compact.compressed.wasm",
