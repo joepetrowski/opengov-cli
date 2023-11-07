@@ -116,7 +116,7 @@ opengov-cli submit-referendum \
 
 ### Submit a Referendum on Kusama
 
-As a proposal, send an [XCM to Statemine](https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Fkusama-rpc.polkadot.io#/extrinsics/decode/0x630001000100a10f0204060202286bee880102957f0c9b47bc84d11116aef273e61565cf893801e7db0223aeea112e53922a4a) to authorize an upgrade.
+As a proposal, send an [XCM to Kusama Asset Hub](https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Fkusama-rpc.polkadot.io#/extrinsics/decode/0x630001000100a10f0204060202286bee880102957f0c9b47bc84d11116aef273e61565cf893801e7db0223aeea112e53922a4a) to authorize an upgrade.
 
 Call data:
 ```
