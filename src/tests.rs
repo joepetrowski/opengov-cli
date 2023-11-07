@@ -11,7 +11,7 @@ mod tests {
 		use crate::DispatchTimeWrapper::*;
 		use crate::NetworkTrack::*;
 		use crate::Output::*;
-		return ProposalDetails {
+		ProposalDetails {
 			// `system.remark("opengov-submit test")`
 			proposal: String::from("0x00004c6f70656e676f762d7375626d69742074657374"),
 			track: Polkadot(PolkadotOpenGovOrigin::WhitelistedCaller),
@@ -30,7 +30,7 @@ mod tests {
 		use crate::DispatchTimeWrapper::*;
 		use crate::NetworkTrack::*;
 		use crate::Output::*;
-		return ProposalDetails {
+		ProposalDetails {
 			// `staking.increase_validator_count(50)`
 			proposal: String::from("0x070ac8"),
 			track: Polkadot(PolkadotOpenGovOrigin::StakingAdmin),
@@ -49,7 +49,7 @@ mod tests {
 		use crate::DispatchTimeWrapper::*;
 		use crate::NetworkTrack::*;
 		use crate::Output::*;
-		return ProposalDetails {
+		ProposalDetails {
 			// `system.remark("opengov-submit test")`
 			proposal: String::from("0x00004c6f70656e676f762d7375626d69742074657374"),
 			track: PolkadotRoot,
@@ -68,7 +68,7 @@ mod tests {
 		use crate::DispatchTimeWrapper::*;
 		use crate::NetworkTrack::*;
 		use crate::Output::*;
-		return ProposalDetails {
+		ProposalDetails {
 			// `system.remark("opengov-submit test")`
 			proposal: String::from("0x00004c6f70656e676f762d7375626d69742074657374"),
 			track: Kusama(KusamaOpenGovOrigin::WhitelistedCaller),
@@ -87,7 +87,7 @@ mod tests {
 		use crate::DispatchTimeWrapper::*;
 		use crate::NetworkTrack::*;
 		use crate::Output::*;
-		return ProposalDetails {
+		ProposalDetails {
 			// `staking.increase_validator_count(50)`
 			proposal: String::from("0x060ac8"),
 			track: Kusama(KusamaOpenGovOrigin::StakingAdmin),
@@ -106,7 +106,7 @@ mod tests {
 		use crate::DispatchTimeWrapper::*;
 		use crate::NetworkTrack::*;
 		use crate::Output::*;
-		return ProposalDetails {
+		ProposalDetails {
 			// `system.remark("opengov-submit test")`
 			proposal: String::from("0x00004c6f70656e676f762d7375626d69742074657374"),
 			track: KusamaRoot,
@@ -125,7 +125,7 @@ mod tests {
 		use crate::DispatchTimeWrapper::*;
 		use crate::NetworkTrack::*;
 		use crate::Output::*;
-		return ProposalDetails {
+		ProposalDetails {
 			// `system.remark("opengov-submit test")`
 			proposal: String::from("0x00004c6f70656e676f762d7375626d69742074657374"),
 			track: Polkadot(PolkadotOpenGovOrigin::StakingAdmin),
