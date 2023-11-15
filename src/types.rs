@@ -5,7 +5,7 @@ pub(super) use sp_core::{blake2_256, H256};
 	derive_for_all_types = "PartialEq, Clone"
 )]
 pub mod kusama_relay {}
-pub(super) use kusama_relay::runtime_types::kusama_runtime::{
+pub(super) use kusama_relay::runtime_types::staging_kusama_runtime::{
 	governance::origins::pallet_custom_origins::Origin as KusamaOpenGovOrigin,
 	OriginCaller as KusamaOriginCaller, RuntimeCall as KusamaRuntimeCall,
 };
@@ -13,7 +13,7 @@ pub(super) use kusama_relay::runtime_types::kusama_runtime::{
 #[subxt::subxt(runtime_metadata_url = "wss://kusama-asset-hub-rpc.polkadot.io:443")]
 pub mod kusama_asset_hub {}
 // pub(super) use kusama_asset_hub::runtime_types::asset_hub_kusama_runtime::RuntimeCall as KusamaAssetHubRuntimeCall;
-pub(super) use kusama_asset_hub::runtime_types::statemine_runtime::RuntimeCall as KusamaAssetHubRuntimeCall;
+pub(super) use kusama_asset_hub::runtime_types::asset_hub_kusama_runtime::RuntimeCall as KusamaAssetHubRuntimeCall;
 
 #[subxt::subxt(runtime_metadata_url = "wss://kusama-bridge-hub-rpc.polkadot.io:443")]
 pub mod kusama_bridge_hub {}
