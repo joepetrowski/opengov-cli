@@ -337,13 +337,11 @@ async fn polkadot_fellowship_referenda(
 		pallet_preimage::pallet::Call as CollectivesPreimageCall,
 		pallet_referenda::pallet::Call as FellowshipReferendaCall,
 		pallet_xcm::pallet::Call as CollectivesXcmCall,
+		staging_xcm::v3::multilocation::MultiLocation,
 		xcm::{
 			double_encoded::DoubleEncoded,
 			v2::OriginKind,
-			v3::{
-				junctions::Junctions::Here, multilocation::MultiLocation, Instruction, WeightLimit,
-				Xcm,
-			},
+			v3::{junctions::Junctions::Here, Instruction, WeightLimit, Xcm},
 			VersionedMultiLocation,
 			VersionedXcm::V3,
 		},

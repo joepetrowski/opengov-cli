@@ -434,12 +434,13 @@ async fn send_as_superuser_from_polkadot(auth: &CallInfo) -> PolkadotRuntimeCall
 	use polkadot_relay::runtime_types::{
 		pallet_xcm::pallet::Call as XcmCall,
 		sp_weights::weight_v2::Weight as PolkadotWeight,
+		staging_xcm::v3::multilocation::MultiLocation,
 		xcm::{
 			double_encoded::DoubleEncoded,
 			v2::OriginKind,
 			v3::{
-				junction::Junction::Parachain, junctions::Junctions::X1,
-				multilocation::MultiLocation, Instruction, WeightLimit, Xcm,
+				junction::Junction::Parachain, junctions::Junctions::X1, Instruction, WeightLimit,
+				Xcm,
 			},
 			VersionedMultiLocation,
 			VersionedXcm::V3,
