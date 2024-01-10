@@ -6,3 +6,4 @@ collectives_types.rs
 kusama_types.rs
 kusama_ah_types.rs
 polkadot_types.rs
+.DS_Store

@@ -667,7 +667,7 @@ pub(crate) fn get_proposal_bytes(proposal: String) -> Vec<u8> {
 fn print_output(output: &Output, network_call: &NetworkRuntimeCall) {
 	match network_call {
 		NetworkRuntimeCall::Kusama(call) => {
-			let rpc: &'static str = "wss%3A%2F%2Fkusama-rpc.polkadot.io";
+			let rpc: &'static str = "wss%3A%2F%2Fkusama-rpc.dwellir.com";
 			match output {
 				Output::CallData => println!("0x{}", hex::encode(call.encode())),
 				Output::AppsUiLink => println!(
@@ -678,7 +678,7 @@ fn print_output(output: &Output, network_call: &NetworkRuntimeCall) {
 			}
 		},
 		NetworkRuntimeCall::Polkadot(call) => {
-			let rpc: &'static str = "wss%3A%2F%2Frpc.polkadot.io";
+			let rpc: &'static str = "wss%3A%2F%2Fpolkadot-rpc.dwellir.com";
 			match output {
 				Output::CallData => println!("0x{}", hex::encode(call.encode())),
 				Output::AppsUiLink => println!(
