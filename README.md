@@ -215,3 +215,57 @@ Finally, the **fourth call** submits a referendum to the public:
 ![start-referendum](https://i.imgur.com/hGN9YHG.png)
 
 Again, note that the hash of the referendum is the hash of the _dispatch_ instructions that contain our actual proposal.
+
+Collectives update
+```js
+const number = (await api.rpc.chain.getHeader()).number.toNumber()
+await api.rpc('dev_setStorage', {
+ scheduler: {
+   agenda: [
+     [
+       [2947608 + 1], [
+         {
+           call: {
+             Lookup: {
+               hash: '0xa808a3a3e540ead812361a6a7962c31b0c581361029cb6b62a9f1def29ca84cf',
+               len: 53
+             }
+           },
+           origin: {
+             fellowshipOrigins: 'Fellows'
+           }
+         }
+       ]
+     ]
+   ]
+ }
+})
+await api.rpc('dev_newBlock')
+```
+
+Relay Chain Referendum
+```js
+const number = (await api.rpc.chain.getHeader()).number.toNumber()
+await api.rpc('dev_setStorage', {
+ scheduler: {
+   agenda: [
+     [
+       [18999532 + 1], [
+         {
+           call: {
+             Lookup: {
+               hash: '0x8445f9b61bcf16794202e733a96c646cb1079d140b8f5add70502d7d89316d0d',
+               len: 1419627
+             }
+           },
+           origin: {
+             origins: 'WhitelistedCaller'
+           }
+         }
+       ]
+     ]
+   ]
+ }
+})
+await api.rpc('dev_newBlock')
+```
