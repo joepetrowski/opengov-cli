@@ -13,6 +13,7 @@ on:
     branches: ["master"]
 
 env:
+  CARGO_TERM_COLOR: always
   TOOLCHAIN_LINT: nightly-2023-11-13
 
 jobs:
