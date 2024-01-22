@@ -50,9 +50,9 @@ pub(crate) async fn build_upgrade(prefs: UpgradeArgs) {
 // Parse the CLI inputs and return a typed struct with all the details needed.
 fn parse_inputs(prefs: UpgradeArgs) -> UpgradeDetails {
 	let mut networks = Vec::new();
-	let relay_version = String::from(prefs.relay_version.trim_start_matches("v"));
+	let relay_version = String::from(prefs.relay_version.trim_start_matches('v'));
 	let paras_version = if let Some(user_para_version) = prefs.parachain_version {
-		String::from(user_para_version.trim_start_matches("v"))
+		String::from(user_para_version.trim_start_matches('v'))
 	} else {
 		relay_version.clone()
 	};
@@ -106,7 +106,7 @@ fn parse_inputs(prefs: UpgradeArgs) -> UpgradeDetails {
 
 	make_version_directory(directory.as_str());
 
-	return UpgradeDetails { relay, networks, directory, output_file }
+	UpgradeDetails { relay, networks, directory, output_file }
 }
 
 // Create a directory into which to place runtime blobs and the final call data.
@@ -117,7 +117,7 @@ fn make_version_directory(dir_name: &str) {
 }
 
 // Convert a semver version (e.g. "1.2.3") to an integer runtime version (e.g. 1002003).
-fn semver_to_intver(semver: &String) -> String {
+fn semver_to_intver(semver: &str) -> String {
 	// M.m.p => M_mmm_ppp
 	let points =
 		semver.bytes().enumerate().filter(|(_, b)| *b == b'.').map(|(i, _)| i).collect::<Vec<_>>();
@@ -186,7 +186,7 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 				);
 				let runtime = fs::read(path).expect("Should give a valid file path");
 				let runtime_hash = blake2_256(&runtime);
-				println!("Kusama Asset Hub Runtime Hash:   0x{}", hex::encode(&runtime_hash));
+				println!("Kusama Asset Hub Runtime Hash:   0x{}", hex::encode(runtime_hash));
 
 				let call = CallInfo::from_runtime_call(NetworkRuntimeCall::KusamaAssetHub(
 					KusamaAssetHubRuntimeCall::ParachainSystem(Call::authorize_upgrade {
@@ -204,7 +204,7 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 				);
 				let runtime = fs::read(path).expect("Should give a valid file path");
 				let runtime_hash = blake2_256(&runtime);
-				println!("Kusama Bridge Hub Runtime Hash:  0x{}", hex::encode(&runtime_hash));
+				println!("Kusama Bridge Hub Runtime Hash:  0x{}", hex::encode(runtime_hash));
 
 				let call = CallInfo::from_runtime_call(NetworkRuntimeCall::KusamaBridgeHub(
 					KusamaBridgeHubRuntimeCall::ParachainSystem(Call::authorize_upgrade {
@@ -222,7 +222,7 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 				);
 				let runtime = fs::read(path).expect("Should give a valid file path");
 				let runtime_hash = blake2_256(&runtime);
-				println!("Polkadot Asset Hub Runtime Hash:   0x{}", hex::encode(&runtime_hash));
+				println!("Polkadot Asset Hub Runtime Hash:   0x{}", hex::encode(runtime_hash));
 
 				let call = CallInfo::from_runtime_call(NetworkRuntimeCall::PolkadotAssetHub(
 					PolkadotAssetHubRuntimeCall::ParachainSystem(Call::authorize_upgrade {
@@ -240,7 +240,7 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 				);
 				let runtime = fs::read(path).expect("Should give a valid file path");
 				let runtime_hash = blake2_256(&runtime);
-				println!("Polkadot Collectives Runtime Hash: 0x{}", hex::encode(&runtime_hash));
+				println!("Polkadot Collectives Runtime Hash: 0x{}", hex::encode(runtime_hash));
 
 				let call = CallInfo::from_runtime_call(NetworkRuntimeCall::PolkadotCollectives(
 					CollectivesRuntimeCall::ParachainSystem(Call::authorize_upgrade {
@@ -258,7 +258,7 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 				);
 				let runtime = fs::read(path).expect("Should give a valid file path");
 				let runtime_hash = blake2_256(&runtime);
-				println!("Polkadot Bridge Hub Runtime Hash:  0x{}", hex::encode(&runtime_hash));
+				println!("Polkadot Bridge Hub Runtime Hash:  0x{}", hex::encode(runtime_hash));
 
 				let call = CallInfo::from_runtime_call(NetworkRuntimeCall::PolkadotBridgeHub(
 					PolkadotBridgeHubRuntimeCall::ParachainSystem(Call::authorize_upgrade {
@@ -278,7 +278,7 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 fn generate_relay_upgrade_call(upgrade_details: &UpgradeDetails) -> CallInfo {
 	println!("\nGenerating Relay Chain upgrade call. The runtime hash is logged if you would like to verify it with srtool.\n");
 	let runtime_version = semver_to_intver(&upgrade_details.relay.version);
-	let upgrade_call = match upgrade_details.relay.network {
+	match upgrade_details.relay.network {
 		Network::Kusama => {
 			use kusama_relay::runtime_types::frame_system::pallet::Call as SystemCall;
 
@@ -288,7 +288,7 @@ fn generate_relay_upgrade_call(upgrade_details: &UpgradeDetails) -> CallInfo {
 			);
 			let runtime = fs::read(path).expect("Should give a valid file path");
 			let runtime_hash = blake2_256(&runtime);
-			println!("Kusama Relay Chain Runtime Hash: 0x{}", hex::encode(&runtime_hash));
+			println!("Kusama Relay Chain Runtime Hash: 0x{}", hex::encode(runtime_hash));
 
 			CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(KusamaRuntimeCall::System(
 				SystemCall::set_code { code: runtime },
@@ -303,15 +303,14 @@ fn generate_relay_upgrade_call(upgrade_details: &UpgradeDetails) -> CallInfo {
 			);
 			let runtime = fs::read(path).expect("Should give a valid file path");
 			let runtime_hash = blake2_256(&runtime);
-			println!("Polkadot Relay Chain Runtime Hash: 0x{}", hex::encode(&runtime_hash));
+			println!("Polkadot Relay Chain Runtime Hash: 0x{}", hex::encode(runtime_hash));
 
 			CallInfo::from_runtime_call(NetworkRuntimeCall::Polkadot(PolkadotRuntimeCall::System(
 				SystemCall::set_code { code: runtime },
 			)))
 		},
 		_ => panic!("Not a Relay Chain"),
-	};
-	upgrade_call
+	}
 }
 
 // Take the parachain authorization calls and the Relay Chain call, and batch them into one call
@@ -407,7 +406,7 @@ async fn send_as_superuser_from_kusama(auth: &CallInfo) -> KusamaRuntimeCall {
 		},
 	};
 
-	let (ref_time, proof_size) = get_weight(&auth).await;
+	let (ref_time, proof_size) = get_weight(auth).await;
 	let para_id = auth.network.get_para_id().unwrap();
 	KusamaRuntimeCall::XcmPallet(XcmCall::send {
 		dest: Box::new(VersionedMultiLocation::V3(MultiLocation {
@@ -447,7 +446,7 @@ async fn send_as_superuser_from_polkadot(auth: &CallInfo) -> PolkadotRuntimeCall
 		},
 	};
 
-	let (ref_time, proof_size) = get_weight(&auth).await;
+	let (ref_time, proof_size) = get_weight(auth).await;
 	let para_id = auth.network.get_para_id().unwrap();
 	PolkadotRuntimeCall::XcmPallet(XcmCall::send {
 		dest: Box::new(VersionedMultiLocation::V3(MultiLocation {

@@ -1,22 +1,53 @@
 name: Rust
 
+# Cancel a currently running workflow from the same PR, branch or tag when a new workflow is
+# triggered (ref https://stackoverflow.com/a/72408109)
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
-    branches: [ "master" ]
+    branches: ["master"]
   pull_request:
-    branches: [ "master" ]
+    branches: ["master"]
 
 env:
   CARGO_TERM_COLOR: always
+  TOOLCHAIN_LINT: nightly-2023-11-13
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
     steps:
-    - uses: actions/checkout@v3
-    - name: Build
-      run: cargo build --verbose
-    - name: Run tests
-      run: cargo test --verbose
+      - uses: actions/checkout@v3
+      - name: Build
+        run: cargo build --verbose
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install nightly toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.TOOLCHAIN_LINT }}
+          components: rustfmt, clippy, rust-src
+          override: true
+
+      - name: Fmt
+        run: cargo +${{ env.TOOLCHAIN_LINT }} fmt --all -- --check
+
+      - name: Clippy
+        uses: actions-rs-plus/clippy-check@v2
+        with:
+          toolchain: ${{ env.TOOLCHAIN_LINT }}
+          args: --all-targets --all-features -- -D warnings
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run tests
+        run: cargo test --verbose

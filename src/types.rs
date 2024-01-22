@@ -174,14 +174,14 @@ impl CallInfo {
 			NetworkRuntimeCall::PolkadotBridgeHub(cc) => (Network::PolkadotBridgeHub, cc.encode()),
 		};
 		let hash = blake2_256(&encoded);
-		let length: u32 = (*&encoded.len()).try_into().unwrap();
+		let length: u32 = (encoded.len()).try_into().unwrap();
 		Self { network, encoded: encoded.to_vec(), hash, length }
 	}
 
 	// Construct `Self` for some `network` given some `encoded` bytes.
 	pub(super) fn from_bytes(encoded: &Vec<u8>, network: Network) -> Self {
-		let hash = blake2_256(&encoded);
-		let length = (*&encoded.len()).try_into().unwrap();
+		let hash = blake2_256(encoded);
+		let length = (encoded.len()).try_into().unwrap();
 		Self { network, encoded: encoded.to_vec(), hash, length }
 	}
 
@@ -193,7 +193,7 @@ impl CallInfo {
 				Ok(<KusamaRuntimeCall as parity_scale_codec::Decode>::decode(&mut &bytes[..])
 					.unwrap())
 			},
-			_ => return Err("not a kusama call"),
+			_ => Err("not a kusama call"),
 		}
 	}
 
@@ -210,7 +210,7 @@ impl CallInfo {
 				)
 				.unwrap())
 			},
-			_ => return Err("not a kusama asset hub call"),
+			_ => Err("not a kusama asset hub call"),
 		}
 	}
 
@@ -227,7 +227,7 @@ impl CallInfo {
 				)
 				.unwrap())
 			},
-			_ => return Err("not a kusama bridge hub call"),
+			_ => Err("not a kusama bridge hub call"),
 		}
 	}
 
@@ -239,7 +239,7 @@ impl CallInfo {
 				Ok(<PolkadotRuntimeCall as parity_scale_codec::Decode>::decode(&mut &bytes[..])
 					.unwrap())
 			},
-			_ => return Err("not a polkadot call"),
+			_ => Err("not a polkadot call"),
 		}
 	}
 
@@ -256,7 +256,7 @@ impl CallInfo {
 				)
 				.unwrap())
 			},
-			_ => return Err("not a polkadot asset hub call"),
+			_ => Err("not a polkadot asset hub call"),
 		}
 	}
 
@@ -270,7 +270,7 @@ impl CallInfo {
 				Ok(<CollectivesRuntimeCall as parity_scale_codec::Decode>::decode(&mut &bytes[..])
 					.unwrap())
 			},
-			_ => return Err("not a polkadot collectives call"),
+			_ => Err("not a polkadot collectives call"),
 		}
 	}
 
@@ -287,7 +287,7 @@ impl CallInfo {
 				)
 				.unwrap())
 			},
-			_ => return Err("not a polkadot bridge hub call"),
+			_ => Err("not a polkadot bridge hub call"),
 		}
 	}
 
@@ -327,11 +327,10 @@ impl CallInfo {
 	// length. This is because the call is `preimage.note_preimage(call)`, so the outer pallet/call
 	// indices have a length of 2 bytes.
 	pub(super) fn create_print_output(&self, length_limit: u32) -> (CallOrHash, u32) {
-		let print_output: CallOrHash;
-		if self.length > length_limit {
-			print_output = CallOrHash::Hash(self.hash);
+		let print_output = if self.length > length_limit {
+			CallOrHash::Hash(self.hash)
 		} else {
-			print_output = match &self.network {
+			match &self.network {
 				Network::Kusama => {
 					let kusama_call = self.get_kusama_call().expect("kusama");
 					CallOrHash::Call(NetworkRuntimeCall::Kusama(kusama_call))
@@ -346,8 +345,8 @@ impl CallInfo {
 					CallOrHash::Call(NetworkRuntimeCall::PolkadotCollectives(collectives_call))
 				},
 				_ => panic!("to do"),
-			};
-		}
+			}
+		};
 		(print_output, self.length)
 	}
 }
