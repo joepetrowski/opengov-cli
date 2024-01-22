@@ -13,7 +13,7 @@ on:
     branches: ["master"]
 
 env:
-  CARGO_TERM_COLOR: always
+  TOOLCHAIN_LINT: nightly-2023-11-13
 
 jobs:
   build:
@@ -31,14 +31,17 @@ jobs:
       - name: Install nightly toolchain
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2023-11-01
+          toolchain: ${{ env.TOOLCHAIN_LINT }}
           components: clippy, rust-src
           override: true
+
+      - name: cargo fmt
+        run: cargo +${{ env.TOOLCHAIN_LINT }} fmt --all -- --check
 
       - name: Clippy
         uses: actions-rs-plus/clippy-check@v2
         with:
-          toolchain: nightly-2023-11-01
+          toolchain: ${{ env.TOOLCHAIN_LINT }}
           args: --all-targets --all-features -- -D warnings
 
   test:
