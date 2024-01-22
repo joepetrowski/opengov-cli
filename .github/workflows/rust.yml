@@ -32,7 +32,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ env.TOOLCHAIN_LINT }}
-          components: clippy, rust-src
+          components: rustfmt, clippy, rust-src
           override: true
 
       - name: cargo fmt
