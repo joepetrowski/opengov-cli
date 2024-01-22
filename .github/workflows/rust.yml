@@ -35,7 +35,7 @@ jobs:
           override: true
 
       - name: Clippy
-        uses: actions-rs/clippy-check@v1
+        uses: actions-rs-plus/clippy-check@v2
         with:
           toolchain: nightly-2023-11-01
           args: --all-targets --all-features -- -D warnings
