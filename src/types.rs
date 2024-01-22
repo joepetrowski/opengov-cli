@@ -1,26 +1,25 @@
 pub(super) use parity_scale_codec::Encode as _;
 pub(super) use sp_core::{blake2_256, H256};
 #[subxt::subxt(
-	runtime_metadata_url = "wss://kusama-rpc.polkadot.io:443",
+	runtime_metadata_url = "wss://kusama-rpc.dwellir.com:443",
 	derive_for_all_types = "PartialEq, Clone"
 )]
 pub mod kusama_relay {}
-pub(super) use kusama_relay::runtime_types::kusama_runtime::{
+pub(super) use kusama_relay::runtime_types::staging_kusama_runtime::{
 	governance::origins::pallet_custom_origins::Origin as KusamaOpenGovOrigin,
 	OriginCaller as KusamaOriginCaller, RuntimeCall as KusamaRuntimeCall,
 };
 
 #[subxt::subxt(runtime_metadata_url = "wss://kusama-asset-hub-rpc.polkadot.io:443")]
 pub mod kusama_asset_hub {}
-// pub(super) use kusama_asset_hub::runtime_types::asset_hub_kusama_runtime::RuntimeCall as KusamaAssetHubRuntimeCall;
-pub(super) use kusama_asset_hub::runtime_types::statemine_runtime::RuntimeCall as KusamaAssetHubRuntimeCall;
+pub(super) use kusama_asset_hub::runtime_types::asset_hub_kusama_runtime::RuntimeCall as KusamaAssetHubRuntimeCall;
 
 #[subxt::subxt(runtime_metadata_url = "wss://kusama-bridge-hub-rpc.polkadot.io:443")]
 pub mod kusama_bridge_hub {}
 pub(super) use kusama_bridge_hub::runtime_types::bridge_hub_kusama_runtime::RuntimeCall as KusamaBridgeHubRuntimeCall;
 
 #[subxt::subxt(
-	runtime_metadata_url = "wss://rpc.polkadot.io:443",
+	runtime_metadata_url = "wss://polkadot-rpc.dwellir.com:443",
 	derive_for_all_types = "PartialEq, Clone"
 )]
 pub mod polkadot_relay {}
@@ -31,8 +30,7 @@ pub(super) use polkadot_relay::runtime_types::polkadot_runtime::{
 
 #[subxt::subxt(runtime_metadata_url = "wss://polkadot-asset-hub-rpc.polkadot.io:443")]
 pub mod polkadot_asset_hub {}
-// pub(super) use polkadot_asset_hub::runtime_types::asset_hub_polkadot_runtime::RuntimeCall as PolkadotAssetHubRuntimeCall;
-pub(super) use polkadot_asset_hub::runtime_types::statemint_runtime::RuntimeCall as PolkadotAssetHubRuntimeCall;
+pub(super) use polkadot_asset_hub::runtime_types::asset_hub_polkadot_runtime::RuntimeCall as PolkadotAssetHubRuntimeCall;
 
 #[subxt::subxt(runtime_metadata_url = "wss://polkadot-collectives-rpc.polkadot.io:443")]
 pub mod polkadot_collectives {}
@@ -303,10 +301,10 @@ impl CallInfo {
 		use subxt::{OnlineClient, PolkadotConfig};
 
 		let url = match network {
-			Network::Kusama => "wss://kusama-rpc.polkadot.io:443",
+			Network::Kusama => "wss://kusama-rpc.dwellir.com:443",
 			Network::KusamaAssetHub => "wss://kusama-asset-hub-rpc.polkadot.io:443",
 			Network::KusamaBridgeHub => "wss://kusama-bridge-hub-rpc.polkadot.io:443",
-			Network::Polkadot => "wss://rpc.polkadot.io:443",
+			Network::Polkadot => "wss://polkadot-rpc.dwellir.com:443",
 			Network::PolkadotAssetHub => "wss://polkadot-asset-hub-rpc.polkadot.io:443",
 			Network::PolkadotCollectives => "wss://polkadot-collectives-rpc.polkadot.io:443",
 			Network::PolkadotBridgeHub => "wss://polkadot-bridge-hub-rpc.polkadot.io:443",

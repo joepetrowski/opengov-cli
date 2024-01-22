@@ -144,11 +144,11 @@ async fn download_runtimes(upgrade_details: &UpgradeDetails) {
 		let chain_name = match chain.network {
 			Network::Kusama => "kusama",
 			Network::Polkadot => "polkadot",
-			Network::KusamaAssetHub => "asset_hub_kusama",
-			Network::KusamaBridgeHub => "bridge_hub_kusama",
-			Network::PolkadotAssetHub => "asset_hub_polkadot",
-			Network::PolkadotCollectives => "collectives_polkadot",
-			Network::PolkadotBridgeHub => "bridge_hub_polkadot",
+			Network::KusamaAssetHub => "asset-hub-kusama",
+			Network::KusamaBridgeHub => "bridge-hub-kusama",
+			Network::PolkadotAssetHub => "asset-hub-polkadot",
+			Network::PolkadotCollectives => "collectives-polkadot",
+			Network::PolkadotBridgeHub => "bridge-hub-polkadot",
 		};
 		let runtime_version = semver_to_intver(&chain.version);
 		let fname = format!("{}_runtime-v{}.compact.compressed.wasm", chain_name, runtime_version);
@@ -181,7 +181,7 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 			Network::KusamaAssetHub => {
 				use kusama_asset_hub::runtime_types::cumulus_pallet_parachain_system::pallet::Call;
 				let path = format!(
-					"{}asset_hub_kusama_runtime-v{}.compact.compressed.wasm",
+					"{}asset-hub-kusama_runtime-v{}.compact.compressed.wasm",
 					upgrade_details.directory, runtime_version
 				);
 				let runtime = fs::read(path).expect("Should give a valid file path");
@@ -199,7 +199,7 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 			Network::KusamaBridgeHub => {
 				use kusama_bridge_hub::runtime_types::cumulus_pallet_parachain_system::pallet::Call;
 				let path = format!(
-					"{}bridge_hub_kusama_runtime-v{}.compact.compressed.wasm",
+					"{}bridge-hub-kusama_runtime-v{}.compact.compressed.wasm",
 					upgrade_details.directory, runtime_version
 				);
 				let runtime = fs::read(path).expect("Should give a valid file path");
@@ -217,7 +217,7 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 			Network::PolkadotAssetHub => {
 				use polkadot_asset_hub::runtime_types::cumulus_pallet_parachain_system::pallet::Call;
 				let path = format!(
-					"{}asset_hub_polkadot_runtime-v{}.compact.compressed.wasm",
+					"{}asset-hub-polkadot_runtime-v{}.compact.compressed.wasm",
 					upgrade_details.directory, runtime_version
 				);
 				let runtime = fs::read(path).expect("Should give a valid file path");
@@ -235,7 +235,7 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 			Network::PolkadotCollectives => {
 				use polkadot_collectives::runtime_types::cumulus_pallet_parachain_system::pallet::Call;
 				let path = format!(
-					"{}collectives_polkadot_runtime-v{}.compact.compressed.wasm",
+					"{}collectives-polkadot_runtime-v{}.compact.compressed.wasm",
 					upgrade_details.directory, runtime_version
 				);
 				let runtime = fs::read(path).expect("Should give a valid file path");
@@ -253,7 +253,7 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 			Network::PolkadotBridgeHub => {
 				use polkadot_bridge_hub::runtime_types::cumulus_pallet_parachain_system::pallet::Call;
 				let path = format!(
-					"{}bridge_hub_polkadot_runtime-v{}.compact.compressed.wasm",
+					"{}bridge-hub-polkadot_runtime-v{}.compact.compressed.wasm",
 					upgrade_details.directory, runtime_version
 				);
 				let runtime = fs::read(path).expect("Should give a valid file path");
@@ -393,12 +393,13 @@ async fn send_as_superuser_from_kusama(auth: &CallInfo) -> KusamaRuntimeCall {
 	use kusama_relay::runtime_types::{
 		pallet_xcm::pallet::Call as XcmCall,
 		sp_weights::weight_v2::Weight as KusamaWeight,
+		staging_xcm::v3::multilocation::MultiLocation,
 		xcm::{
 			double_encoded::DoubleEncoded,
 			v2::OriginKind,
 			v3::{
-				junction::Junction::Parachain, junctions::Junctions::X1,
-				multilocation::MultiLocation, Instruction, WeightLimit, Xcm,
+				junction::Junction::Parachain, junctions::Junctions::X1, Instruction, WeightLimit,
+				Xcm,
 			},
 			VersionedMultiLocation,
 			VersionedXcm::V3,
@@ -432,12 +433,13 @@ async fn send_as_superuser_from_polkadot(auth: &CallInfo) -> PolkadotRuntimeCall
 	use polkadot_relay::runtime_types::{
 		pallet_xcm::pallet::Call as XcmCall,
 		sp_weights::weight_v2::Weight as PolkadotWeight,
+		staging_xcm::v3::multilocation::MultiLocation,
 		xcm::{
 			double_encoded::DoubleEncoded,
 			v2::OriginKind,
 			v3::{
-				junction::Junction::Parachain, junctions::Junctions::X1,
-				multilocation::MultiLocation, Instruction, WeightLimit, Xcm,
+				junction::Junction::Parachain, junctions::Junctions::X1, Instruction, WeightLimit,
+				Xcm,
 			},
 			VersionedMultiLocation,
 			VersionedXcm::V3,
