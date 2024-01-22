@@ -24,7 +24,7 @@ jobs:
       - name: Clippy
         uses: actions-rs-plus/clippy-check@v2
         with:
-          toolchain: stable
+          toolchain: nightly-2023-11-01
           args: --all-targets --all-features -- -D warnings
 
   test:
