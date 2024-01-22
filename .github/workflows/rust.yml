@@ -24,7 +24,7 @@ jobs:
       - name: Build
         run: cargo build --verbose
 
-  clippy:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -36,7 +36,7 @@ jobs:
           components: rustfmt, clippy, rust-src
           override: true
 
-      - name: cargo fmt
+      - name: Fmt
         run: cargo +${{ env.TOOLCHAIN_LINT }} fmt --all -- --check
 
       - name: Clippy
