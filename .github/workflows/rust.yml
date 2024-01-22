@@ -32,6 +32,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           toolchain: nightly-2023-11-01
+          components: clippy, rust-src
           override: true
 
       - name: Clippy
