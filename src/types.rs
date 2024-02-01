@@ -1,7 +1,7 @@
 pub(super) use parity_scale_codec::Encode as _;
 pub(super) use sp_core::{blake2_256, H256};
 #[subxt::subxt(
-	runtime_metadata_url = "wss://kusama-rpc.dwellir.com:443",
+	runtime_metadata_insecure_url = "wss://kusama-rpc.dwellir.com:443",
 	derive_for_all_types = "PartialEq, Clone"
 )]
 pub mod kusama_relay {}
@@ -10,16 +10,16 @@ pub(super) use kusama_relay::runtime_types::staging_kusama_runtime::{
 	OriginCaller as KusamaOriginCaller, RuntimeCall as KusamaRuntimeCall,
 };
 
-#[subxt::subxt(runtime_metadata_url = "wss://kusama-asset-hub-rpc.polkadot.io:443")]
+#[subxt::subxt(runtime_metadata_insecure_url = "wss://kusama-asset-hub-rpc.polkadot.io:443")]
 pub mod kusama_asset_hub {}
 pub(super) use kusama_asset_hub::runtime_types::asset_hub_kusama_runtime::RuntimeCall as KusamaAssetHubRuntimeCall;
 
-#[subxt::subxt(runtime_metadata_url = "wss://kusama-bridge-hub-rpc.polkadot.io:443")]
+#[subxt::subxt(runtime_metadata_insecure_url = "wss://kusama-bridge-hub-rpc.polkadot.io:443")]
 pub mod kusama_bridge_hub {}
 pub(super) use kusama_bridge_hub::runtime_types::bridge_hub_kusama_runtime::RuntimeCall as KusamaBridgeHubRuntimeCall;
 
 #[subxt::subxt(
-	runtime_metadata_url = "wss://polkadot-rpc.dwellir.com:443",
+	runtime_metadata_insecure_url = "wss://polkadot-rpc.dwellir.com:443",
 	derive_for_all_types = "PartialEq, Clone"
 )]
 pub mod polkadot_relay {}
@@ -28,11 +28,11 @@ pub(super) use polkadot_relay::runtime_types::polkadot_runtime::{
 	OriginCaller as PolkadotOriginCaller, RuntimeCall as PolkadotRuntimeCall,
 };
 
-#[subxt::subxt(runtime_metadata_url = "wss://polkadot-asset-hub-rpc.polkadot.io:443")]
+#[subxt::subxt(runtime_metadata_insecure_url = "wss://polkadot-asset-hub-rpc.polkadot.io:443")]
 pub mod polkadot_asset_hub {}
 pub(super) use polkadot_asset_hub::runtime_types::asset_hub_polkadot_runtime::RuntimeCall as PolkadotAssetHubRuntimeCall;
 
-#[subxt::subxt(runtime_metadata_url = "wss://polkadot-collectives-rpc.polkadot.io:443")]
+#[subxt::subxt(runtime_metadata_insecure_url = "wss://polkadot-collectives-rpc.polkadot.io:443")]
 pub mod polkadot_collectives {}
 pub(super) use polkadot_collectives::runtime_types::{
 	collectives_polkadot_runtime::{
@@ -42,7 +42,7 @@ pub(super) use polkadot_collectives::runtime_types::{
 	sp_weights::weight_v2::Weight,
 };
 
-#[subxt::subxt(runtime_metadata_url = "wss://polkadot-bridge-hub-rpc.polkadot.io:443")]
+#[subxt::subxt(runtime_metadata_insecure_url = "wss://polkadot-bridge-hub-rpc.polkadot.io:443")]
 pub mod polkadot_bridge_hub {}
 pub(super) use polkadot_bridge_hub::runtime_types::bridge_hub_polkadot_runtime::RuntimeCall as PolkadotBridgeHubRuntimeCall;
 
