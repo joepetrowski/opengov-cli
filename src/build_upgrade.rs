@@ -14,10 +14,20 @@ pub(crate) struct UpgradeArgs {
 	#[clap(long = "relay-version")]
 	relay_version: String,
 
-	/// Optional. The runtime version of the system parachains to which to upgrade. If not provided,
-	/// it will use the Relay Chain's version.
-	#[clap(long = "parachain-version")]
-	parachain_version: Option<String>,
+	/// Optional. The runtime version of Asset Hub to which to upgrade. If not provided, it will use
+	/// the Relay Chain's version.
+	#[clap(long = "asset-hub")]
+	asset_hub: Option<String>,
+
+	/// Optional. The runtime version of Bridge Hub to which to upgrade. If not provided, it will use
+	/// the Relay Chain's version.
+	#[clap(long = "bridge-hub")]
+	bridge_hub: Option<String>,
+
+	/// Optional. The runtime version of Collectives to which to upgrade. If not provided, it will
+	/// use the Relay Chain's version.
+	#[clap(long = "collectives")]
+	collectives: Option<String>,
 
 	/// Name of the file to which to write the output. If not provided, a default will be
 	/// constructed.
@@ -51,8 +61,18 @@ pub(crate) async fn build_upgrade(prefs: UpgradeArgs) {
 fn parse_inputs(prefs: UpgradeArgs) -> UpgradeDetails {
 	let mut networks = Vec::new();
 	let relay_version = String::from(prefs.relay_version.trim_start_matches('v'));
-	let paras_version = if let Some(user_para_version) = prefs.parachain_version {
-		String::from(user_para_version.trim_start_matches('v'))
+	let asset_hub_version = if let Some(v) = prefs.asset_hub {
+		String::from(v.trim_start_matches('v'))
+	} else {
+		relay_version.clone()
+	};
+	let bridge_hub_version = if let Some(v) = prefs.bridge_hub {
+		String::from(v.trim_start_matches('v'))
+	} else {
+		relay_version.clone()
+	};
+	let collectives_version = if let Some(v) = prefs.collectives {
+		String::from(v.trim_start_matches('v'))
 	} else {
 		relay_version.clone()
 	};
@@ -66,15 +86,15 @@ fn parse_inputs(prefs: UpgradeArgs) -> UpgradeDetails {
 			});
 			networks.push(VersionedNetwork {
 				network: Network::PolkadotAssetHub,
-				version: paras_version.clone(),
+				version: asset_hub_version.clone(),
 			});
 			networks.push(VersionedNetwork {
 				network: Network::PolkadotCollectives,
-				version: paras_version.clone(),
+				version: collectives_version.clone(),
 			});
 			networks.push(VersionedNetwork {
 				network: Network::PolkadotBridgeHub,
-				version: paras_version.clone(),
+				version: bridge_hub_version.clone(),
 			});
 			VersionedNetwork { network: Network::Polkadot, version: relay_version.clone() }
 		},
@@ -86,11 +106,11 @@ fn parse_inputs(prefs: UpgradeArgs) -> UpgradeDetails {
 			});
 			networks.push(VersionedNetwork {
 				network: Network::KusamaAssetHub,
-				version: paras_version.clone(),
+				version: asset_hub_version.clone(),
 			});
 			networks.push(VersionedNetwork {
 				network: Network::KusamaBridgeHub,
-				version: paras_version.clone(),
+				version: bridge_hub_version.clone(),
 			});
 			VersionedNetwork { network: Network::Kusama, version: relay_version.clone() }
 		},
