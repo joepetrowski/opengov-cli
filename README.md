@@ -68,16 +68,13 @@ Generate a single call that will upgrade a Relay Chain and all of its system par
 Usage: opengov-cli build-upgrade [OPTIONS] --network <NETWORK> --relay-version <RELAY_VERSION>
 
 Options:
-  -n, --network <NETWORK>
-          Network on which to submit the referendum. `polkadot` or `kusama`
-      --relay-version <RELAY_VERSION>
-          The Fellowship release version. Should be semver and correspond to the release published
-      --parachain-version <PARACHAIN_VERSION>
-          Optional. The runtime version of the system parachains to which to upgrade. If not provided, it will use the Relay Chain's version
-      --filename <FILENAME>
-          Name of the file to which to write the output. If not provided, a default will be constructed
-  -h, --help
-          Print help
+  -n, --network <NETWORK>              Network on which to submit the referendum. `polkadot` or `kusama`
+      --relay-version <RELAY_VERSION>  The Fellowship release version. Should be semver and correspond to the release published
+      --asset-hub <ASSET_HUB>          Optional. The runtime version of Asset Hub to which to upgrade. If not provided, it will use the Relay Chain's version
+      --bridge-hub <BRIDGE_HUB>        Optional. The runtime version of Bridge Hub to which to upgrade. If not provided, it will use the Relay Chain's version
+      --collectives <COLLECTIVES>      Optional. The runtime version of Collectives to which to upgrade. If not provided, it will use the Relay Chain's version
+      --filename <FILENAME>            Name of the file to which to write the output. If not provided, a default will be constructed
+  -h, --help                           Print help
 ```
 
 ## Examples
