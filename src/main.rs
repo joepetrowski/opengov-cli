@@ -1,5 +1,7 @@
 mod types;
 use crate::types::*;
+mod functions;
+use crate::functions::*;
 mod build_upgrade;
 use crate::build_upgrade::{build_upgrade, UpgradeArgs};
 mod submit_referendum;

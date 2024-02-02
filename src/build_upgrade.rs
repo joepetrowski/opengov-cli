@@ -33,6 +33,10 @@ pub(crate) struct UpgradeArgs {
 	/// constructed.
 	#[clap(long = "filename")]
 	filename: Option<String>,
+
+	/// Some additional call that you want executed on the Relay Chain along with the upgrade.
+	#[clap(long = "additional")]
+	additional: Option<String>,
 }
 
 // The sub-command's "main" function.
@@ -117,6 +121,20 @@ fn parse_inputs(prefs: UpgradeArgs) -> UpgradeDetails {
 		_ => panic!("`network` must be `polkadot` or `kusama`"),
 	};
 
+	let additional = match prefs.additional {
+		Some(c) => {
+			let additional_bytes = get_proposal_bytes(c.clone());
+			match relay.network {
+				Network::Polkadot =>
+					Some(CallInfo::from_bytes(&additional_bytes, Network::Polkadot)),
+				Network::Kusama => Some(CallInfo::from_bytes(&additional_bytes, Network::Kusama)),
+				// for now, only support additional on the relay chain
+				_ => panic!("`network` must be `polkadot` or `kusama`"),
+			}
+		},
+		None => None,
+	};
+
 	let directory = format!("./upgrade-{}-{}/", &prefs.network, &relay_version);
 	let output_file = if let Some(user_filename) = prefs.filename {
 		format!("{}{}", directory, user_filename)
@@ -126,7 +144,7 @@ fn parse_inputs(prefs: UpgradeArgs) -> UpgradeDetails {
 
 	make_version_directory(directory.as_str());
 
-	UpgradeDetails { relay, networks, directory, output_file }
+	UpgradeDetails { relay, networks, directory, output_file, additional }
 }
 
 // Create a directory into which to place runtime blobs and the final call data.
@@ -343,14 +361,21 @@ async fn construct_batch(
 ) -> CallInfo {
 	println!("\nBatching calls.");
 	match upgrade_details.relay.network {
-		Network::Kusama => construct_kusama_batch(relay_call, para_calls).await,
-		Network::Polkadot => construct_polkadot_batch(relay_call, para_calls).await,
+		Network::Kusama =>
+			construct_kusama_batch(relay_call, para_calls, upgrade_details.additional.clone()).await,
+		Network::Polkadot =>
+			construct_polkadot_batch(relay_call, para_calls, upgrade_details.additional.clone())
+				.await,
 		_ => panic!("Not a Relay Chain"),
 	}
 }
 
 // Construct the batch needed on Kusama.
-async fn construct_kusama_batch(relay_call: CallInfo, para_calls: Vec<CallInfo>) -> CallInfo {
+async fn construct_kusama_batch(
+	relay_call: CallInfo,
+	para_calls: Vec<CallInfo>,
+	additional: Option<CallInfo>,
+) -> CallInfo {
 	use kusama_relay::runtime_types::pallet_utility::pallet::Call as UtilityCall;
 
 	let mut batch_calls = Vec::new();
@@ -371,6 +396,10 @@ async fn construct_kusama_batch(relay_call: CallInfo, para_calls: Vec<CallInfo>)
 			},
 		}
 	}
+	if let Some(a) = additional {
+		batch_calls.push(a.get_kusama_call().expect("kusama call"))
+	}
+	// Relay set code goes last
 	batch_calls.push(relay_call.get_kusama_call().expect("kusama call"));
 	CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(KusamaRuntimeCall::Utility(
 		UtilityCall::force_batch { calls: batch_calls },
@@ -378,7 +407,11 @@ async fn construct_kusama_batch(relay_call: CallInfo, para_calls: Vec<CallInfo>)
 }
 
 // Construct the batch needed on Polkadot.
-async fn construct_polkadot_batch(relay_call: CallInfo, para_calls: Vec<CallInfo>) -> CallInfo {
+async fn construct_polkadot_batch(
+	relay_call: CallInfo,
+	para_calls: Vec<CallInfo>,
+	additional: Option<CallInfo>,
+) -> CallInfo {
 	use polkadot_relay::runtime_types::pallet_utility::pallet::Call as UtilityCall;
 
 	let mut batch_calls = Vec::new();
@@ -401,6 +434,10 @@ async fn construct_polkadot_batch(relay_call: CallInfo, para_calls: Vec<CallInfo
 			},
 		}
 	}
+	if let Some(a) = additional {
+		batch_calls.push(a.get_polkadot_call().expect("polkadot call"))
+	}
+	// Relay set code goes last
 	batch_calls.push(relay_call.get_polkadot_call().expect("polkadot call"));
 	CallInfo::from_runtime_call(NetworkRuntimeCall::Polkadot(PolkadotRuntimeCall::Utility(
 		UtilityCall::force_batch { calls: batch_calls },
