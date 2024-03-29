@@ -46,6 +46,7 @@ pub(super) use polkadot_collectives::runtime_types::{
 pub mod polkadot_bridge_hub {}
 pub(super) use polkadot_bridge_hub::runtime_types::bridge_hub_polkadot_runtime::RuntimeCall as PolkadotBridgeHubRuntimeCall;
 
+#[derive(Clone)]
 pub(super) enum Network {
 	Kusama,
 	KusamaAssetHub,
@@ -103,6 +104,8 @@ pub(super) struct UpgradeDetails {
 	pub(super) directory: String,
 	// The filename of the output.
 	pub(super) output_file: String,
+	// An additional call to be enacted in the same batch as the system upgrade.
+	pub(super) additional: Option<CallInfo>,
 }
 
 // A network and the version to which it will upgrade.
@@ -153,6 +156,7 @@ pub(super) enum CallOrHash {
 }
 
 // All the info associated with a call in the forms you may need it in.
+#[derive(Clone)]
 pub(super) struct CallInfo {
 	pub(super) network: Network,
 	pub(super) encoded: Vec<u8>,

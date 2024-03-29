@@ -74,6 +74,7 @@ Options:
       --bridge-hub <BRIDGE_HUB>        Optional. The runtime version of Bridge Hub to which to upgrade. If not provided, it will use the Relay Chain's version
       --collectives <COLLECTIVES>      Optional. The runtime version of Collectives to which to upgrade. If not provided, it will use the Relay Chain's version
       --filename <FILENAME>            Name of the file to which to write the output. If not provided, a default will be constructed
+      --additional <ADDITIONAL>        Some additional call that you want executed on the Relay Chain along with the upgrade
   -h, --help                           Print help
 ```
 
