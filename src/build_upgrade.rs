@@ -19,8 +19,8 @@ pub(crate) struct UpgradeArgs {
 	#[clap(long = "asset-hub")]
 	asset_hub: Option<String>,
 
-	/// Optional. The runtime version of Bridge Hub to which to upgrade. If not provided, it will use
-	/// the Relay Chain's version.
+	/// Optional. The runtime version of Bridge Hub to which to upgrade. If not provided, it will
+	/// use the Relay Chain's version.
 	#[clap(long = "bridge-hub")]
 	bridge_hub: Option<String>,
 
@@ -28,6 +28,16 @@ pub(crate) struct UpgradeArgs {
 	/// use the Relay Chain's version.
 	#[clap(long = "collectives")]
 	collectives: Option<String>,
+
+	/// Optional. The runtime version of People to which to upgrade. If not provided, it will use
+	/// the Relay Chain's version.
+	#[clap(long = "people")]
+	people: Option<String>,
+
+	/// Optional. The runtime version of Coretime to which to upgrade. If not provided, it will use
+	/// the Relay Chain's version.
+	#[clap(long = "coretime")]
+	coretime: Option<String>,
 
 	/// Name of the file to which to write the output. If not provided, a default will be
 	/// constructed.
@@ -80,6 +90,16 @@ fn parse_inputs(prefs: UpgradeArgs) -> UpgradeDetails {
 	} else {
 		relay_version.clone()
 	};
+	let people_version = if let Some(v) = prefs.people {
+		String::from(v.trim_start_matches('v'))
+	} else {
+		relay_version.clone()
+	};
+	let coretime_version = if let Some(v) = prefs.coretime {
+		String::from(v.trim_start_matches('v'))
+	} else {
+		relay_version.clone()
+	};
 
 	let relay = match prefs.network.to_ascii_lowercase().as_str() {
 		"polkadot" => {
@@ -115,6 +135,14 @@ fn parse_inputs(prefs: UpgradeArgs) -> UpgradeDetails {
 			networks.push(VersionedNetwork {
 				network: Network::KusamaBridgeHub,
 				version: bridge_hub_version.clone(),
+			});
+			networks.push(VersionedNetwork {
+				network: Network::KusamaPeople,
+				version: people_version.clone(),
+			});
+			networks.push(VersionedNetwork {
+				network: Network::KusamaCoretime,
+				version: coretime_version.clone(),
 			});
 			VersionedNetwork { network: Network::Kusama, version: relay_version.clone() }
 		},
