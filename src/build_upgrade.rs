@@ -184,6 +184,8 @@ async fn download_runtimes(upgrade_details: &UpgradeDetails) {
 			Network::Polkadot => "polkadot",
 			Network::KusamaAssetHub => "asset-hub-kusama",
 			Network::KusamaBridgeHub => "bridge-hub-kusama",
+			Network::KusamaPeople => "people-kusama",
+			Network::KusamaCoretime => "coretime-kusama",
 			Network::PolkadotAssetHub => "asset-hub-polkadot",
 			Network::PolkadotCollectives => "collectives-polkadot",
 			Network::PolkadotBridgeHub => "bridge-hub-polkadot",
@@ -246,6 +248,42 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 
 				let call = CallInfo::from_runtime_call(NetworkRuntimeCall::KusamaBridgeHub(
 					KusamaBridgeHubRuntimeCall::ParachainSystem(Call::authorize_upgrade {
+						code_hash: H256(runtime_hash),
+						check_version: true,
+					}),
+				));
+				authorization_calls.push(call);
+			},
+			Network::KusamaPeople => {
+				use kusama_people::runtime_types::cumulus_pallet_parachain_system::pallet::Call;
+				let path = format!(
+					"{}people-kusama_runtime-v{}.compact.compressed.wasm",
+					upgrade_details.directory, runtime_version
+				);
+				let runtime = fs::read(path).expect("Should give a valid file path");
+				let runtime_hash = blake2_256(&runtime);
+				println!("Kusama People Runtime Hash:  0x{}", hex::encode(runtime_hash));
+
+				let call = CallInfo::from_runtime_call(NetworkRuntimeCall::KusamaPeople(
+					KusamaPeopleRuntimeCall::ParachainSystem(Call::authorize_upgrade {
+						code_hash: H256(runtime_hash),
+						check_version: true,
+					}),
+				));
+				authorization_calls.push(call);
+			},
+			Network::KusamaCoretime => {
+				use kusama_coretime::runtime_types::cumulus_pallet_parachain_system::pallet::Call;
+				let path = format!(
+					"{}coretime-kusama_runtime-v{}.compact.compressed.wasm",
+					upgrade_details.directory, runtime_version
+				);
+				let runtime = fs::read(path).expect("Should give a valid file path");
+				let runtime_hash = blake2_256(&runtime);
+				println!("Kusama Coretime Runtime Hash:  0x{}", hex::encode(runtime_hash));
+
+				let call = CallInfo::from_runtime_call(NetworkRuntimeCall::KusamaCoretime(
+					KusamaCoretimeRuntimeCall::ParachainSystem(Call::authorize_upgrade {
 						code_hash: H256(runtime_hash),
 						check_version: true,
 					}),
@@ -394,6 +432,14 @@ async fn construct_kusama_batch(
 				let send_auth = send_as_superuser_from_kusama(&auth).await;
 				batch_calls.push(send_auth);
 			},
+			Network::KusamaPeople => {
+				let send_auth = send_as_superuser_from_kusama(&auth).await;
+				batch_calls.push(send_auth);
+			},
+			Network::KusamaCoretime => {
+				let send_auth = send_as_superuser_from_kusama(&auth).await;
+				batch_calls.push(send_auth);
+			},
 		}
 	}
 	if let Some(a) = additional {
@@ -419,7 +465,10 @@ async fn construct_polkadot_batch(
 		match auth.network {
 			Network::Kusama | Network::Polkadot =>
 				panic!("para calls should not contain relay calls"),
-			Network::KusamaAssetHub | Network::KusamaBridgeHub => panic!("not polkadot parachains"),
+			Network::KusamaAssetHub
+			| Network::KusamaBridgeHub
+			| Network::KusamaPeople
+			| Network::KusamaCoretime => panic!("not polkadot parachains"),
 			Network::PolkadotAssetHub => {
 				let send_auth = send_as_superuser_from_polkadot(&auth).await;
 				batch_calls.push(send_auth);
