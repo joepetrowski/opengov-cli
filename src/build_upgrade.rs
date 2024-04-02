@@ -504,7 +504,7 @@ async fn construct_kusama_batch(
 			Network::KusamaCoretime => {
 				let send_auth = send_as_superuser_from_kusama(&auth).await;
 				batch_calls.push(send_auth);
-			}
+			},
 		}
 	}
 	if let Some(a) = additional {
@@ -533,7 +533,7 @@ async fn construct_polkadot_batch(
 			Network::KusamaAssetHub
 			| Network::KusamaBridgeHub
 			| Network::KusamaPeople
-			| Network::KusamaCoretime 
+			| Network::KusamaCoretime
 			| Network::KusamaEncointer => panic!("not polkadot parachains"),
 			Network::PolkadotAssetHub => {
 				let send_auth = send_as_superuser_from_polkadot(&auth).await;

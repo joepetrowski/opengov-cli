@@ -278,16 +278,12 @@ impl CallInfo {
 
 	// Strip the outer enum and return a Kusama People `RuntimeCall`.
 	#[allow(dead_code)]
-	pub(super) fn get_kusama_people_call(
-		&self,
-	) -> Result<KusamaPeopleRuntimeCall, &'static str> {
+	pub(super) fn get_kusama_people_call(&self) -> Result<KusamaPeopleRuntimeCall, &'static str> {
 		match &self.network {
 			Network::KusamaPeople => {
 				let bytes = &self.encoded;
-				Ok(<KusamaPeopleRuntimeCall as parity_scale_codec::Decode>::decode(
-					&mut &bytes[..],
-				)
-				.unwrap())
+				Ok(<KusamaPeopleRuntimeCall as parity_scale_codec::Decode>::decode(&mut &bytes[..])
+					.unwrap())
 			},
 			_ => Err("not a kusama people call"),
 		}
