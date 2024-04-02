@@ -326,7 +326,7 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 				println!("Kusama Coretime Runtime Hash:  0x{}", hex::encode(runtime_hash));
 
 				let call = CallInfo::from_runtime_call(NetworkRuntimeCall::KusamaCoretime(
-					KusamaPeopleRuntimeCall::ParachainSystem(Call::authorize_upgrade {
+					KusamaCoretimeRuntimeCall::ParachainSystem(Call::authorize_upgrade {
 						code_hash: H256(runtime_hash),
 						check_version: true,
 					}),
@@ -344,7 +344,7 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 				println!("Kusama Encointer Runtime Hash:  0x{}", hex::encode(runtime_hash));
 
 				let call = CallInfo::from_runtime_call(NetworkRuntimeCall::KusamaEncointer(
-					KusamaPeopleRuntimeCall::ParachainSystem(Call::authorize_upgrade {
+					KusamaEncointerRuntimeCall::ParachainSystem(Call::authorize_upgrade {
 						code_hash: H256(runtime_hash),
 						check_version: true,
 					}),

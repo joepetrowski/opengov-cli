@@ -67,6 +67,7 @@ pub(super) enum Network {
 	KusamaCoretime,
 	KusamaEncointer,
 	Polkadot,
+	PolkadotAssetHub,
 	PolkadotCollectives,
 	PolkadotBridgeHub,
 }
