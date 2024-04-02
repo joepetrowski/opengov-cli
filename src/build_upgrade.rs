@@ -29,6 +29,11 @@ pub(crate) struct UpgradeArgs {
 	#[clap(long = "collectives")]
 	collectives: Option<String>,
 
+	/// Optional. The runtime version of Encointer to which to upgrade. If not provided, it will use
+	/// the Relay Chain's version.
+	#[clap(long = "encointer")]
+	encointer: Option<String>,
+
 	/// Name of the file to which to write the output. If not provided, a default will be
 	/// constructed.
 	#[clap(long = "filename")]
@@ -75,6 +80,11 @@ fn parse_inputs(prefs: UpgradeArgs) -> UpgradeDetails {
 	} else {
 		relay_version.clone()
 	};
+	let encointer_version = if let Some(v) = prefs.encointer {
+		String::from(v.trim_start_matches('v'))
+	} else {
+		relay_version.clone()
+	};
 	let collectives_version = if let Some(v) = prefs.collectives {
 		String::from(v.trim_start_matches('v'))
 	} else {
@@ -115,6 +125,10 @@ fn parse_inputs(prefs: UpgradeArgs) -> UpgradeDetails {
 			networks.push(VersionedNetwork {
 				network: Network::KusamaBridgeHub,
 				version: bridge_hub_version.clone(),
+			});
+			networks.push(VersionedNetwork {
+				network: Network::KusamaEncointer,
+				version: encointer_version.clone(),
 			});
 			VersionedNetwork { network: Network::Kusama, version: relay_version.clone() }
 		},
@@ -184,6 +198,7 @@ async fn download_runtimes(upgrade_details: &UpgradeDetails) {
 			Network::Polkadot => "polkadot",
 			Network::KusamaAssetHub => "asset-hub-kusama",
 			Network::KusamaBridgeHub => "bridge-hub-kusama",
+			Network::KusamaEncointer => "encointer-kusama",
 			Network::PolkadotAssetHub => "asset-hub-polkadot",
 			Network::PolkadotCollectives => "collectives-polkadot",
 			Network::PolkadotBridgeHub => "bridge-hub-polkadot",
@@ -246,6 +261,24 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 
 				let call = CallInfo::from_runtime_call(NetworkRuntimeCall::KusamaBridgeHub(
 					KusamaBridgeHubRuntimeCall::ParachainSystem(Call::authorize_upgrade {
+						code_hash: H256(runtime_hash),
+						check_version: true,
+					}),
+				));
+				authorization_calls.push(call);
+			},
+			Network::KusamaEncointer => {
+				use kusama_encointer::runtime_types::cumulus_pallet_parachain_system::pallet::Call;
+				let path = format!(
+					"{}encointer-kusama_runtime-v{}.compact.compressed.wasm",
+					upgrade_details.directory, runtime_version
+				);
+				let runtime = fs::read(path).expect("Should give a valid file path");
+				let runtime_hash = blake2_256(&runtime);
+				println!("Kusama Encointer Runtime Hash:   0x{}", hex::encode(runtime_hash));
+
+				let call = CallInfo::from_runtime_call(NetworkRuntimeCall::KusamaEncointer(
+					KusamaEncointerRuntimeCall::ParachainSystem(Call::authorize_upgrade {
 						code_hash: H256(runtime_hash),
 						check_version: true,
 					}),
@@ -394,6 +427,10 @@ async fn construct_kusama_batch(
 				let send_auth = send_as_superuser_from_kusama(&auth).await;
 				batch_calls.push(send_auth);
 			},
+			Network::KusamaEncointer => {
+				let send_auth = send_as_superuser_from_kusama(&auth).await;
+				batch_calls.push(send_auth);
+			},
 		}
 	}
 	if let Some(a) = additional {
@@ -419,7 +456,8 @@ async fn construct_polkadot_batch(
 		match auth.network {
 			Network::Kusama | Network::Polkadot =>
 				panic!("para calls should not contain relay calls"),
-			Network::KusamaAssetHub | Network::KusamaBridgeHub => panic!("not polkadot parachains"),
+			Network::KusamaAssetHub | Network::KusamaBridgeHub | Network::KusamaEncointer =>
+				panic!("not polkadot parachains"),
 			Network::PolkadotAssetHub => {
 				let send_auth = send_as_superuser_from_polkadot(&auth).await;
 				batch_calls.push(send_auth);
