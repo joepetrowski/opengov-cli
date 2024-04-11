@@ -450,7 +450,7 @@ fn only_relay_chain() {
 	let details = build_upgrade::parse_inputs(args);
 	assert_eq!(details.relay, Network::Polkadot);
 	assert_eq!(details.relay_version, Some(String::from("1.2.0")));
-	let mut expected_networks =
+	let expected_networks =
 		vec![VersionedNetwork { network: Network::Polkadot, version: String::from("1.2.0") }];
 	assert_eq!(details.networks, expected_networks);
 	assert!(details.additional.is_none());
