@@ -50,7 +50,7 @@ pub(super) use polkadot_collectives::runtime_types::{
 pub mod polkadot_bridge_hub {}
 pub(super) use polkadot_bridge_hub::runtime_types::bridge_hub_polkadot_runtime::RuntimeCall as PolkadotBridgeHubRuntimeCall;
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub(super) enum Network {
 	Kusama,
 	KusamaAssetHub,
@@ -103,7 +103,9 @@ pub(super) struct ProposalDetails {
 // Info and preferences provided by the user for runtime upgrade construction.
 pub(super) struct UpgradeDetails {
 	// The Relay Network for this upgrade, Polkadot or Kusama.
-	pub(super) relay: VersionedNetwork,
+	pub(super) relay: Network,
+	// The version of the Relay Chain to which to upgrade. Typically, but not always, the default.
+	pub(super) relay_version: Option<String>,
 	// All networks to upgrade.
 	pub(super) networks: Vec<VersionedNetwork>,
 	// The directory into which to write information needed.
@@ -115,6 +117,7 @@ pub(super) struct UpgradeDetails {
 }
 
 // A network and the version to which it will upgrade.
+#[derive(Debug, PartialEq)]
 pub(super) struct VersionedNetwork {
 	// A network identifier.
 	pub(super) network: Network,
