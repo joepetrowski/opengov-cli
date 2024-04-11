@@ -450,9 +450,8 @@ fn only_relay_chain() {
 	let details = build_upgrade::parse_inputs(args);
 	assert_eq!(details.relay, Network::Polkadot);
 	assert_eq!(details.relay_version, Some(String::from("1.2.0")));
-	let mut expected_networks = Vec::new();
-	expected_networks
-		.push(VersionedNetwork { network: Network::Polkadot, version: String::from("1.2.0") });
+	let mut expected_networks =
+		vec![VersionedNetwork { network: Network::Polkadot, version: String::from("1.2.0") }];
 	assert_eq!(details.networks, expected_networks);
 	assert!(details.additional.is_none());
 }
@@ -463,11 +462,10 @@ fn only_asset_hub() {
 	let details = build_upgrade::parse_inputs(args);
 	assert_eq!(details.relay, Network::Polkadot);
 	assert_eq!(details.relay_version, None);
-	let mut expected_networks = Vec::new();
-	expected_networks.push(VersionedNetwork {
+	let expected_networks = vec![VersionedNetwork {
 		network: Network::PolkadotAssetHub,
 		version: String::from("1.2.0"),
-	});
+	}];
 	assert_eq!(details.networks, expected_networks);
 	assert!(details.additional.is_none());
 }
@@ -478,21 +476,12 @@ fn upgrade_everything_works_with_just_relay_version() {
 	let details = build_upgrade::parse_inputs(args);
 	assert_eq!(details.relay, Network::Polkadot);
 	assert_eq!(details.relay_version, Some(String::from("1.2.0")));
-	let mut expected_networks = Vec::new();
-	expected_networks
-		.push(VersionedNetwork { network: Network::Polkadot, version: String::from("1.2.0") });
-	expected_networks.push(VersionedNetwork {
-		network: Network::PolkadotAssetHub,
-		version: String::from("1.2.0"),
-	});
-	expected_networks.push(VersionedNetwork {
-		network: Network::PolkadotCollectives,
-		version: String::from("1.2.0"),
-	});
-	expected_networks.push(VersionedNetwork {
-		network: Network::PolkadotBridgeHub,
-		version: String::from("1.2.0"),
-	});
+	let expected_networks = vec![
+		VersionedNetwork { network: Network::Polkadot, version: String::from("1.2.0") },
+		VersionedNetwork { network: Network::PolkadotAssetHub, version: String::from("1.2.0") },
+		VersionedNetwork { network: Network::PolkadotCollectives, version: String::from("1.2.0") },
+		VersionedNetwork { network: Network::PolkadotBridgeHub, version: String::from("1.2.0") },
+	];
 	assert_eq!(details.networks, expected_networks);
 	assert!(details.additional.is_none());
 }

@@ -356,9 +356,8 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 // Generate the `system.set_code` call that will upgrade the Relay Chain.
 fn generate_relay_upgrade_call(upgrade_details: &UpgradeDetails) -> Option<CallInfo> {
 	println!("\nGenerating Relay Chain upgrade call. The runtime hash is logged if you would like to verify it with srtool.\n");
-	if upgrade_details.relay_version.clone().is_none() {
-		return None
-	}
+	// None if there is no version.
+	upgrade_details.relay_version.clone()?;
 	let runtime_version = semver_to_intver(&upgrade_details.relay_version.clone().unwrap());
 	match upgrade_details.relay {
 		Network::Kusama => {
@@ -448,8 +447,8 @@ async fn construct_kusama_batch(
 		batch_calls.push(a.get_kusama_call().expect("kusama call"))
 	}
 	// Relay set code goes last
-	if relay_call.is_some() {
-		batch_calls.push(relay_call.unwrap().get_kusama_call().expect("kusama call"));
+	if let Some(rc) = relay_call {
+		batch_calls.push(rc.get_kusama_call().expect("kusama call"));
 	}
 	CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(KusamaRuntimeCall::Utility(
 		UtilityCall::force_batch { calls: batch_calls },
@@ -489,8 +488,8 @@ async fn construct_polkadot_batch(
 		batch_calls.push(a.get_polkadot_call().expect("polkadot call"))
 	}
 	// Relay set code goes last
-	if relay_call.is_some() {
-		batch_calls.push(relay_call.unwrap().get_polkadot_call().expect("polkadot call"));
+	if let Some(rc) = relay_call {
+		batch_calls.push(rc.get_polkadot_call().expect("polkadot call"));
 	}
 	CallInfo::from_runtime_call(NetworkRuntimeCall::Polkadot(PolkadotRuntimeCall::Utility(
 		UtilityCall::force_batch { calls: batch_calls },
