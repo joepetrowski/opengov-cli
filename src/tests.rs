@@ -127,6 +127,7 @@ fn upgrade_args_for_only_relay() -> UpgradeArgs {
 		bridge_hub: None,
 		collectives: None,
 		encointer: None,
+		coretime: None,
 		filename: None,
 		additional: None,
 	}
@@ -141,6 +142,7 @@ fn upgrade_args_for_only_asset_hub() -> UpgradeArgs {
 		bridge_hub: None,
 		collectives: None,
 		encointer: None,
+		coretime: None,
 		filename: None,
 		additional: None,
 	}
@@ -155,6 +157,7 @@ fn upgrade_args_for_all() -> UpgradeArgs {
 		bridge_hub: None,
 		collectives: None,
 		encointer: None,
+		coretime: None,
 		filename: None,
 		additional: None,
 	}
