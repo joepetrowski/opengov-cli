@@ -207,7 +207,7 @@ impl CallInfo {
 	}
 
 	// Construct `Self` for some `network` given some `encoded` bytes.
-	pub(super) fn from_bytes(encoded: &Vec<u8>, network: Network) -> Self {
+	pub(super) fn from_bytes(encoded: &[u8], network: Network) -> Self {
 		let hash = blake2_256(encoded);
 		let length = (encoded.len()).try_into().unwrap();
 		Self { network, encoded: encoded.to_vec(), hash, length }
