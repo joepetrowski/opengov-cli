@@ -1,8 +1,9 @@
 use crate::get_proposal_bytes;
 use crate::polkadot_relay::runtime_types::frame_system::pallet::Call as PolkadotRelaySystemCall;
 use crate::{
-	submit_referendum::generate_calls, CallInfo, CallOrHash, KusamaOpenGovOrigin, Network,
-	NetworkRuntimeCall, PolkadotOpenGovOrigin, PolkadotRuntimeCall, ProposalDetails, Weight,
+	build_upgrade, submit_referendum::generate_calls, CallInfo, CallOrHash, KusamaOpenGovOrigin,
+	Network, NetworkRuntimeCall, PolkadotOpenGovOrigin, PolkadotRuntimeCall, ProposalDetails,
+	UpgradeArgs, VersionedNetwork, Weight,
 };
 
 fn polkadot_whitelist_remark_user_input() -> ProposalDetails {
@@ -114,6 +115,48 @@ fn limited_length_user_input() -> ProposalDetails {
 		output_len_limit: 5, // very limiting
 		print_batch: true,
 		transact_weight_override: Some(Weight { ref_time: 1_000_000_000, proof_size: 1_000_000 }),
+	}
+}
+
+fn upgrade_args_for_only_relay() -> UpgradeArgs {
+	UpgradeArgs {
+		network: String::from("polkadot"),
+		only: true,
+		relay_version: Some(String::from("v1.2.0")),
+		asset_hub: None,
+		bridge_hub: None,
+		collectives: None,
+		encointer: None,
+		filename: None,
+		additional: None,
+	}
+}
+
+fn upgrade_args_for_only_asset_hub() -> UpgradeArgs {
+	UpgradeArgs {
+		network: String::from("polkadot"),
+		only: true,
+		relay_version: None,
+		asset_hub: Some(String::from("v1.2.0")),
+		bridge_hub: None,
+		collectives: None,
+		encointer: None,
+		filename: None,
+		additional: None,
+	}
+}
+
+fn upgrade_args_for_all() -> UpgradeArgs {
+	UpgradeArgs {
+		network: String::from("polkadot"),
+		only: false,
+		relay_version: Some(String::from("v1.2.0")),
+		asset_hub: None,
+		bridge_hub: None,
+		collectives: None,
+		encointer: None,
+		filename: None,
+		additional: None,
 	}
 }
 
@@ -399,6 +442,48 @@ async fn it_starts_kusama_root_referenda_correctly() {
 		let call_info = CallInfo::from_runtime_call(public_referendum_generated);
 		assert_eq!(call_info.encoded, public_referendum);
 	}
+}
+
+#[test]
+fn only_relay_chain() {
+	let args = upgrade_args_for_only_relay();
+	let details = build_upgrade::parse_inputs(args);
+	assert_eq!(details.relay, Network::Polkadot);
+	assert_eq!(details.relay_version, Some(String::from("1.2.0")));
+	let expected_networks =
+		vec![VersionedNetwork { network: Network::Polkadot, version: String::from("1.2.0") }];
+	assert_eq!(details.networks, expected_networks);
+	assert!(details.additional.is_none());
+}
+
+#[test]
+fn only_asset_hub() {
+	let args = upgrade_args_for_only_asset_hub();
+	let details = build_upgrade::parse_inputs(args);
+	assert_eq!(details.relay, Network::Polkadot);
+	assert_eq!(details.relay_version, None);
+	let expected_networks = vec![VersionedNetwork {
+		network: Network::PolkadotAssetHub,
+		version: String::from("1.2.0"),
+	}];
+	assert_eq!(details.networks, expected_networks);
+	assert!(details.additional.is_none());
+}
+
+#[test]
+fn upgrade_everything_works_with_just_relay_version() {
+	let args = upgrade_args_for_all();
+	let details = build_upgrade::parse_inputs(args);
+	assert_eq!(details.relay, Network::Polkadot);
+	assert_eq!(details.relay_version, Some(String::from("1.2.0")));
+	let expected_networks = vec![
+		VersionedNetwork { network: Network::Polkadot, version: String::from("1.2.0") },
+		VersionedNetwork { network: Network::PolkadotAssetHub, version: String::from("1.2.0") },
+		VersionedNetwork { network: Network::PolkadotCollectives, version: String::from("1.2.0") },
+		VersionedNetwork { network: Network::PolkadotBridgeHub, version: String::from("1.2.0") },
+	];
+	assert_eq!(details.networks, expected_networks);
+	assert!(details.additional.is_none());
 }
 
 #[test]

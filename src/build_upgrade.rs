@@ -8,40 +8,44 @@ use std::path::Path;
 pub(crate) struct UpgradeArgs {
 	/// Network on which to submit the referendum. `polkadot` or `kusama`.
 	#[clap(long = "network", short)]
-	network: String,
+	pub(crate) network: String,
+
+	/// Only include the runtimes explicitly specified.
+	#[clap(long = "only")]
+	pub(crate) only: bool,
 
 	/// The Fellowship release version. Should be semver and correspond to the release published.
 	#[clap(long = "relay-version")]
-	relay_version: String,
+	pub(crate) relay_version: Option<String>,
 
 	/// Optional. The runtime version of Asset Hub to which to upgrade. If not provided, it will use
 	/// the Relay Chain's version.
 	#[clap(long = "asset-hub")]
-	asset_hub: Option<String>,
+	pub(crate) asset_hub: Option<String>,
 
 	/// Optional. The runtime version of Bridge Hub to which to upgrade. If not provided, it will use
 	/// the Relay Chain's version.
 	#[clap(long = "bridge-hub")]
-	bridge_hub: Option<String>,
+	pub(crate) bridge_hub: Option<String>,
 
 	/// Optional. The runtime version of Collectives to which to upgrade. If not provided, it will
 	/// use the Relay Chain's version.
 	#[clap(long = "collectives")]
-	collectives: Option<String>,
+	pub(crate) collectives: Option<String>,
 
 	/// Optional. The runtime version of Encointer to which to upgrade. If not provided, it will use
 	/// the Relay Chain's version.
 	#[clap(long = "encointer")]
-	encointer: Option<String>,
+	pub(crate) encointer: Option<String>,
 
 	/// Name of the file to which to write the output. If not provided, a default will be
 	/// constructed.
 	#[clap(long = "filename")]
-	filename: Option<String>,
+	pub(crate) filename: Option<String>,
 
 	/// Some additional call that you want executed on the Relay Chain along with the upgrade.
 	#[clap(long = "additional")]
-	additional: Option<String>,
+	pub(crate) additional: Option<String>,
 }
 
 // The sub-command's "main" function.
@@ -66,71 +70,71 @@ pub(crate) async fn build_upgrade(prefs: UpgradeArgs) {
 	write_batch(&upgrade_details, batch);
 }
 
+fn chain_version(chain: Option<String>, default: Option<String>, only: bool) -> Option<String> {
+	// if the user specified a version for this particular chain, use it
+	if let Some(v) = chain {
+		Some(String::from(v.trim_start_matches('v')))
+	} else {
+		// if the user only wants to upgrade specific chains, and have not specified this one, then
+		// return None so that it will not be added to the batch of upgrades
+		if only {
+			None
+		// otherwise, use the default version
+		} else {
+			assert!(default.is_some(), "no version specified");
+			default
+		}
+	}
+}
+
 // Parse the CLI inputs and return a typed struct with all the details needed.
-fn parse_inputs(prefs: UpgradeArgs) -> UpgradeDetails {
+pub(crate) fn parse_inputs(prefs: UpgradeArgs) -> UpgradeDetails {
 	let mut networks = Vec::new();
-	let relay_version = String::from(prefs.relay_version.trim_start_matches('v'));
-	let asset_hub_version = if let Some(v) = prefs.asset_hub {
-		String::from(v.trim_start_matches('v'))
-	} else {
-		relay_version.clone()
-	};
-	let bridge_hub_version = if let Some(v) = prefs.bridge_hub {
-		String::from(v.trim_start_matches('v'))
-	} else {
-		relay_version.clone()
-	};
-	let encointer_version = if let Some(v) = prefs.encointer {
-		String::from(v.trim_start_matches('v'))
-	} else {
-		relay_version.clone()
-	};
-	let collectives_version = if let Some(v) = prefs.collectives {
-		String::from(v.trim_start_matches('v'))
-	} else {
-		relay_version.clone()
-	};
+	let only = prefs.only;
+
+	if !only {
+		assert!(
+			prefs.relay_version.is_some(),
+			"relay-version must be specified unless using --only"
+		);
+	}
+	let relay_version = chain_version(prefs.relay_version, None, only);
+	let asset_hub_version = chain_version(prefs.asset_hub, relay_version.clone(), only);
+	let bridge_hub_version = chain_version(prefs.bridge_hub, relay_version.clone(), only);
+	let encointer_version = chain_version(prefs.encointer, relay_version.clone(), only);
+	let collectives_version = chain_version(prefs.collectives, relay_version.clone(), only);
 
 	let relay = match prefs.network.to_ascii_lowercase().as_str() {
 		"polkadot" => {
-			// Relay must be first!
-			networks.push(VersionedNetwork {
-				network: Network::Polkadot,
-				version: relay_version.clone(),
-			});
-			networks.push(VersionedNetwork {
-				network: Network::PolkadotAssetHub,
-				version: asset_hub_version.clone(),
-			});
-			networks.push(VersionedNetwork {
-				network: Network::PolkadotCollectives,
-				version: collectives_version.clone(),
-			});
-			networks.push(VersionedNetwork {
-				network: Network::PolkadotBridgeHub,
-				version: bridge_hub_version.clone(),
-			});
-			VersionedNetwork { network: Network::Polkadot, version: relay_version.clone() }
+			if let Some(v) = relay_version.clone() {
+				networks.push(VersionedNetwork { network: Network::Polkadot, version: v });
+			}
+			if let Some(v) = asset_hub_version.clone() {
+				networks.push(VersionedNetwork { network: Network::PolkadotAssetHub, version: v });
+			}
+			if let Some(v) = collectives_version.clone() {
+				networks
+					.push(VersionedNetwork { network: Network::PolkadotCollectives, version: v });
+			}
+			if let Some(v) = bridge_hub_version.clone() {
+				networks.push(VersionedNetwork { network: Network::PolkadotBridgeHub, version: v });
+			}
+			Network::Polkadot
 		},
 		"kusama" => {
-			// Relay must be first!
-			networks.push(VersionedNetwork {
-				network: Network::Kusama,
-				version: relay_version.clone(),
-			});
-			networks.push(VersionedNetwork {
-				network: Network::KusamaAssetHub,
-				version: asset_hub_version.clone(),
-			});
-			networks.push(VersionedNetwork {
-				network: Network::KusamaBridgeHub,
-				version: bridge_hub_version.clone(),
-			});
-			networks.push(VersionedNetwork {
-				network: Network::KusamaEncointer,
-				version: encointer_version.clone(),
-			});
-			VersionedNetwork { network: Network::Kusama, version: relay_version.clone() }
+			if let Some(v) = relay_version.clone() {
+				networks.push(VersionedNetwork { network: Network::Kusama, version: v });
+			}
+			if let Some(v) = asset_hub_version.clone() {
+				networks.push(VersionedNetwork { network: Network::KusamaAssetHub, version: v });
+			}
+			if let Some(v) = encointer_version.clone() {
+				networks.push(VersionedNetwork { network: Network::KusamaEncointer, version: v });
+			}
+			if let Some(v) = bridge_hub_version.clone() {
+				networks.push(VersionedNetwork { network: Network::KusamaBridgeHub, version: v });
+			}
+			Network::Kusama
 		},
 		_ => panic!("`network` must be `polkadot` or `kusama`"),
 	};
@@ -138,7 +142,7 @@ fn parse_inputs(prefs: UpgradeArgs) -> UpgradeDetails {
 	let additional = match prefs.additional {
 		Some(c) => {
 			let additional_bytes = get_proposal_bytes(c.clone());
-			match relay.network {
+			match relay {
 				Network::Polkadot =>
 					Some(CallInfo::from_bytes(&additional_bytes, Network::Polkadot)),
 				Network::Kusama => Some(CallInfo::from_bytes(&additional_bytes, Network::Kusama)),
@@ -149,16 +153,21 @@ fn parse_inputs(prefs: UpgradeArgs) -> UpgradeDetails {
 		None => None,
 	};
 
-	let directory = format!("./upgrade-{}-{}/", &prefs.network, &relay_version);
+	let version =
+		relay_version.clone().unwrap_or(asset_hub_version.unwrap_or(bridge_hub_version.unwrap_or(
+			encointer_version.unwrap_or(collectives_version.unwrap_or(String::from("no-version"))),
+		)));
+
+	let directory = format!("./upgrade-{}-{}/", &prefs.network, &version);
 	let output_file = if let Some(user_filename) = prefs.filename {
 		format!("{}{}", directory, user_filename)
 	} else {
-		format!("{}{}-{}.call", directory, prefs.network, relay_version)
+		format!("{}{}-{}.call", directory, prefs.network, version)
 	};
 
 	make_version_directory(directory.as_str());
 
-	UpgradeDetails { relay, networks, directory, output_file, additional }
+	UpgradeDetails { relay, relay_version, networks, directory, output_file, additional }
 }
 
 // Create a directory into which to place runtime blobs and the final call data.
@@ -344,12 +353,13 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 	authorization_calls
 }
 
-// Generate the `system.set_code` call, wrapped in `utility.with_weight`, that will upgrade the
-// Relay Chain.
-fn generate_relay_upgrade_call(upgrade_details: &UpgradeDetails) -> CallInfo {
+// Generate the `system.set_code` call that will upgrade the Relay Chain.
+fn generate_relay_upgrade_call(upgrade_details: &UpgradeDetails) -> Option<CallInfo> {
 	println!("\nGenerating Relay Chain upgrade call. The runtime hash is logged if you would like to verify it with srtool.\n");
-	let runtime_version = semver_to_intver(&upgrade_details.relay.version);
-	match upgrade_details.relay.network {
+	// None if there is no version.
+	upgrade_details.relay_version.clone()?;
+	let runtime_version = semver_to_intver(&upgrade_details.relay_version.clone().unwrap());
+	match upgrade_details.relay {
 		Network::Kusama => {
 			use kusama_relay::runtime_types::frame_system::pallet::Call as SystemCall;
 
@@ -361,8 +371,8 @@ fn generate_relay_upgrade_call(upgrade_details: &UpgradeDetails) -> CallInfo {
 			let runtime_hash = blake2_256(&runtime);
 			println!("Kusama Relay Chain Runtime Hash: 0x{}", hex::encode(runtime_hash));
 
-			CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(KusamaRuntimeCall::System(
-				SystemCall::set_code { code: runtime },
+			Some(CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(
+				KusamaRuntimeCall::System(SystemCall::set_code { code: runtime }),
 			)))
 		},
 		Network::Polkadot => {
@@ -376,8 +386,8 @@ fn generate_relay_upgrade_call(upgrade_details: &UpgradeDetails) -> CallInfo {
 			let runtime_hash = blake2_256(&runtime);
 			println!("Polkadot Relay Chain Runtime Hash: 0x{}", hex::encode(runtime_hash));
 
-			CallInfo::from_runtime_call(NetworkRuntimeCall::Polkadot(PolkadotRuntimeCall::System(
-				SystemCall::set_code { code: runtime },
+			Some(CallInfo::from_runtime_call(NetworkRuntimeCall::Polkadot(
+				PolkadotRuntimeCall::System(SystemCall::set_code { code: runtime }),
 			)))
 		},
 		_ => panic!("Not a Relay Chain"),
@@ -389,11 +399,11 @@ fn generate_relay_upgrade_call(upgrade_details: &UpgradeDetails) -> CallInfo {
 // referendum.
 async fn construct_batch(
 	upgrade_details: &UpgradeDetails,
-	relay_call: CallInfo,
+	relay_call: Option<CallInfo>,
 	para_calls: Vec<CallInfo>,
 ) -> CallInfo {
 	println!("\nBatching calls.");
-	match upgrade_details.relay.network {
+	match upgrade_details.relay {
 		Network::Kusama =>
 			construct_kusama_batch(relay_call, para_calls, upgrade_details.additional.clone()).await,
 		Network::Polkadot =>
@@ -405,7 +415,7 @@ async fn construct_batch(
 
 // Construct the batch needed on Kusama.
 async fn construct_kusama_batch(
-	relay_call: CallInfo,
+	relay_call: Option<CallInfo>,
 	para_calls: Vec<CallInfo>,
 	additional: Option<CallInfo>,
 ) -> CallInfo {
@@ -437,7 +447,9 @@ async fn construct_kusama_batch(
 		batch_calls.push(a.get_kusama_call().expect("kusama call"))
 	}
 	// Relay set code goes last
-	batch_calls.push(relay_call.get_kusama_call().expect("kusama call"));
+	if let Some(rc) = relay_call {
+		batch_calls.push(rc.get_kusama_call().expect("kusama call"));
+	}
 	CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(KusamaRuntimeCall::Utility(
 		UtilityCall::force_batch { calls: batch_calls },
 	)))
@@ -445,7 +457,7 @@ async fn construct_kusama_batch(
 
 // Construct the batch needed on Polkadot.
 async fn construct_polkadot_batch(
-	relay_call: CallInfo,
+	relay_call: Option<CallInfo>,
 	para_calls: Vec<CallInfo>,
 	additional: Option<CallInfo>,
 ) -> CallInfo {
@@ -476,7 +488,9 @@ async fn construct_polkadot_batch(
 		batch_calls.push(a.get_polkadot_call().expect("polkadot call"))
 	}
 	// Relay set code goes last
-	batch_calls.push(relay_call.get_polkadot_call().expect("polkadot call"));
+	if let Some(rc) = relay_call {
+		batch_calls.push(rc.get_polkadot_call().expect("polkadot call"));
+	}
 	CallInfo::from_runtime_call(NetworkRuntimeCall::Polkadot(PolkadotRuntimeCall::Utility(
 		UtilityCall::force_batch { calls: batch_calls },
 	)))
@@ -593,7 +607,7 @@ fn write_batch(upgrade_details: &UpgradeDetails, batch: CallInfo) {
 
 	println!("\nSuccess! The call data was written to {}", fname);
 	println!("To submit this as a referendum in OpenGov, run:");
-	let network = match upgrade_details.relay.network {
+	let network = match upgrade_details.relay {
 		Network::Kusama => "kusama",
 		Network::Polkadot => "polkadot",
 		_ => panic!("not a relay network"),
