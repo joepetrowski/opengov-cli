@@ -22,6 +22,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Build
+        env:
+          SKIP_WASM_BUILD: 1
         run: cargo build --verbose
 
   lint:
@@ -40,6 +42,8 @@ jobs:
         run: cargo +${{ env.TOOLCHAIN_LINT }} fmt --all -- --check
 
       - name: Clippy
+        env:
+          SKIP_WASM_BUILD: 1
         uses: actions-rs-plus/clippy-check@v2
         with:
           toolchain: ${{ env.TOOLCHAIN_LINT }}
