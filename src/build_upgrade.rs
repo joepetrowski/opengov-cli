@@ -38,6 +38,11 @@ pub(crate) struct UpgradeArgs {
 	#[clap(long = "encointer")]
 	pub(crate) encointer: Option<String>,
 
+	/// Optional. The runtime version of Coretime to which to upgrade. If not provided, it will use
+	/// the Relay Chain's version.
+	#[clap(long = "coretime")]
+	pub(crate) coretime: Option<String>,
+
 	/// Name of the file to which to write the output. If not provided, a default will be
 	/// constructed.
 	#[clap(long = "filename")]
@@ -101,6 +106,7 @@ pub(crate) fn parse_inputs(prefs: UpgradeArgs) -> UpgradeDetails {
 	let relay_version = chain_version(prefs.relay_version, None, only);
 	let asset_hub_version = chain_version(prefs.asset_hub, relay_version.clone(), only);
 	let bridge_hub_version = chain_version(prefs.bridge_hub, relay_version.clone(), only);
+	let coretime_version = chain_version(prefs.coretime, relay_version.clone(), only);
 	let encointer_version = chain_version(prefs.encointer, relay_version.clone(), only);
 	let collectives_version = chain_version(prefs.collectives, relay_version.clone(), only);
 
@@ -134,6 +140,9 @@ pub(crate) fn parse_inputs(prefs: UpgradeArgs) -> UpgradeDetails {
 			if let Some(v) = bridge_hub_version.clone() {
 				networks.push(VersionedNetwork { network: Network::KusamaBridgeHub, version: v });
 			}
+			if let Some(v) = coretime_version.clone() {
+				networks.push(VersionedNetwork { network: Network::KusamaCoretime, version: v });
+			}
 			Network::Kusama
 		},
 		_ => panic!("`network` must be `polkadot` or `kusama`"),
@@ -153,10 +162,11 @@ pub(crate) fn parse_inputs(prefs: UpgradeArgs) -> UpgradeDetails {
 		None => None,
 	};
 
-	let version =
-		relay_version.clone().unwrap_or(asset_hub_version.unwrap_or(bridge_hub_version.unwrap_or(
-			encointer_version.unwrap_or(collectives_version.unwrap_or(String::from("no-version"))),
-		)));
+	let version = relay_version.clone().unwrap_or(asset_hub_version.unwrap_or(
+		bridge_hub_version.unwrap_or(encointer_version.unwrap_or(
+			collectives_version.unwrap_or(coretime_version.unwrap_or(String::from("no-version"))),
+		)),
+	));
 
 	let directory = format!("./upgrade-{}-{}/", &prefs.network, &version);
 	let output_file = if let Some(user_filename) = prefs.filename {
@@ -173,7 +183,7 @@ pub(crate) fn parse_inputs(prefs: UpgradeArgs) -> UpgradeDetails {
 // Create a directory into which to place runtime blobs and the final call data.
 fn make_version_directory(dir_name: &str) {
 	if !Path::new(dir_name).is_dir() {
-		fs::create_dir(dir_name).expect("it makes a dir");
+		fs::create_dir_all(dir_name).expect("it makes a dir");
 	}
 }
 
@@ -207,6 +217,7 @@ async fn download_runtimes(upgrade_details: &UpgradeDetails) {
 			Network::Polkadot => "polkadot",
 			Network::KusamaAssetHub => "asset-hub-kusama",
 			Network::KusamaBridgeHub => "bridge-hub-kusama",
+			Network::KusamaCoretime => "coretime-kusama",
 			Network::KusamaEncointer => "encointer-kusama",
 			Network::PolkadotAssetHub => "asset-hub-polkadot",
 			Network::PolkadotCollectives => "collectives-polkadot",
@@ -270,6 +281,24 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 
 				let call = CallInfo::from_runtime_call(NetworkRuntimeCall::KusamaBridgeHub(
 					KusamaBridgeHubRuntimeCall::ParachainSystem(Call::authorize_upgrade {
+						code_hash: H256(runtime_hash),
+						check_version: true,
+					}),
+				));
+				authorization_calls.push(call);
+			},
+			Network::KusamaCoretime => {
+				use kusama_coretime::runtime_types::cumulus_pallet_parachain_system::pallet::Call;
+				let path = format!(
+					"{}coretime-kusama_runtime-v{}.compact.compressed.wasm",
+					upgrade_details.directory, runtime_version
+				);
+				let runtime = fs::read(path).expect("Should give a valid file path");
+				let runtime_hash = blake2_256(&runtime);
+				println!("Kusama Coretime Runtime Hash:   0x{}", hex::encode(runtime_hash));
+
+				let call = CallInfo::from_runtime_call(NetworkRuntimeCall::KusamaCoretime(
+					KusamaCoretimeRuntimeCall::ParachainSystem(Call::authorize_upgrade {
 						code_hash: H256(runtime_hash),
 						check_version: true,
 					}),
@@ -424,20 +453,21 @@ async fn construct_kusama_batch(
 	let mut batch_calls = Vec::new();
 	for auth in para_calls {
 		match auth.network {
+			// Relays. This iterator should only have parachain calls.
 			Network::Kusama | Network::Polkadot =>
 				panic!("para calls should not contain relay calls"),
+
+			// Polkadot parachains
 			Network::PolkadotAssetHub
 			| Network::PolkadotCollectives
 			| Network::PolkadotBridgeHub => panic!("not kusama parachains"),
-			Network::KusamaAssetHub => {
-				let send_auth = send_as_superuser_from_kusama(&auth).await;
-				batch_calls.push(send_auth);
-			},
-			Network::KusamaBridgeHub => {
-				let send_auth = send_as_superuser_from_kusama(&auth).await;
-				batch_calls.push(send_auth);
-			},
-			Network::KusamaEncointer => {
+
+			// The rest. We could `_` it but we match explicitly to avoid footguns when adding new
+			// chains to a network.
+			Network::KusamaAssetHub
+			| Network::KusamaBridgeHub
+			| Network::KusamaCoretime
+			| Network::KusamaEncointer => {
 				let send_auth = send_as_superuser_from_kusama(&auth).await;
 				batch_calls.push(send_auth);
 			},
@@ -466,19 +496,21 @@ async fn construct_polkadot_batch(
 	let mut batch_calls = Vec::new();
 	for auth in para_calls {
 		match auth.network {
+			// Relays. This iterator should only have parachain calls.
 			Network::Kusama | Network::Polkadot =>
 				panic!("para calls should not contain relay calls"),
-			Network::KusamaAssetHub | Network::KusamaBridgeHub | Network::KusamaEncointer =>
-				panic!("not polkadot parachains"),
-			Network::PolkadotAssetHub => {
-				let send_auth = send_as_superuser_from_polkadot(&auth).await;
-				batch_calls.push(send_auth);
-			},
-			Network::PolkadotCollectives => {
-				let send_auth = send_as_superuser_from_polkadot(&auth).await;
-				batch_calls.push(send_auth);
-			},
-			Network::PolkadotBridgeHub => {
+
+			// Kusama parachains
+			Network::KusamaAssetHub
+			| Network::KusamaBridgeHub
+			| Network::KusamaCoretime
+			| Network::KusamaEncointer => panic!("not polkadot parachains"),
+
+			// The rest. We could `_` it but we match explicitly to avoid footguns when adding new
+			// chains to a network.
+			Network::PolkadotAssetHub
+			| Network::PolkadotCollectives
+			| Network::PolkadotBridgeHub => {
 				let send_auth = send_as_superuser_from_polkadot(&auth).await;
 				batch_calls.push(send_auth);
 			},

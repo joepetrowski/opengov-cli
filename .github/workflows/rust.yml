@@ -22,12 +22,39 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Build
+        env:
+          SKIP_WASM_BUILD: 1
         run: cargo build --verbose
 
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
+
+      - name: Free Disk Space
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          # this might remove tools that are actually needed,
+          # if set to "true" but frees about 6 GB
+          tool-cache: false
+
+          # all of these default to true, but feel free to set to
+          # "false" if necessary for your workflow
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: false
+
+      - name: Increase swap
+        run: |
+          sudo swapoff -a
+          sudo fallocate -l 16G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          sudo swapon --show
 
       - name: Install nightly toolchain
         uses: actions-rs/toolchain@v1
@@ -40,6 +67,8 @@ jobs:
         run: cargo +${{ env.TOOLCHAIN_LINT }} fmt --all -- --check
 
       - name: Clippy
+        env:
+          SKIP_WASM_BUILD: 1
         uses: actions-rs-plus/clippy-check@v2
         with:
           toolchain: ${{ env.TOOLCHAIN_LINT }}

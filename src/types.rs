@@ -1,5 +1,8 @@
 pub(super) use parity_scale_codec::Encode as _;
 pub(super) use sp_core::{blake2_256, H256};
+
+// Kusama Chains -----------------------------------------------------------------------------------
+
 #[subxt::subxt(
 	runtime_metadata_insecure_url = "wss://kusama-rpc.dwellir.com:443",
 	derive_for_all_types = "PartialEq, Clone"
@@ -21,6 +24,12 @@ pub(super) use kusama_bridge_hub::runtime_types::bridge_hub_kusama_runtime::Runt
 #[subxt::subxt(runtime_metadata_insecure_url = "wss://kusama.api.encointer.org:443")]
 pub mod kusama_encointer {}
 pub(super) use kusama_encointer::runtime_types::encointer_runtime::RuntimeCall as KusamaEncointerRuntimeCall;
+
+#[subxt::subxt(runtime_metadata_insecure_url = "wss://kusama-coretime-rpc.polkadot.io:443")]
+pub mod kusama_coretime {}
+pub(super) use kusama_coretime::runtime_types::coretime_kusama_runtime::RuntimeCall as KusamaCoretimeRuntimeCall;
+
+// Polkadot Chains ---------------------------------------------------------------------------------
 
 #[subxt::subxt(
 	runtime_metadata_insecure_url = "wss://polkadot-rpc.dwellir.com:443",
@@ -55,6 +64,7 @@ pub(super) enum Network {
 	Kusama,
 	KusamaAssetHub,
 	KusamaBridgeHub,
+	KusamaCoretime,
 	KusamaEncointer,
 	Polkadot,
 	PolkadotAssetHub,
@@ -69,6 +79,7 @@ impl Network {
 			Kusama => Err("relay chain"),
 			KusamaAssetHub => Ok(1_000),
 			KusamaBridgeHub => Ok(1_002),
+			KusamaCoretime => Ok(1_005),
 			KusamaEncointer => Ok(1_001),
 			Polkadot => Err("relay chain"),
 			PolkadotAssetHub => Ok(1_000),
@@ -138,6 +149,7 @@ pub(super) enum NetworkRuntimeCall {
 	Kusama(KusamaRuntimeCall),
 	KusamaAssetHub(KusamaAssetHubRuntimeCall),
 	KusamaBridgeHub(KusamaBridgeHubRuntimeCall),
+	KusamaCoretime(KusamaCoretimeRuntimeCall),
 	KusamaEncointer(KusamaEncointerRuntimeCall),
 	Polkadot(PolkadotRuntimeCall),
 	PolkadotAssetHub(PolkadotAssetHubRuntimeCall),
@@ -181,6 +193,7 @@ impl CallInfo {
 			NetworkRuntimeCall::Kusama(cc) => (Network::Kusama, cc.encode()),
 			NetworkRuntimeCall::KusamaAssetHub(cc) => (Network::KusamaAssetHub, cc.encode()),
 			NetworkRuntimeCall::KusamaBridgeHub(cc) => (Network::KusamaBridgeHub, cc.encode()),
+			NetworkRuntimeCall::KusamaCoretime(cc) => (Network::KusamaCoretime, cc.encode()),
 			NetworkRuntimeCall::KusamaEncointer(cc) => (Network::KusamaEncointer, cc.encode()),
 			NetworkRuntimeCall::Polkadot(cc) => (Network::Polkadot, cc.encode()),
 			NetworkRuntimeCall::PolkadotAssetHub(cc) => (Network::PolkadotAssetHub, cc.encode()),
@@ -194,7 +207,7 @@ impl CallInfo {
 	}
 
 	// Construct `Self` for some `network` given some `encoded` bytes.
-	pub(super) fn from_bytes(encoded: &Vec<u8>, network: Network) -> Self {
+	pub(super) fn from_bytes(encoded: &[u8], network: Network) -> Self {
 		let hash = blake2_256(encoded);
 		let length = (encoded.len()).try_into().unwrap();
 		Self { network, encoded: encoded.to_vec(), hash, length }
@@ -260,6 +273,23 @@ impl CallInfo {
 				.unwrap())
 			},
 			_ => Err("not a kusama encointer call"),
+		}
+	}
+
+	// Strip the outer enum and return a Kusama Coretime `RuntimeCall`.
+	#[allow(dead_code)]
+	pub(super) fn get_kusama_coretime_call(
+		&self,
+	) -> Result<KusamaCoretimeRuntimeCall, &'static str> {
+		match &self.network {
+			Network::KusamaCoretime => {
+				let bytes = &self.encoded;
+				Ok(<KusamaCoretimeRuntimeCall as parity_scale_codec::Decode>::decode(
+					&mut &bytes[..],
+				)
+				.unwrap())
+			},
+			_ => Err("not a kusama coretime call"),
 		}
 	}
 
@@ -336,6 +366,7 @@ impl CallInfo {
 			Network::Kusama => "wss://kusama-rpc.dwellir.com:443",
 			Network::KusamaAssetHub => "wss://kusama-asset-hub-rpc.polkadot.io:443",
 			Network::KusamaBridgeHub => "wss://kusama-bridge-hub-rpc.polkadot.io:443",
+			Network::KusamaCoretime => "wss://kusama-coretime-rpc.polkadot.io:443",
 			Network::KusamaEncointer => "wss://kusama.api.encointer.org:443",
 			Network::Polkadot => "wss://polkadot-rpc.dwellir.com:443",
 			Network::PolkadotAssetHub => "wss://polkadot-asset-hub-rpc.polkadot.io:443",
