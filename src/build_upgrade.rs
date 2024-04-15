@@ -183,7 +183,7 @@ pub(crate) fn parse_inputs(prefs: UpgradeArgs) -> UpgradeDetails {
 // Create a directory into which to place runtime blobs and the final call data.
 fn make_version_directory(dir_name: &str) {
 	if !Path::new(dir_name).is_dir() {
-		fs::create_dir(dir_name).expect("it makes a dir");
+		fs::create_dir_all(dir_name).expect("it makes a dir");
 	}
 }
 
