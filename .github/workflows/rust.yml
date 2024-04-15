@@ -31,6 +31,15 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      - name: Increase swap
+        run: |
+          sudo swapoff -a
+          sudo fallocate -l 16G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          sudo swapon --show
+
       - name: Install nightly toolchain
         uses: actions-rs/toolchain@v1
         with:
