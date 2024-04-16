@@ -452,25 +452,9 @@ async fn construct_kusama_batch(
 
 	let mut batch_calls = Vec::new();
 	for auth in para_calls {
-		match auth.network {
-			// Relays. This iterator should only have parachain calls.
-			Network::Kusama | Network::Polkadot =>
-				panic!("para calls should not contain relay calls"),
-
-			// Polkadot parachains
-			Network::PolkadotAssetHub
-			| Network::PolkadotCollectives
-			| Network::PolkadotBridgeHub => panic!("not kusama parachains"),
-
-			// The rest. We could `_` it but we match explicitly to avoid footguns when adding new
-			// chains to a network.
-			Network::KusamaAssetHub
-			| Network::KusamaBridgeHub
-			| Network::KusamaCoretime
-			| Network::KusamaEncointer => {
-				let send_auth = send_as_superuser_from_kusama(&auth).await;
-				batch_calls.push(send_auth);
-			},
+		if auth.network.is_kusama_para() {
+			let send_auth = send_as_superuser_from_kusama(&auth).await;
+			batch_calls.push(send_auth);
 		}
 	}
 	if let Some(a) = additional {
@@ -495,25 +479,9 @@ async fn construct_polkadot_batch(
 
 	let mut batch_calls = Vec::new();
 	for auth in para_calls {
-		match auth.network {
-			// Relays. This iterator should only have parachain calls.
-			Network::Kusama | Network::Polkadot =>
-				panic!("para calls should not contain relay calls"),
-
-			// Kusama parachains
-			Network::KusamaAssetHub
-			| Network::KusamaBridgeHub
-			| Network::KusamaCoretime
-			| Network::KusamaEncointer => panic!("not polkadot parachains"),
-
-			// The rest. We could `_` it but we match explicitly to avoid footguns when adding new
-			// chains to a network.
-			Network::PolkadotAssetHub
-			| Network::PolkadotCollectives
-			| Network::PolkadotBridgeHub => {
-				let send_auth = send_as_superuser_from_polkadot(&auth).await;
-				batch_calls.push(send_auth);
-			},
+		if auth.network.is_polkadot_para() {
+			let send_auth = send_as_superuser_from_polkadot(&auth).await;
+			batch_calls.push(send_auth);
 		}
 	}
 	if let Some(a) = additional {
