@@ -73,19 +73,34 @@ pub(super) enum Network {
 }
 
 impl Network {
+	/// Return the `ParaId` of a given network. Returns an error if the network is not a parachain.
 	pub(super) fn get_para_id(&self) -> Result<u32, &'static str> {
 		use Network::*;
 		match &self {
+			// Kusama
 			Kusama => Err("relay chain"),
 			KusamaAssetHub => Ok(1_000),
 			KusamaBridgeHub => Ok(1_002),
 			KusamaCoretime => Ok(1_005),
 			KusamaEncointer => Ok(1_001),
+			// Polkadot
 			Polkadot => Err("relay chain"),
 			PolkadotAssetHub => Ok(1_000),
-			PolkadotCollectives => Ok(1_001),
 			PolkadotBridgeHub => Ok(1_002),
+			PolkadotCollectives => Ok(1_001),
 		}
+	}
+
+	/// Returns `true` if the network is a Kusama _parachain_.
+	pub(super) fn is_kusama_para(&self) -> bool {
+		use Network::*;
+		matches!(self, KusamaAssetHub | KusamaBridgeHub | KusamaCoretime | KusamaEncointer)
+	}
+
+	/// Returns `true` if the network is a Polkadot _parachain_.
+	pub(super) fn is_polkadot_para(&self) -> bool {
+		use Network::*;
+		matches!(self, PolkadotAssetHub | PolkadotCollectives | PolkadotBridgeHub)
 	}
 }
 
