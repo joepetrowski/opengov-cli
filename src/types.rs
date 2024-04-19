@@ -23,7 +23,7 @@ pub(super) use kusama_bridge_hub::runtime_types::bridge_hub_kusama_runtime::Runt
 
 #[subxt::subxt(runtime_metadata_insecure_url = "wss://kusama.api.encointer.org:443")]
 pub mod kusama_encointer {}
-pub(super) use kusama_encointer::runtime_types::encointer_runtime::RuntimeCall as KusamaEncointerRuntimeCall;
+pub(super) use kusama_encointer::runtime_types::encointer_kusama_runtime::RuntimeCall as KusamaEncointerRuntimeCall;
 
 #[subxt::subxt(runtime_metadata_insecure_url = "wss://kusama-coretime-rpc.polkadot.io:443")]
 pub mod kusama_coretime {}
