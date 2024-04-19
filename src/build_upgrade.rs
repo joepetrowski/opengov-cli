@@ -252,7 +252,7 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 		match chain.network {
 			Network::Kusama | Network::Polkadot => continue, // do relay chain separately
 			Network::KusamaAssetHub => {
-				use kusama_asset_hub::runtime_types::cumulus_pallet_parachain_system::pallet::Call;
+				use kusama_asset_hub::runtime_types::frame_system::pallet::Call;
 				let path = format!(
 					"{}asset-hub-kusama_runtime-v{}.compact.compressed.wasm",
 					upgrade_details.directory, runtime_version
@@ -262,15 +262,14 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 				println!("Kusama Asset Hub Runtime Hash:   0x{}", hex::encode(runtime_hash));
 
 				let call = CallInfo::from_runtime_call(NetworkRuntimeCall::KusamaAssetHub(
-					KusamaAssetHubRuntimeCall::ParachainSystem(Call::authorize_upgrade {
+					KusamaAssetHubRuntimeCall::System(Call::authorize_upgrade {
 						code_hash: H256(runtime_hash),
-						check_version: true,
 					}),
 				));
 				authorization_calls.push(call);
 			},
 			Network::KusamaBridgeHub => {
-				use kusama_bridge_hub::runtime_types::cumulus_pallet_parachain_system::pallet::Call;
+				use kusama_bridge_hub::runtime_types::frame_system::pallet::Call;
 				let path = format!(
 					"{}bridge-hub-kusama_runtime-v{}.compact.compressed.wasm",
 					upgrade_details.directory, runtime_version
@@ -280,15 +279,14 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 				println!("Kusama Bridge Hub Runtime Hash:  0x{}", hex::encode(runtime_hash));
 
 				let call = CallInfo::from_runtime_call(NetworkRuntimeCall::KusamaBridgeHub(
-					KusamaBridgeHubRuntimeCall::ParachainSystem(Call::authorize_upgrade {
+					KusamaBridgeHubRuntimeCall::System(Call::authorize_upgrade {
 						code_hash: H256(runtime_hash),
-						check_version: true,
 					}),
 				));
 				authorization_calls.push(call);
 			},
 			Network::KusamaCoretime => {
-				use kusama_coretime::runtime_types::cumulus_pallet_parachain_system::pallet::Call;
+				use kusama_coretime::runtime_types::frame_system::pallet::Call;
 				let path = format!(
 					"{}coretime-kusama_runtime-v{}.compact.compressed.wasm",
 					upgrade_details.directory, runtime_version
@@ -298,15 +296,14 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 				println!("Kusama Coretime Runtime Hash:   0x{}", hex::encode(runtime_hash));
 
 				let call = CallInfo::from_runtime_call(NetworkRuntimeCall::KusamaCoretime(
-					KusamaCoretimeRuntimeCall::ParachainSystem(Call::authorize_upgrade {
+					KusamaCoretimeRuntimeCall::System(Call::authorize_upgrade {
 						code_hash: H256(runtime_hash),
-						check_version: true,
 					}),
 				));
 				authorization_calls.push(call);
 			},
 			Network::KusamaEncointer => {
-				use kusama_encointer::runtime_types::cumulus_pallet_parachain_system::pallet::Call;
+				use kusama_encointer::runtime_types::frame_system::pallet::Call;
 				let path = format!(
 					"{}encointer-kusama_runtime-v{}.compact.compressed.wasm",
 					upgrade_details.directory, runtime_version
@@ -316,9 +313,8 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 				println!("Kusama Encointer Runtime Hash:   0x{}", hex::encode(runtime_hash));
 
 				let call = CallInfo::from_runtime_call(NetworkRuntimeCall::KusamaEncointer(
-					KusamaEncointerRuntimeCall::ParachainSystem(Call::authorize_upgrade {
+					KusamaEncointerRuntimeCall::System(Call::authorize_upgrade {
 						code_hash: H256(runtime_hash),
-						check_version: true,
 					}),
 				));
 				authorization_calls.push(call);
@@ -401,8 +397,13 @@ fn generate_relay_upgrade_call(upgrade_details: &UpgradeDetails) -> Option<CallI
 			println!("Kusama Relay Chain Runtime Hash: 0x{}", hex::encode(runtime_hash));
 
 			Some(CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(
-				KusamaRuntimeCall::System(SystemCall::set_code { code: runtime }),
+				KusamaRuntimeCall::System(SystemCall::authorize_upgrade { code_hash: H256(runtime_hash) }),
 			)))
+
+			// TODO: Add CLI flag to `--set-relay-code` if people want to do this.
+			// Some(CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(
+			// 	KusamaRuntimeCall::System(SystemCall::set_code { code: runtime }),
+			// )))
 		},
 		Network::Polkadot => {
 			use polkadot_relay::runtime_types::frame_system::pallet::Call as SystemCall;
