@@ -9,8 +9,8 @@ authors = ["joepetrowski"]
 [dependencies]
 parity-scale-codec = "3.6.9"
 sp-core = { git = "https://github.com/paritytech/polkadot-sdk", branch = "master" }
-subxt = "0.34.0"
+subxt = "0.35.3"
 hex = "0.4.3"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 clap = { version = "4.4.18", features = ["derive", "cargo"] }
-reqwest = "0.11.24"
+reqwest = "0.12.3"
