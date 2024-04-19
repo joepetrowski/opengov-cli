@@ -365,7 +365,7 @@ async fn polkadot_fellowship_referenda(
 	//
 	//    let send_whitelist = CollectivesRuntimeCall::PolkadotXcm(
 	//        PolkadotXcmCall::send {
-	// 	          dest: MultiLocation { parents: 1, interior: Here },
+	// 	          dest: Location { parents: 1, interior: Here },
 	// 	          message: vec![UnpaidExecution, Transact {call: whitelist_call, ..}],
 	//        }
 	//    );

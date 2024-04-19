@@ -502,27 +502,24 @@ async fn send_as_superuser_from_kusama(auth: &CallInfo) -> KusamaRuntimeCall {
 	use kusama_relay::runtime_types::{
 		pallet_xcm::pallet::Call as XcmCall,
 		sp_weights::weight_v2::Weight as KusamaWeight,
-		staging_xcm::v3::multilocation::MultiLocation,
+		staging_xcm::v4::{
+			junction::Junction::Parachain, junctions::Junctions::X1, location::Location,
+			Instruction, Xcm,
+		},
 		xcm::{
-			double_encoded::DoubleEncoded,
-			v2::OriginKind,
-			v3::{
-				junction::Junction::Parachain, junctions::Junctions::X1, Instruction, WeightLimit,
-				Xcm,
-			},
-			VersionedMultiLocation,
-			VersionedXcm::V3,
+			double_encoded::DoubleEncoded, v2::OriginKind, v3::WeightLimit, VersionedLocation,
+			VersionedXcm::V4,
 		},
 	};
 
 	let (ref_time, proof_size) = get_weight(auth).await;
 	let para_id = auth.network.get_para_id().unwrap();
 	KusamaRuntimeCall::XcmPallet(XcmCall::send {
-		dest: Box::new(VersionedMultiLocation::V3(MultiLocation {
+		dest: Box::new(VersionedLocation::V4(Location {
 			parents: 0,
-			interior: X1(Parachain(para_id)),
+			interior: X1([Parachain(para_id)]),
 		})),
-		message: Box::new(V3(Xcm(vec![
+		message: Box::new(V4(Xcm(vec![
 			Instruction::UnpaidExecution {
 				weight_limit: WeightLimit::Unlimited,
 				check_origin: None,
