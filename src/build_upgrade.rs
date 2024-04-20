@@ -397,7 +397,9 @@ fn generate_relay_upgrade_call(upgrade_details: &UpgradeDetails) -> Option<CallI
 			println!("Kusama Relay Chain Runtime Hash: 0x{}", hex::encode(runtime_hash));
 
 			Some(CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(
-				KusamaRuntimeCall::System(SystemCall::authorize_upgrade { code_hash: H256(runtime_hash) }),
+				KusamaRuntimeCall::System(SystemCall::authorize_upgrade {
+					code_hash: H256(runtime_hash),
+				}),
 			)))
 
 			// TODO: Add CLI flag to `--set-relay-code` if people want to do this.
