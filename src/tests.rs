@@ -251,8 +251,8 @@ async fn it_starts_polkadot_fellowship_referenda_correctly() {
 	let proposal_details = polkadot_whitelist_remark_user_input();
 	let calls = generate_calls(&proposal_details).await;
 
-	let fellowship_preimage = hex::decode("0x2b00dc1f0003010003082f0000060302286bee02093d008817008821e8db19b8e34b62ee8bc618a5ed3eecb9761d7d81349b00aa5ce5dfca2534".trim_start_matches("0x")).expect("Valid call");
-	let fellowship_referendum = hex::decode("0x3d003e0202adb9e4e4165f92f984690cac8816898978b7dfc8aff6db735ffd5ec9b043009737000000010a000000".trim_start_matches("0x")).expect("Valid call");
+	let fellowship_preimage = hex::decode("0x2b00dc1f0004010004082f0000060302286bee02093d008817008821e8db19b8e34b62ee8bc618a5ed3eecb9761d7d81349b00aa5ce5dfca2534".trim_start_matches("0x")).expect("Valid call");
+	let fellowship_referendum = hex::decode("0x3d003e020270ace20636863d9122dea540102dda7df4a52d3a0fe5eaf673e4eca7598aeeca37000000010a000000".trim_start_matches("0x")).expect("Valid call");
 	let public_preimage = hex::decode(
 		"0x0a0060170300004c6f70656e676f762d7375626d69742074657374".trim_start_matches("0x"),
 	)

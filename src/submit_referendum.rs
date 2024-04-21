@@ -337,13 +337,10 @@ async fn polkadot_fellowship_referenda(
 		pallet_preimage::pallet::Call as CollectivesPreimageCall,
 		pallet_referenda::pallet::Call as FellowshipReferendaCall,
 		pallet_xcm::pallet::Call as CollectivesXcmCall,
-		staging_xcm::v3::multilocation::MultiLocation,
+		staging_xcm::v4::{junctions::Junctions::Here, location::Location, Instruction, Xcm},
 		xcm::{
-			double_encoded::DoubleEncoded,
-			v2::OriginKind,
-			v3::{junctions::Junctions::Here, Instruction, WeightLimit, Xcm},
-			VersionedMultiLocation,
-			VersionedXcm::V3,
+			double_encoded::DoubleEncoded, v2::OriginKind, v3::WeightLimit, VersionedLocation,
+			VersionedXcm::V4,
 		},
 	};
 	use polkadot_relay::runtime_types::{
@@ -410,11 +407,8 @@ async fn polkadot_fellowship_referenda(
 	// This is what the Fellowship will actually vote on enacting.
 	let whitelist_over_xcm = CallInfo::from_runtime_call(NetworkRuntimeCall::PolkadotCollectives(
 		CollectivesRuntimeCall::PolkadotXcm(CollectivesXcmCall::send {
-			dest: Box::new(VersionedMultiLocation::V3(MultiLocation {
-				parents: 1,
-				interior: Here,
-			})),
-			message: Box::new(V3(Xcm(vec![
+			dest: Box::new(VersionedLocation::V4(Location { parents: 1, interior: Here })),
+			message: Box::new(V4(Xcm(vec![
 				Instruction::UnpaidExecution {
 					weight_limit: WeightLimit::Unlimited,
 					check_origin: None,

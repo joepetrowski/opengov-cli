@@ -21,7 +21,7 @@ pub(super) use kusama_asset_hub::runtime_types::asset_hub_kusama_runtime::Runtim
 pub mod kusama_bridge_hub {}
 pub(super) use kusama_bridge_hub::runtime_types::bridge_hub_kusama_runtime::RuntimeCall as KusamaBridgeHubRuntimeCall;
 
-#[subxt::subxt(runtime_metadata_insecure_url = "wss://kusama.api.encointer.org:443")]
+#[subxt::subxt(runtime_metadata_insecure_url = "wss://encointer-kusama-rpc.dwellir.com:443")]
 pub mod kusama_encointer {}
 pub(super) use kusama_encointer::runtime_types::encointer_kusama_runtime::RuntimeCall as KusamaEncointerRuntimeCall;
 
@@ -382,7 +382,7 @@ impl CallInfo {
 			Network::KusamaAssetHub => "wss://kusama-asset-hub-rpc.polkadot.io:443",
 			Network::KusamaBridgeHub => "wss://kusama-bridge-hub-rpc.polkadot.io:443",
 			Network::KusamaCoretime => "wss://kusama-coretime-rpc.polkadot.io:443",
-			Network::KusamaEncointer => "wss://kusama.api.encointer.org:443",
+			Network::KusamaEncointer => "wss://encointer-kusama-rpc.dwellir.com:443",
 			Network::Polkadot => "wss://polkadot-rpc.dwellir.com:443",
 			Network::PolkadotAssetHub => "wss://polkadot-asset-hub-rpc.polkadot.io:443",
 			Network::PolkadotCollectives => "wss://polkadot-collectives-rpc.polkadot.io:443",
