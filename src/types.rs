@@ -140,6 +140,8 @@ pub(super) struct UpgradeDetails {
 	pub(super) output_file: String,
 	// An additional call to be enacted in the same batch as the system upgrade.
 	pub(super) additional: Option<CallInfo>,
+	// Call `set_code` directly on the Relay Chain.
+	pub(super) set_relay_directly: bool,
 }
 
 // A network and the version to which it will upgrade.
