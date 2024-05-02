@@ -503,9 +503,13 @@ async fn construct_kusama_batch(
 	if let Some(rc) = relay_call {
 		batch_calls.push(rc.get_kusama_call().expect("kusama call"));
 	}
-	CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(KusamaRuntimeCall::Utility(
-		UtilityCall::force_batch { calls: batch_calls },
-	)))
+	match &batch_calls.len() {
+		0 => panic!("no calls"),
+		1 => CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(batch_calls[0].clone())),
+		_ => CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(KusamaRuntimeCall::Utility(
+			UtilityCall::force_batch { calls: batch_calls },
+		))),
+	}
 }
 
 // Construct the batch needed on Polkadot.
@@ -530,9 +534,13 @@ async fn construct_polkadot_batch(
 	if let Some(rc) = relay_call {
 		batch_calls.push(rc.get_polkadot_call().expect("polkadot call"));
 	}
-	CallInfo::from_runtime_call(NetworkRuntimeCall::Polkadot(PolkadotRuntimeCall::Utility(
-		UtilityCall::force_batch { calls: batch_calls },
-	)))
+	match &batch_calls.len() {
+		0 => panic!("no calls"),
+		1 => CallInfo::from_runtime_call(NetworkRuntimeCall::Polkadot(batch_calls[0].clone())),
+		_ => CallInfo::from_runtime_call(NetworkRuntimeCall::Polkadot(
+			PolkadotRuntimeCall::Utility(UtilityCall::force_batch { calls: batch_calls }),
+		)),
+	}
 }
 
 // Take a call, which includes its intended destination, and wrap it in XCM instructions to `send`
