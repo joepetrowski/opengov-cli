@@ -339,7 +339,7 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 				authorization_calls.push(call);
 			},
 			Network::PolkadotAssetHub => {
-				use polkadot_asset_hub::runtime_types::cumulus_pallet_parachain_system::pallet::Call;
+				use polkadot_asset_hub::runtime_types::frame_system::pallet::Call;
 				let path = format!(
 					"{}asset-hub-polkadot_runtime-v{}.compact.compressed.wasm",
 					upgrade_details.directory, runtime_version
@@ -349,15 +349,14 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 				println!("Polkadot Asset Hub Runtime Hash:   0x{}", hex::encode(runtime_hash));
 
 				let call = CallInfo::from_runtime_call(NetworkRuntimeCall::PolkadotAssetHub(
-					PolkadotAssetHubRuntimeCall::ParachainSystem(Call::authorize_upgrade {
+					PolkadotAssetHubRuntimeCall::System(Call::authorize_upgrade {
 						code_hash: H256(runtime_hash),
-						check_version: true,
 					}),
 				));
 				authorization_calls.push(call);
 			},
 			Network::PolkadotCollectives => {
-				use polkadot_collectives::runtime_types::cumulus_pallet_parachain_system::pallet::Call;
+				use polkadot_collectives::runtime_types::frame_system::pallet::Call;
 				let path = format!(
 					"{}collectives-polkadot_runtime-v{}.compact.compressed.wasm",
 					upgrade_details.directory, runtime_version
@@ -367,15 +366,14 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 				println!("Polkadot Collectives Runtime Hash: 0x{}", hex::encode(runtime_hash));
 
 				let call = CallInfo::from_runtime_call(NetworkRuntimeCall::PolkadotCollectives(
-					CollectivesRuntimeCall::ParachainSystem(Call::authorize_upgrade {
+					CollectivesRuntimeCall::System(Call::authorize_upgrade {
 						code_hash: H256(runtime_hash),
-						check_version: true,
 					}),
 				));
 				authorization_calls.push(call);
 			},
 			Network::PolkadotBridgeHub => {
-				use polkadot_bridge_hub::runtime_types::cumulus_pallet_parachain_system::pallet::Call;
+				use polkadot_bridge_hub::runtime_types::frame_system::pallet::Call;
 				let path = format!(
 					"{}bridge-hub-polkadot_runtime-v{}.compact.compressed.wasm",
 					upgrade_details.directory, runtime_version
@@ -385,9 +383,8 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 				println!("Polkadot Bridge Hub Runtime Hash:  0x{}", hex::encode(runtime_hash));
 
 				let call = CallInfo::from_runtime_call(NetworkRuntimeCall::PolkadotBridgeHub(
-					PolkadotBridgeHubRuntimeCall::ParachainSystem(Call::authorize_upgrade {
+					PolkadotBridgeHubRuntimeCall::System(Call::authorize_upgrade {
 						code_hash: H256(runtime_hash),
-						check_version: true,
 					}),
 				));
 				authorization_calls.push(call);
