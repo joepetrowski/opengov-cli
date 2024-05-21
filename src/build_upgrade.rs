@@ -324,7 +324,7 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 				);
 				let runtime = fs::read(path).expect("Should give a valid file path");
 				let runtime_hash = blake2_256(&runtime);
-				println!("Kusama People Runtime Hash:     0x{}", hex::encode(runtime_hash));
+				println!("Kusama People Runtime Hash:      0x{}", hex::encode(runtime_hash));
 
 				let call = CallInfo::from_runtime_call(NetworkRuntimeCall::KusamaPeople(
 					KusamaPeopleRuntimeCall::ParachainSystem(Call::authorize_upgrade {
@@ -342,7 +342,7 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 				);
 				let runtime = fs::read(path).expect("Should give a valid file path");
 				let runtime_hash = blake2_256(&runtime);
-				println!("Kusama Coretime Runtime Hash:   0x{}", hex::encode(runtime_hash));
+				println!("Kusama Coretime Runtime Hash:    0x{}", hex::encode(runtime_hash));
 
 				let call = CallInfo::from_runtime_call(NetworkRuntimeCall::KusamaCoretime(
 					KusamaCoretimeRuntimeCall::ParachainSystem(Call::authorize_upgrade {
