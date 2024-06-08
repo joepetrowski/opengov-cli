@@ -315,7 +315,7 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 				authorization_calls.push(call);
 			},
 			Network::KusamaPeople => {
-				use kusama_people::runtime_types::cumulus_pallet_parachain_system::pallet::Call;
+				use kusama_people::runtime_types::frame_system::pallet::Call;
 				let path = format!(
 					"{}people-kusama_runtime-v{}.compact.compressed.wasm",
 					upgrade_details.directory, runtime_version
@@ -325,9 +325,8 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 				println!("Kusama People Runtime Hash:      0x{}", hex::encode(runtime_hash));
 
 				let call = CallInfo::from_runtime_call(NetworkRuntimeCall::KusamaPeople(
-					KusamaPeopleRuntimeCall::ParachainSystem(Call::authorize_upgrade {
+					KusamaPeopleRuntimeCall::System(Call::authorize_upgrade {
 						code_hash: H256(runtime_hash),
-						check_version: true,
 					}),
 				));
 				authorization_calls.push(call);
