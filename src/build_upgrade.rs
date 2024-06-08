@@ -45,6 +45,11 @@ pub(crate) struct UpgradeArgs {
 	#[clap(long = "encointer")]
 	pub(crate) encointer: Option<String>,
 
+	/// Optional. The runtime version of People to which to upgrade. If not provided, it will use
+	/// the Relay Chain's version.
+	#[clap(long = "people")]
+	pub(crate) people: Option<String>,
+
 	/// Optional. The runtime version of Coretime to which to upgrade. If not provided, it will use
 	/// the Relay Chain's version.
 	#[clap(long = "coretime")]
@@ -113,6 +118,7 @@ pub(crate) fn parse_inputs(prefs: UpgradeArgs) -> UpgradeDetails {
 	let relay_version = chain_version(prefs.relay_version, None, only);
 	let asset_hub_version = chain_version(prefs.asset_hub, relay_version.clone(), only);
 	let bridge_hub_version = chain_version(prefs.bridge_hub, relay_version.clone(), only);
+	let people_version = chain_version(prefs.people, relay_version.clone(), only);
 	let coretime_version = chain_version(prefs.coretime, relay_version.clone(), only);
 	let encointer_version = chain_version(prefs.encointer, relay_version.clone(), only);
 	let collectives_version = chain_version(prefs.collectives, relay_version.clone(), only);
@@ -147,6 +153,9 @@ pub(crate) fn parse_inputs(prefs: UpgradeArgs) -> UpgradeDetails {
 			if let Some(v) = bridge_hub_version.clone() {
 				networks.push(VersionedNetwork { network: Network::KusamaBridgeHub, version: v });
 			}
+			if let Some(v) = people_version.clone() {
+				networks.push(VersionedNetwork { network: Network::KusamaPeople, version: v });
+			}
 			if let Some(v) = coretime_version.clone() {
 				networks.push(VersionedNetwork { network: Network::KusamaCoretime, version: v });
 			}
@@ -173,9 +182,9 @@ pub(crate) fn parse_inputs(prefs: UpgradeArgs) -> UpgradeDetails {
 
 	// Get a version from one of the args. (This still feels dirty.)
 	let version = relay_version.clone().unwrap_or(asset_hub_version.unwrap_or(
-		bridge_hub_version.unwrap_or(encointer_version.unwrap_or(
-			collectives_version.unwrap_or(coretime_version.unwrap_or(String::from("no-version"))),
-		)),
+		bridge_hub_version.unwrap_or(encointer_version.unwrap_or(collectives_version.unwrap_or(
+			coretime_version.unwrap_or(people_version.unwrap_or(String::from("no-version"))),
+		))),
 	));
 
 	// Set up a directory to store information fetched/written during this program.
@@ -236,6 +245,7 @@ async fn download_runtimes(upgrade_details: &UpgradeDetails) {
 			Network::Polkadot => "polkadot",
 			Network::KusamaAssetHub => "asset-hub-kusama",
 			Network::KusamaBridgeHub => "bridge-hub-kusama",
+			Network::KusamaPeople => "people-kusama",
 			Network::KusamaCoretime => "coretime-kusama",
 			Network::KusamaEncointer => "encointer-kusama",
 			Network::PolkadotAssetHub => "asset-hub-polkadot",
@@ -304,6 +314,24 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 				));
 				authorization_calls.push(call);
 			},
+			Network::KusamaPeople => {
+				use kusama_people::runtime_types::cumulus_pallet_parachain_system::pallet::Call;
+				let path = format!(
+					"{}people-kusama_runtime-v{}.compact.compressed.wasm",
+					upgrade_details.directory, runtime_version
+				);
+				let runtime = fs::read(path).expect("Should give a valid file path");
+				let runtime_hash = blake2_256(&runtime);
+				println!("Kusama People Runtime Hash:      0x{}", hex::encode(runtime_hash));
+
+				let call = CallInfo::from_runtime_call(NetworkRuntimeCall::KusamaPeople(
+					KusamaPeopleRuntimeCall::ParachainSystem(Call::authorize_upgrade {
+						code_hash: H256(runtime_hash),
+						check_version: true,
+					}),
+				));
+				authorization_calls.push(call);
+			},
 			Network::KusamaCoretime => {
 				use kusama_coretime::runtime_types::frame_system::pallet::Call;
 				let path = format!(
@@ -312,7 +340,7 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 				);
 				let runtime = fs::read(path).expect("Should give a valid file path");
 				let runtime_hash = blake2_256(&runtime);
-				println!("Kusama Coretime Runtime Hash:   0x{}", hex::encode(runtime_hash));
+				println!("Kusama Coretime Runtime Hash:    0x{}", hex::encode(runtime_hash));
 
 				let call = CallInfo::from_runtime_call(NetworkRuntimeCall::KusamaCoretime(
 					KusamaCoretimeRuntimeCall::System(Call::authorize_upgrade {
@@ -496,9 +524,13 @@ async fn construct_kusama_batch(
 	if let Some(rc) = relay_call {
 		batch_calls.push(rc.get_kusama_call().expect("kusama call"));
 	}
-	CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(KusamaRuntimeCall::Utility(
-		UtilityCall::force_batch { calls: batch_calls },
-	)))
+	match &batch_calls.len() {
+		0 => panic!("no calls"),
+		1 => CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(batch_calls[0].clone())),
+		_ => CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(KusamaRuntimeCall::Utility(
+			UtilityCall::force_batch { calls: batch_calls },
+		))),
+	}
 }
 
 // Construct the batch needed on Polkadot.
@@ -523,9 +555,13 @@ async fn construct_polkadot_batch(
 	if let Some(rc) = relay_call {
 		batch_calls.push(rc.get_polkadot_call().expect("polkadot call"));
 	}
-	CallInfo::from_runtime_call(NetworkRuntimeCall::Polkadot(PolkadotRuntimeCall::Utility(
-		UtilityCall::force_batch { calls: batch_calls },
-	)))
+	match &batch_calls.len() {
+		0 => panic!("no calls"),
+		1 => CallInfo::from_runtime_call(NetworkRuntimeCall::Polkadot(batch_calls[0].clone())),
+		_ => CallInfo::from_runtime_call(NetworkRuntimeCall::Polkadot(
+			PolkadotRuntimeCall::Utility(UtilityCall::force_batch { calls: batch_calls }),
+		)),
+	}
 }
 
 // Take a call, which includes its intended destination, and wrap it in XCM instructions to `send`
