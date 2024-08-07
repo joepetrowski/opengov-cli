@@ -191,7 +191,6 @@ fn kusama_fellowship_referenda(proposal_details: &ProposalDetails) -> PossibleCa
 		frame_support::traits::{preimages::Bounded::Lookup, schedule::DispatchTime},
 		pallet_preimage::pallet::Call as PreimageCall,
 		pallet_referenda::pallet::Call as ReferendaCall,
-		pallet_referenda::pallet::Call2 as FellowshipReferendaCall,
 		pallet_whitelist::pallet::Call as WhitelistCall,
 	};
 	// First we need to whitelist this proposal. We will need:
@@ -214,7 +213,7 @@ fn kusama_fellowship_referenda(proposal_details: &ProposalDetails) -> PossibleCa
 	));
 
 	let fellowship_proposal = CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(
-		KusamaRuntimeCall::FellowshipReferenda(FellowshipReferendaCall::submit {
+		KusamaRuntimeCall::FellowshipReferenda(ReferendaCall::submit {
 			proposal_origin: Box::new(KusamaOriginCaller::Origins(KusamaOpenGovOrigin::Fellows)),
 			proposal: Lookup { hash: H256(whitelist_call.hash), len: whitelist_call.length },
 			enactment_moment: DispatchTime::After(10),
@@ -334,8 +333,10 @@ async fn polkadot_fellowship_referenda(
 			preimages::Bounded::Lookup as CollectivesLookup,
 			schedule::DispatchTime as CollectivesDispatchTime,
 		},
+		// Since the Relay Chain and Collectives chains may be on different versions of Preimage,
+		// Referenda, and XCM pallets, we need to define their `Call` enum separately.
 		pallet_preimage::pallet::Call as CollectivesPreimageCall,
-		pallet_referenda::pallet::Call as FellowshipReferendaCall,
+		pallet_referenda::pallet::Call as CollectivesReferendaCall,
 		pallet_xcm::pallet::Call as CollectivesXcmCall,
 		staging_xcm::v4::{junctions::Junctions::Here, location::Location, Instruction, Xcm},
 		xcm::{
@@ -430,7 +431,7 @@ async fn polkadot_fellowship_referenda(
 
 	// The actual Fellowship referendum submission.
 	let fellowship_proposal = CallInfo::from_runtime_call(NetworkRuntimeCall::PolkadotCollectives(
-		CollectivesRuntimeCall::FellowshipReferenda(FellowshipReferendaCall::submit {
+		CollectivesRuntimeCall::FellowshipReferenda(CollectivesReferendaCall::submit {
 			proposal_origin: Box::new(CollectivesOriginCaller::FellowshipOrigins(
 				FellowshipOrigins::Fellows,
 			)),
