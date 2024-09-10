@@ -63,6 +63,10 @@ pub(super) use polkadot_collectives::runtime_types::{
 pub mod polkadot_bridge_hub {}
 pub(super) use polkadot_bridge_hub::runtime_types::bridge_hub_polkadot_runtime::RuntimeCall as PolkadotBridgeHubRuntimeCall;
 
+#[subxt::subxt(runtime_metadata_insecure_url = "wss://polkadot-people-rpc.polkadot.io:443")]
+pub mod polkadot_people {}
+pub(super) use polkadot_people::runtime_types::people_polkadot_runtime::RuntimeCall as PolkadotPeopleRuntimeCall;
+
 #[derive(Clone, Debug, PartialEq)]
 pub(super) enum Network {
 	Kusama,
@@ -75,6 +79,7 @@ pub(super) enum Network {
 	PolkadotAssetHub,
 	PolkadotCollectives,
 	PolkadotBridgeHub,
+	PolkadotPeople,
 }
 
 impl Network {
@@ -94,6 +99,7 @@ impl Network {
 			PolkadotAssetHub => Ok(1_000),
 			PolkadotBridgeHub => Ok(1_002),
 			PolkadotCollectives => Ok(1_001),
+			PolkadotPeople => Ok(1_004),
 		}
 	}
 
@@ -109,7 +115,7 @@ impl Network {
 	/// Returns `true` if the network is a Polkadot _parachain_.
 	pub(super) fn is_polkadot_para(&self) -> bool {
 		use Network::*;
-		matches!(self, PolkadotAssetHub | PolkadotCollectives | PolkadotBridgeHub)
+		matches!(self, PolkadotAssetHub | PolkadotCollectives | PolkadotBridgeHub | PolkadotPeople)
 	}
 }
 
@@ -182,6 +188,7 @@ pub(super) enum NetworkRuntimeCall {
 	PolkadotAssetHub(PolkadotAssetHubRuntimeCall),
 	PolkadotCollectives(CollectivesRuntimeCall),
 	PolkadotBridgeHub(PolkadotBridgeHubRuntimeCall),
+	PolkadotPeople(PolkadotPeopleRuntimeCall),
 }
 
 // How the user would like to see the output of the program.
@@ -228,6 +235,7 @@ impl CallInfo {
 			NetworkRuntimeCall::PolkadotCollectives(cc) =>
 				(Network::PolkadotCollectives, cc.encode()),
 			NetworkRuntimeCall::PolkadotBridgeHub(cc) => (Network::PolkadotBridgeHub, cc.encode()),
+			NetworkRuntimeCall::PolkadotPeople(cc) => (Network::PolkadotPeople, cc.encode()),
 		};
 		let hash = blake2_256(&encoded);
 		let length: u32 = (encoded.len()).try_into().unwrap();
@@ -394,6 +402,23 @@ impl CallInfo {
 		}
 	}
 
+	// Strip the outer enum and return a Polkadot People `RuntimeCall`.
+	#[allow(dead_code)]
+	pub(super) fn get_polkadot_people_call(
+		&self,
+	) -> Result<PolkadotPeopleRuntimeCall, &'static str> {
+		match &self.network {
+			Network::PolkadotPeople => {
+				let bytes = &self.encoded;
+				Ok(<PolkadotPeopleRuntimeCall as parity_scale_codec::Decode>::decode(
+					&mut &bytes[..],
+				)
+				.unwrap())
+			},
+			_ => Err("not a polkadot people call"),
+		}
+	}
+
 	pub(super) async fn get_transact_weight_needed(
 		&self,
 		network: &Network,
@@ -414,6 +439,7 @@ impl CallInfo {
 			Network::PolkadotAssetHub => "wss://polkadot-asset-hub-rpc.polkadot.io:443",
 			Network::PolkadotCollectives => "wss://polkadot-collectives-rpc.polkadot.io:443",
 			Network::PolkadotBridgeHub => "wss://polkadot-bridge-hub-rpc.polkadot.io:443",
+			Network::PolkadotPeople => "wss://polkadot-people-rpc.polkadot.io:443",
 		};
 
 		let mut args = self.encoded.clone();

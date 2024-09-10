@@ -138,6 +138,9 @@ pub(crate) fn parse_inputs(prefs: UpgradeArgs) -> UpgradeDetails {
 			if let Some(v) = bridge_hub_version.clone() {
 				networks.push(VersionedNetwork { network: Network::PolkadotBridgeHub, version: v });
 			}
+			if let Some(v) = people_version.clone() {
+				networks.push(VersionedNetwork { network: Network::PolkadotPeople, version: v });
+			}
 			Network::Polkadot
 		},
 		"kusama" => {
@@ -251,6 +254,7 @@ async fn download_runtimes(upgrade_details: &UpgradeDetails) {
 			Network::PolkadotAssetHub => "asset-hub-polkadot",
 			Network::PolkadotCollectives => "collectives-polkadot",
 			Network::PolkadotBridgeHub => "bridge-hub-polkadot",
+			Network::PolkadotPeople => "people-polkadot",
 		};
 		let runtime_version = semver_to_intver(&chain.version);
 		let fname = format!("{}_runtime-v{}.compact.compressed.wasm", chain_name, runtime_version);
@@ -416,6 +420,23 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 				));
 				authorization_calls.push(call);
 			},
+			Network::PolkadotPeople => {
+				use polkadot_people::runtime_types::frame_system::pallet::Call;
+				let path = format!(
+					"{}people-polkadot_runtime-v{}.compact.compressed.wasm",
+					upgrade_details.directory, runtime_version
+				);
+				let runtime = fs::read(path).expect("Should give a valid file path");
+				let runtime_hash = blake2_256(&runtime);
+				println!("Polkadot People Runtime Hash:      0x{}", hex::encode(runtime_hash));
+
+				let call = CallInfo::from_runtime_call(NetworkRuntimeCall::PolkadotPeople(
+					PolkadotPeopleRuntimeCall::System(Call::authorize_upgrade {
+						code_hash: H256(runtime_hash),
+					}),
+				));
+				authorization_calls.push(call);
+			},
 		};
 	}
 	authorization_calls
@@ -574,7 +595,7 @@ async fn send_as_superuser_from_kusama(auth: &CallInfo) -> KusamaRuntimeCall {
 			Instruction, Xcm,
 		},
 		xcm::{
-			double_encoded::DoubleEncoded, v2::OriginKind, v3::WeightLimit, VersionedLocation,
+			double_encoded::DoubleEncoded, v3::OriginKind, v3::WeightLimit, VersionedLocation,
 			VersionedXcm::V4,
 		},
 	};
