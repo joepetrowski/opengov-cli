@@ -141,6 +141,9 @@ pub(crate) fn parse_inputs(prefs: UpgradeArgs) -> UpgradeDetails {
 			if let Some(v) = people_version.clone() {
 				networks.push(VersionedNetwork { network: Network::PolkadotPeople, version: v });
 			}
+			if let Some(v) = coretime_version.clone() {
+				networks.push(VersionedNetwork { network: Network::PolkadotCoretime, version: v });
+			}
 			Network::Polkadot
 		},
 		"kusama" => {
@@ -255,6 +258,7 @@ async fn download_runtimes(upgrade_details: &UpgradeDetails) {
 			Network::PolkadotCollectives => "collectives-polkadot",
 			Network::PolkadotBridgeHub => "bridge-hub-polkadot",
 			Network::PolkadotPeople => "people-polkadot",
+			Network::PolkadotCoretime => "coretime-polkadot",
 		};
 		let runtime_version = semver_to_intver(&chain.version);
 		let fname = format!("{}_runtime-v{}.compact.compressed.wasm", chain_name, runtime_version);
@@ -432,6 +436,23 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 
 				let call = CallInfo::from_runtime_call(NetworkRuntimeCall::PolkadotPeople(
 					PolkadotPeopleRuntimeCall::System(Call::authorize_upgrade {
+						code_hash: H256(runtime_hash),
+					}),
+				));
+				authorization_calls.push(call);
+			},
+			Network::PolkadotCoretime => {
+				use polkadot_coretime::runtime_types::frame_system::pallet::Call;
+				let path = format!(
+					"{}coretime-polkadot_runtime-v{}.compact.compressed.wasm",
+					upgrade_details.directory, runtime_version
+				);
+				let runtime = fs::read(path).expect("Should give a valid file path");
+				let runtime_hash = blake2_256(&runtime);
+				println!("Polkadot Coretime Runtime Hash:    0x{}", hex::encode(runtime_hash));
+
+				let call = CallInfo::from_runtime_call(NetworkRuntimeCall::PolkadotCoretime(
+					PolkadotCoretimeRuntimeCall::System(Call::authorize_upgrade {
 						code_hash: H256(runtime_hash),
 					}),
 				));
