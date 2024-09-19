@@ -340,7 +340,7 @@ async fn polkadot_fellowship_referenda(
 		pallet_xcm::pallet::Call as CollectivesXcmCall,
 		staging_xcm::v4::{junctions::Junctions::Here, location::Location, Instruction, Xcm},
 		xcm::{
-			double_encoded::DoubleEncoded, v2::OriginKind, v3::WeightLimit, VersionedLocation,
+			double_encoded::DoubleEncoded, v3::OriginKind, v3::WeightLimit, VersionedLocation,
 			VersionedXcm::V4,
 		},
 	};

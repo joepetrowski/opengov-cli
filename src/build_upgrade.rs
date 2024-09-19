@@ -632,7 +632,7 @@ async fn send_as_superuser_from_polkadot(auth: &CallInfo) -> PolkadotRuntimeCall
 			Instruction, Xcm,
 		},
 		xcm::{
-			double_encoded::DoubleEncoded, v2::OriginKind, v3::WeightLimit, VersionedLocation,
+			double_encoded::DoubleEncoded, v3::OriginKind, v3::WeightLimit, VersionedLocation,
 			VersionedXcm::V4,
 		},
 	};
