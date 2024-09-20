@@ -491,6 +491,7 @@ fn upgrade_everything_works_with_just_relay_version() {
 		VersionedNetwork { network: Network::PolkadotCollectives, version: String::from("1.2.0") },
 		VersionedNetwork { network: Network::PolkadotBridgeHub, version: String::from("1.2.0") },
 		VersionedNetwork { network: Network::PolkadotPeople, version: String::from("1.2.0") },
+		VersionedNetwork { network: Network::PolkadotCoretime, version: String::from("1.2.0") },
 	];
 	assert_eq!(details.networks, expected_networks);
 	assert!(details.additional.is_none());
