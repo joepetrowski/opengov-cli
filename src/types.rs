@@ -1,5 +1,6 @@
 pub(super) use parity_scale_codec::Encode as _;
-pub(super) use sp_core::{blake2_256, H256};
+pub(super) use sp_core::blake2_256;
+pub(super) use subxt::utils::H256;
 
 // Kusama Chains -----------------------------------------------------------------------------------
 
