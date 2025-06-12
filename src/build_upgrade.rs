@@ -693,9 +693,9 @@ async fn construct_westend_batch(
 	match &batch_calls.len() {
 		0 => panic!("no calls"),
 		1 => CallInfo::from_runtime_call(NetworkRuntimeCall::Westend(batch_calls[0].clone())),
-		_ => CallInfo::from_runtime_call(NetworkRuntimeCall::Westend(
-			WestendRuntimeCall::Utility(UtilityCall::force_batch { calls: batch_calls }),
-		)),
+		_ => CallInfo::from_runtime_call(NetworkRuntimeCall::Westend(WestendRuntimeCall::Utility(
+			UtilityCall::force_batch { calls: batch_calls },
+		))),
 	}
 }
 

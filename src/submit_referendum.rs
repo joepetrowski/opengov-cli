@@ -161,7 +161,8 @@ async fn westend_root_referenda(proposal_details: &ProposalDetails) -> PossibleC
 	westend_non_fellowship_referenda(
 		proposal_details,
 		WestendAssetHubOriginCaller::system(RawOrigin::Root),
-	).await
+	)
+	.await
 }
 
 // Generate the calls needed for a proposal to pass on Westend without the Fellowship.
@@ -206,7 +207,10 @@ async fn westend_non_fellowship_referenda(
 
 	PossibleCallsToSubmit {
 		preimage_for_whitelist_call: None,
-		preimage_for_public_referendum: Some((proposal_preimage_print, proposal_preimage_print_len)),
+		preimage_for_public_referendum: Some((
+			proposal_preimage_print,
+			proposal_preimage_print_len,
+		)),
 		fellowship_referendum_submission: None,
 		public_referendum_submission: Some(NetworkRuntimeCall::WestendAssetHub(
 			public_proposal.get_westend_asset_hub_call().expect("westend asset hub"),
@@ -215,9 +219,7 @@ async fn westend_non_fellowship_referenda(
 }
 
 // Generate the calls needed for a proposal to pass through the Westend Fellowship.
-async fn westend_fellowship_referenda(
-	proposal_details: &ProposalDetails,
-) -> PossibleCallsToSubmit {
+async fn westend_fellowship_referenda(proposal_details: &ProposalDetails) -> PossibleCallsToSubmit {
 	use westend_asset_hub::runtime_types::{
 		frame_support::traits::{preimages::Bounded::Lookup, schedule::DispatchTime},
 		pallet_preimage::pallet::Call as PreimageCall,
@@ -241,11 +243,11 @@ async fn westend_fellowship_referenda(
 	));
 
 	// Create preimage for the whitelist call
-	let preimage_for_whitelist_call = CallInfo::from_runtime_call(NetworkRuntimeCall::WestendAssetHub(
-		WestendAssetHubRuntimeCall::Preimage(PreimageCall::note_preimage {
-			bytes: whitelist_call.encoded,
-		}),
-	));
+	let preimage_for_whitelist_call = CallInfo::from_runtime_call(
+		NetworkRuntimeCall::WestendAssetHub(WestendAssetHubRuntimeCall::Preimage(
+			PreimageCall::note_preimage { bytes: whitelist_call.encoded },
+		)),
+	);
 
 	// Create fellowship referendum submission on Westend AssetHub
 	let fellowship_proposal = CallInfo::from_runtime_call(NetworkRuntimeCall::WestendAssetHub(
@@ -253,27 +255,26 @@ async fn westend_fellowship_referenda(
 			proposal_origin: Box::new(WestendAssetHubOriginCaller::FellowshipOrigins(
 				WestendFellowshipOrigins::Fellows,
 			)),
-			proposal: Lookup {
-				hash: H256(whitelist_call.hash),
-				len: whitelist_call.length,
-			},
+			proposal: Lookup { hash: H256(whitelist_call.hash), len: whitelist_call.length },
 			enactment_moment: DispatchTime::After(10),
 		}),
 	));
 
 	// Create the dispatch whitelisted call
-	let dispatch_whitelisted_call = CallInfo::from_runtime_call(NetworkRuntimeCall::WestendAssetHub(
-		WestendAssetHubRuntimeCall::Whitelist(WhitelistCall::dispatch_whitelisted_call_with_preimage {
-			call: Box::new(proposal_call_info.get_westend_asset_hub_call().expect("westend asset hub")),
-		}),
-	));
+	let dispatch_whitelisted_call = CallInfo::from_runtime_call(
+		NetworkRuntimeCall::WestendAssetHub(WestendAssetHubRuntimeCall::Whitelist(
+			WhitelistCall::dispatch_whitelisted_call_with_preimage {
+				call: Box::new(
+					proposal_call_info.get_westend_asset_hub_call().expect("westend asset hub"),
+				),
+			},
+		)),
+	);
 
 	// Create preimage for the dispatch call
 	let preimage_for_dispatch_whitelisted_call = CallInfo::from_runtime_call(
 		NetworkRuntimeCall::WestendAssetHub(WestendAssetHubRuntimeCall::Preimage(
-			PreimageCall::note_preimage {
-				bytes: dispatch_whitelisted_call.encoded.clone(),
-			},
+			PreimageCall::note_preimage { bytes: dispatch_whitelisted_call.encoded.clone() },
 		)),
 	);
 
@@ -295,11 +296,15 @@ async fn westend_fellowship_referenda(
 	let (whitelist_preimage_print, whitelist_preimage_print_len) =
 		preimage_for_whitelist_call.create_print_output(proposal_details.output_len_limit);
 	let (dispatch_preimage_print, dispatch_preimage_print_len) =
-		preimage_for_dispatch_whitelisted_call.create_print_output(proposal_details.output_len_limit);
+		preimage_for_dispatch_whitelisted_call
+			.create_print_output(proposal_details.output_len_limit);
 
 	PossibleCallsToSubmit {
 		preimage_for_whitelist_call: Some((whitelist_preimage_print, whitelist_preimage_print_len)),
-		preimage_for_public_referendum: Some((dispatch_preimage_print, dispatch_preimage_print_len)),
+		preimage_for_public_referendum: Some((
+			dispatch_preimage_print,
+			dispatch_preimage_print_len,
+		)),
 		fellowship_referendum_submission: Some(NetworkRuntimeCall::WestendAssetHub(
 			fellowship_proposal.get_westend_asset_hub_call().expect("westend asset hub"),
 		)),
@@ -360,9 +365,7 @@ pub(crate) async fn generate_calls(proposal_details: &ProposalDetails) -> Possib
 			}
 		},
 
-		NetworkTrack::WestendRoot => {
-			westend_root_referenda(proposal_details).await
-		},
+		NetworkTrack::WestendRoot => westend_root_referenda(proposal_details).await,
 
 		// All special Westend origins.
 		NetworkTrack::Westend(westend_track) => {
@@ -372,10 +375,12 @@ pub(crate) async fn generate_calls(proposal_details: &ProposalDetails) -> Possib
 					westend_fellowship_referenda(proposal_details).await,
 
 				// All other Westend origins.
-				_ => westend_non_fellowship_referenda(
-					proposal_details,
-					WestendOriginCaller::Origins(westend_track.clone()),
-				).await,
+				_ =>
+					westend_non_fellowship_referenda(
+						proposal_details,
+						WestendOriginCaller::Origins(westend_track.clone()),
+					)
+					.await,
 			}
 		},
 	}

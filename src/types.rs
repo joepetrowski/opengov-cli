@@ -293,7 +293,8 @@ impl CallInfo {
 			NetworkRuntimeCall::Westend(cc) => (Network::Westend, cc.encode()),
 			NetworkRuntimeCall::WestendAssetHub(cc) => (Network::WestendAssetHub, cc.encode()),
 			NetworkRuntimeCall::WestendBridgeHub(cc) => (Network::WestendBridgeHub, cc.encode()),
-			NetworkRuntimeCall::WestendCollectives(cc) => (Network::WestendCollectives, cc.encode()),
+			NetworkRuntimeCall::WestendCollectives(cc) =>
+				(Network::WestendCollectives, cc.encode()),
 			NetworkRuntimeCall::WestendPeople(cc) => (Network::WestendPeople, cc.encode()),
 			NetworkRuntimeCall::WestendCoretime(cc) => (Network::WestendCoretime, cc.encode()),
 		};
@@ -533,7 +534,8 @@ impl CallInfo {
 					CallOrHash::Call(NetworkRuntimeCall::Westend(westend_call))
 				},
 				Network::WestendAssetHub => {
-					let westend_asset_hub_call = self.get_westend_asset_hub_call().expect("westend asset hub");
+					let westend_asset_hub_call =
+						self.get_westend_asset_hub_call().expect("westend asset hub");
 					CallOrHash::Call(NetworkRuntimeCall::WestendAssetHub(westend_asset_hub_call))
 				},
 				_ => panic!("to do"),
