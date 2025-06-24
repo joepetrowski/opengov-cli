@@ -1,5 +1,9 @@
 pub(super) use parity_scale_codec::Encode as _;
+use scale_info::TypeInfo;
 pub(super) use sp_core::blake2_256;
+use std::marker::PhantomData;
+use subxt::ext::scale_decode::DecodeAsType;
+use subxt::ext::scale_encode::EncodeAsType;
 pub(super) use subxt::utils::H256;
 
 // Kusama Chains -----------------------------------------------------------------------------------
@@ -10,8 +14,8 @@ pub(super) use subxt::utils::H256;
 )]
 pub mod kusama_relay {}
 pub(super) use kusama_relay::runtime_types::staging_kusama_runtime::{
-	governance::origins::pallet_custom_origins::Origin as KusamaOpenGovOrigin,
 	OriginCaller as KusamaOriginCaller, RuntimeCall as KusamaRuntimeCall,
+	governance::origins::pallet_custom_origins::Origin as KusamaOpenGovOrigin,
 };
 
 #[subxt::subxt(
@@ -80,17 +84,62 @@ pub(super) use polkadot_coretime::runtime_types::coretime_polkadot_runtime::Runt
 
 // Westend Chains -----------------------------------------------------------------------------------
 
+#[derive(
+	Clone,
+	Debug,
+	PartialEq,
+	Eq,
+	TypeInfo,
+	parity_scale_codec::Encode,
+	parity_scale_codec::Decode,
+	DecodeAsType,
+	EncodeAsType,
+)]
+pub struct PlaceholderPagedExposureMetadata<T>(PhantomData<T>);
+
+#[derive(
+	Clone,
+	Debug,
+	PartialEq,
+	Eq,
+	TypeInfo,
+	parity_scale_codec::Encode,
+	parity_scale_codec::Decode,
+	DecodeAsType,
+	EncodeAsType,
+)]
+pub struct PlaceholderExposurePage<T, U>(PhantomData<(T, U)>);
+
 #[subxt::subxt(
 	runtime_metadata_insecure_url = "wss://westend-rpc.polkadot.io:443",
-	derive_for_all_types = "PartialEq, Clone"
+	derive_for_all_types = "PartialEq, Clone",
+	substitute_type(
+		path = "sp_staking::PagedExposureMetadata",
+		with = "crate::types::PlaceholderPagedExposureMetadata"
+	),
+	substitute_type(
+		path = "sp_staking::ExposurePage",
+		with = "crate::types::PlaceholderExposurePage"
+	)
 )]
 pub mod westend_relay {}
 pub(super) use westend_relay::runtime_types::westend_runtime::{
-	governance::origins::pallet_custom_origins::Origin as WestendOpenGovOrigin,
 	OriginCaller as WestendOriginCaller, RuntimeCall as WestendRuntimeCall,
+	governance::origins::pallet_custom_origins::Origin as WestendOpenGovOrigin,
 };
 
-#[subxt::subxt(runtime_metadata_insecure_url = "wss://westend-asset-hub-rpc.polkadot.io:443")]
+#[subxt::subxt(
+	runtime_metadata_insecure_url = "wss://westend-asset-hub-rpc.polkadot.io:443",
+	derive_for_all_types = "PartialEq, Clone",
+	substitute_type(
+		path = "sp_staking::PagedExposureMetadata",
+		with = "crate::types::PlaceholderPagedExposureMetadata"
+	),
+	substitute_type(
+		path = "sp_staking::ExposurePage",
+		with = "crate::types::PlaceholderExposurePage"
+	)
+)]
 pub mod westend_asset_hub {}
 pub(super) use westend_asset_hub::runtime_types::asset_hub_westend_runtime::RuntimeCall as WestendAssetHubRuntimeCall;
 
@@ -111,8 +160,8 @@ pub mod westend_coretime {}
 pub(super) use westend_coretime::runtime_types::coretime_westend_runtime::RuntimeCall as WestendCoretimeRuntimeCall;
 
 pub(super) use westend_asset_hub::runtime_types::asset_hub_westend_runtime::{
-	governance::origins::pallet_custom_origins::Origin as WestendAssetHubOpenGovOrigin,
 	OriginCaller as WestendAssetHubOriginCaller,
+	governance::origins::pallet_custom_origins::Origin as WestendAssetHubOpenGovOrigin,
 };
 
 pub(super) use westend_collectives::runtime_types::collectives_westend_runtime::fellowship::origins::pallet_origins::Origin as WestendFellowshipOrigins;

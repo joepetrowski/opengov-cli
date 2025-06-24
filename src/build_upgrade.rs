@@ -302,7 +302,9 @@ async fn download_runtimes(upgrade_details: &UpgradeDetails) {
 
 // Generate the `authorize_upgrade` calls that will need to execute on each parachain.
 fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<CallInfo> {
-	println!("\nGenerating parachain authorization calls. The runtime hashes are logged if you would like to verify them with srtool.\n");
+	println!(
+		"\nGenerating parachain authorization calls. The runtime hashes are logged if you would like to verify them with srtool.\n"
+	);
 	let mut authorization_calls = Vec::new();
 	for chain in &upgrade_details.networks {
 		let runtime_version = semver_to_intver(&chain.version);
