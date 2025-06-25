@@ -300,8 +300,6 @@ pub(crate) async fn generate_calls(proposal_details: &ProposalDetails) -> Possib
 							WestendAssetHubOpenGovOrigin::ReferendumCanceller,
 						// Handle all other cases with a wildcard pattern
 						_ => {
-							// For now, we'll panic with a helpful message
-							// In the future, you might want to add proper mappings for all variants
 							panic!(
 								"Unsupported Westend origin: {:?}. Please add proper mapping for this variant.",
 								westend_track
