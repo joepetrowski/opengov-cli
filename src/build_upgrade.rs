@@ -73,7 +73,7 @@ pub(crate) async fn build_upgrade(prefs: UpgradeArgs) {
 	let relay_upgrade = generate_relay_upgrade_call(&upgrade_details);
 
 	// 4. Construct a `force_batch` call with everything.
-	let batch = construct_batch(&upgrade_details, relay_upgrade, authorization_calls).await;
+	let batch = construct_batch(&upgrade_details, authorization_calls).await;
 
 	// 5. Write this call as a file that can then be passed to `submit_referendum`.
 	write_batch(&upgrade_details, batch);
@@ -269,7 +269,23 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 	for chain in &upgrade_details.networks {
 		let runtime_version = semver_to_intver(&chain.version);
 		match chain.network {
-			Network::Kusama | Network::Polkadot => continue, // do relay chain separately
+			Network::Kusama => {
+				use kusama_relay::runtime_types::frame_system::pallet::Call as SystemCall;
+				let path = format!(
+					"{}kusama_runtime-v{}.compact.compressed.wasm",
+					upgrade_details.directory, runtime_version
+				);
+				let runtime = fs::read(path).expect("Should give a valid file path");
+				let runtime_hash = blake2_256(&runtime);
+				println!("Kusama Relay Chain Runtime Hash: 0x{}", hex::encode(runtime_hash));
+
+				let call = CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(
+					KusamaRuntimeCall::System(SystemCall::authorize_upgrade {
+						code_hash: H256(runtime_hash),
+					}),
+				));
+				authorization_calls.push(call);
+			},
 			Network::KusamaAssetHub => {
 				use kusama_asset_hub::runtime_types::frame_system::pallet::Call;
 				let path = format!(
@@ -350,6 +366,23 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 
 				let call = CallInfo::from_runtime_call(NetworkRuntimeCall::KusamaEncointer(
 					KusamaEncointerRuntimeCall::System(Call::authorize_upgrade {
+						code_hash: H256(runtime_hash),
+					}),
+				));
+				authorization_calls.push(call);
+			},
+			Network::Polkadot => {
+				use polkadot_relay::runtime_types::frame_system::pallet::Call;
+				let path = format!(
+					"{}polkadot_runtime-v{}.compact.compressed.wasm",
+					upgrade_details.directory, runtime_version
+				);
+				let runtime = fs::read(path).expect("Should give a valid file path");
+				let runtime_hash = blake2_256(&runtime);
+				println!("Polkadot Relay Chain Runtime Hash: 0x{}", hex::encode(runtime_hash));
+
+				let call = CallInfo::from_runtime_call(NetworkRuntimeCall::Polkadot(
+					PolkadotRuntimeCall::System(Call::authorize_upgrade {
 						code_hash: H256(runtime_hash),
 					}),
 				));
@@ -445,75 +478,22 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 	authorization_calls
 }
 
-// Generate the `system.set_code` call that will upgrade the Relay Chain.
-fn generate_relay_upgrade_call(upgrade_details: &UpgradeDetails) -> Option<CallInfo> {
-	println!("\nGenerating Relay Chain upgrade call. The runtime hash is logged if you would like to verify it with srtool.\n");
-	// None if there is no version.
-	upgrade_details.relay_version.clone()?;
-	let runtime_version = semver_to_intver(&upgrade_details.relay_version.clone().unwrap());
-	match upgrade_details.relay {
-		Network::Kusama => {
-			use kusama_relay::runtime_types::frame_system::pallet::Call as SystemCall;
-
-			let path = format!(
-				"{}kusama_runtime-v{}.compact.compressed.wasm",
-				upgrade_details.directory, runtime_version
-			);
-			let runtime = fs::read(path).expect("Should give a valid file path");
-			let runtime_hash = blake2_256(&runtime);
-			println!("Kusama Relay Chain Runtime Hash: 0x{}", hex::encode(runtime_hash));
-
-			// authorize upgrade
-			Some(CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(
-				KusamaRuntimeCall::System(SystemCall::authorize_upgrade {
-					code_hash: H256(runtime_hash),
-				}),
-			)))
-		},
-		Network::Polkadot => {
-			use polkadot_relay::runtime_types::frame_system::pallet::Call as SystemCall;
-
-			let path = format!(
-				"{}polkadot_runtime-v{}.compact.compressed.wasm",
-				upgrade_details.directory, runtime_version
-			);
-			let runtime = fs::read(path).expect("Should give a valid file path");
-			let runtime_hash = blake2_256(&runtime);
-			println!("Polkadot Relay Chain Runtime Hash: 0x{}", hex::encode(runtime_hash));
-
-			// authorize upgrade
-			Some(CallInfo::from_runtime_call(NetworkRuntimeCall::Polkadot(
-				PolkadotRuntimeCall::System(SystemCall::authorize_upgrade {
-					code_hash: H256(runtime_hash),
-				}),
-			)))
-		},
-		_ => panic!("Not a Relay Chain"),
-	}
-}
-
 // Take the parachain authorization calls and the Relay Chain call, and batch them into one call
 // that can be executed on the Relay Chain. The call returned here is the proposal to put to
 // referendum.
-async fn construct_batch(
-	upgrade_details: &UpgradeDetails,
-	relay_call: Option<CallInfo>,
-	para_calls: Vec<CallInfo>,
-) -> CallInfo {
+async fn construct_batch(upgrade_details: &UpgradeDetails, para_calls: Vec<CallInfo>) -> CallInfo {
 	println!("\nBatching calls.");
 	match upgrade_details.relay {
 		Network::Kusama =>
-			construct_kusama_batch(relay_call, para_calls, upgrade_details.additional.clone()).await,
+			construct_kusama_batch(para_calls, upgrade_details.additional.clone()).await,
 		Network::Polkadot =>
-			construct_polkadot_batch(relay_call, para_calls, upgrade_details.additional.clone())
-				.await,
+			construct_polkadot_batch(para_calls, upgrade_details.additional.clone()).await,
 		_ => panic!("Not a Relay Chain"),
 	}
 }
 
 // Construct the batch needed on Kusama.
 async fn construct_kusama_batch(
-	relay_call: Option<CallInfo>,
 	para_calls: Vec<CallInfo>,
 	additional: Option<CallInfo>,
 ) -> CallInfo {
@@ -524,14 +504,13 @@ async fn construct_kusama_batch(
 		if auth.network.is_kusama_para() {
 			let send_auth = send_as_superuser_from_kusama(&auth).await;
 			batch_calls.push(send_auth);
+		} else {
+			// Relay doesn't need an xcm.
+			batch_calls.push(auth);
 		}
 	}
 	if let Some(a) = additional {
 		batch_calls.push(a.get_kusama_call().expect("kusama call"))
-	}
-	// Relay set code goes last
-	if let Some(rc) = relay_call {
-		batch_calls.push(rc.get_kusama_call().expect("kusama call"));
 	}
 	match &batch_calls.len() {
 		0 => panic!("no calls"),
@@ -544,7 +523,6 @@ async fn construct_kusama_batch(
 
 // Construct the batch needed on Polkadot.
 async fn construct_polkadot_batch(
-	relay_call: Option<CallInfo>,
 	para_calls: Vec<CallInfo>,
 	additional: Option<CallInfo>,
 ) -> CallInfo {
@@ -555,14 +533,12 @@ async fn construct_polkadot_batch(
 		if auth.network.is_polkadot_para() {
 			let send_auth = send_as_superuser_from_polkadot(&auth).await;
 			batch_calls.push(send_auth);
+		} else {
+			batch_calls.push(auth);
 		}
 	}
 	if let Some(a) = additional {
 		batch_calls.push(a.get_polkadot_call().expect("polkadot call"))
-	}
-	// Relay set code goes last
-	if let Some(rc) = relay_call {
-		batch_calls.push(rc.get_polkadot_call().expect("polkadot call"));
 	}
 	match &batch_calls.len() {
 		0 => panic!("no calls"),
