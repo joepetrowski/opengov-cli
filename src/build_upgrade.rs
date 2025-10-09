@@ -14,13 +14,6 @@ pub(crate) struct UpgradeArgs {
 	#[clap(long = "only")]
 	pub(crate) only: bool,
 
-	/// Construct a call that will call `set_code` directly on the Relay Chain. This is generally
-	/// not recommended, as it involves submitting a large preimage (and therefore paying a large
-	/// fee). The default (false) uses `authorize_upgrade` instead, which only requires submitting
-	/// the hash. Anyone can then submit the actual runtime after it has been authorized.
-	#[clap(long = "set-relay-directly")]
-	pub(crate) set_relay_directly: bool,
-
 	/// The Fellowship release version. Should be semver and correspond to the release published.
 	#[clap(long = "relay-version")]
 	pub(crate) relay_version: Option<String>,
@@ -76,7 +69,7 @@ pub(crate) async fn build_upgrade(prefs: UpgradeArgs) {
 	// 2. Construct the `authorize_upgrade` call on each parachain.
 	let authorization_calls = generate_authorize_upgrade_calls(&upgrade_details);
 
-	// 3. Construct the `utility.with_weight(system.set_code(..), ..)` call on the Relay Chain.
+	// 3. Construct the `authorize_upgrade` call on the Relay Chain.
 	let relay_upgrade = generate_relay_upgrade_call(&upgrade_details);
 
 	// 4. Construct a `force_batch` call with everything.
@@ -183,8 +176,6 @@ pub(crate) fn parse_inputs(prefs: UpgradeArgs) -> UpgradeDetails {
 		None => None,
 	};
 
-	let set_relay_directly = prefs.set_relay_directly;
-
 	// Get a version from one of the args. (This still feels dirty.)
 	let version = relay_version.clone().unwrap_or(asset_hub_version.unwrap_or(
 		bridge_hub_version.unwrap_or(encointer_version.unwrap_or(collectives_version.unwrap_or(
@@ -202,15 +193,7 @@ pub(crate) fn parse_inputs(prefs: UpgradeArgs) -> UpgradeDetails {
 
 	make_version_directory(directory.as_str());
 
-	UpgradeDetails {
-		relay,
-		relay_version,
-		networks,
-		directory,
-		output_file,
-		additional,
-		set_relay_directly,
-	}
+	UpgradeDetails { relay, relay_version, networks, directory, output_file, additional }
 }
 
 // Create a directory into which to place runtime blobs and the final call data.
@@ -480,19 +463,12 @@ fn generate_relay_upgrade_call(upgrade_details: &UpgradeDetails) -> Option<CallI
 			let runtime_hash = blake2_256(&runtime);
 			println!("Kusama Relay Chain Runtime Hash: 0x{}", hex::encode(runtime_hash));
 
-			if !upgrade_details.set_relay_directly {
-				// authorize upgrade
-				Some(CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(
-					KusamaRuntimeCall::System(SystemCall::authorize_upgrade {
-						code_hash: H256(runtime_hash),
-					}),
-				)))
-			} else {
-				// set code directly
-				Some(CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(
-					KusamaRuntimeCall::System(SystemCall::set_code { code: runtime }),
-				)))
-			}
+			// authorize upgrade
+			Some(CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(
+				KusamaRuntimeCall::System(SystemCall::authorize_upgrade {
+					code_hash: H256(runtime_hash),
+				}),
+			)))
 		},
 		Network::Polkadot => {
 			use polkadot_relay::runtime_types::frame_system::pallet::Call as SystemCall;
@@ -505,19 +481,12 @@ fn generate_relay_upgrade_call(upgrade_details: &UpgradeDetails) -> Option<CallI
 			let runtime_hash = blake2_256(&runtime);
 			println!("Polkadot Relay Chain Runtime Hash: 0x{}", hex::encode(runtime_hash));
 
-			if !upgrade_details.set_relay_directly {
-				// authorize upgrade
-				Some(CallInfo::from_runtime_call(NetworkRuntimeCall::Polkadot(
-					PolkadotRuntimeCall::System(SystemCall::authorize_upgrade {
-						code_hash: H256(runtime_hash),
-					}),
-				)))
-			} else {
-				// set code directly
-				Some(CallInfo::from_runtime_call(NetworkRuntimeCall::Polkadot(
-					PolkadotRuntimeCall::System(SystemCall::set_code { code: runtime }),
-				)))
-			}
+			// authorize upgrade
+			Some(CallInfo::from_runtime_call(NetworkRuntimeCall::Polkadot(
+				PolkadotRuntimeCall::System(SystemCall::authorize_upgrade {
+					code_hash: H256(runtime_hash),
+				}),
+			)))
 		},
 		_ => panic!("Not a Relay Chain"),
 	}

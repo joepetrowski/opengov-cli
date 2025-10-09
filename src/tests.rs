@@ -115,7 +115,6 @@ fn upgrade_args_for_only_relay() -> UpgradeArgs {
 	UpgradeArgs {
 		network: String::from("polkadot"),
 		only: true,
-		set_relay_directly: true,
 		relay_version: Some(String::from("v1.2.0")),
 		asset_hub: None,
 		bridge_hub: None,
@@ -132,7 +131,6 @@ fn upgrade_args_for_only_asset_hub() -> UpgradeArgs {
 	UpgradeArgs {
 		network: String::from("polkadot"),
 		only: true,
-		set_relay_directly: true,
 		relay_version: None,
 		asset_hub: Some(String::from("v1.2.0")),
 		bridge_hub: None,
@@ -149,7 +147,6 @@ fn upgrade_args_for_all() -> UpgradeArgs {
 	UpgradeArgs {
 		network: String::from("polkadot"),
 		only: false,
-		set_relay_directly: true,
 		relay_version: Some(String::from("v1.2.0")),
 		asset_hub: None,
 		bridge_hub: None,
