@@ -66,16 +66,13 @@ pub(crate) async fn build_upgrade(prefs: UpgradeArgs) {
 	// 1. Download all the Wasm files needed from the release pages.
 	download_runtimes(&upgrade_details).await;
 
-	// 2. Construct the `authorize_upgrade` call on each parachain.
+	// 2. Construct the `authorize_upgrade` call on each chain.
 	let authorization_calls = generate_authorize_upgrade_calls(&upgrade_details);
 
-	// 3. Construct the `authorize_upgrade` call on the Relay Chain.
-	let relay_upgrade = generate_relay_upgrade_call(&upgrade_details);
-
-	// 4. Construct a `force_batch` call with everything.
+	// 3. Construct a `force_batch` call with everything.
 	let batch = construct_batch(&upgrade_details, authorization_calls).await;
 
-	// 5. Write this call as a file that can then be passed to `submit_referendum`.
+	// 4. Write this call as a file that can then be passed to `submit_referendum`.
 	write_batch(&upgrade_details, batch);
 }
 
@@ -193,7 +190,7 @@ pub(crate) fn parse_inputs(prefs: UpgradeArgs) -> UpgradeDetails {
 
 	make_version_directory(directory.as_str());
 
-	UpgradeDetails { relay, relay_version, networks, directory, output_file, additional }
+	UpgradeDetails { relay, networks, directory, output_file, additional }
 }
 
 // Create a directory into which to place runtime blobs and the final call data.
@@ -506,7 +503,7 @@ async fn construct_kusama_batch(
 			batch_calls.push(send_auth);
 		} else {
 			// Relay doesn't need an xcm.
-			batch_calls.push(auth);
+			batch_calls.push(auth.get_kusama_call().expect("We just constructed this"));
 		}
 	}
 	if let Some(a) = additional {
@@ -534,7 +531,8 @@ async fn construct_polkadot_batch(
 			let send_auth = send_as_superuser_from_polkadot(&auth).await;
 			batch_calls.push(send_auth);
 		} else {
-			batch_calls.push(auth);
+			// Relay doesn't need an xcm.
+			batch_calls.push(auth.get_polkadot_call().expect("We just constructed this."));
 		}
 	}
 	if let Some(a) = additional {

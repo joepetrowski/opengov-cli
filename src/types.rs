@@ -151,8 +151,6 @@ pub(super) struct ProposalDetails {
 pub(super) struct UpgradeDetails {
 	// The Relay Network for this upgrade, Polkadot or Kusama.
 	pub(super) relay: Network,
-	// The version of the Relay Chain to which to upgrade. Typically, but not always, the default.
-	pub(super) relay_version: Option<String>,
 	// All networks to upgrade.
 	pub(super) networks: Vec<VersionedNetwork>,
 	// The directory into which to write information needed.

@@ -448,7 +448,6 @@ fn only_relay_chain() {
 	let args = upgrade_args_for_only_relay();
 	let details = build_upgrade::parse_inputs(args);
 	assert_eq!(details.relay, Network::Polkadot);
-	assert_eq!(details.relay_version, Some(String::from("1.2.0")));
 	let expected_networks =
 		vec![VersionedNetwork { network: Network::Polkadot, version: String::from("1.2.0") }];
 	assert_eq!(details.networks, expected_networks);
@@ -460,7 +459,6 @@ fn only_asset_hub() {
 	let args = upgrade_args_for_only_asset_hub();
 	let details = build_upgrade::parse_inputs(args);
 	assert_eq!(details.relay, Network::Polkadot);
-	assert_eq!(details.relay_version, None);
 	let expected_networks = vec![VersionedNetwork {
 		network: Network::PolkadotAssetHub,
 		version: String::from("1.2.0"),
@@ -474,7 +472,6 @@ fn upgrade_everything_works_with_just_relay_version() {
 	let args = upgrade_args_for_all();
 	let details = build_upgrade::parse_inputs(args);
 	assert_eq!(details.relay, Network::Polkadot);
-	assert_eq!(details.relay_version, Some(String::from("1.2.0")));
 	let expected_networks = vec![
 		VersionedNetwork { network: Network::Polkadot, version: String::from("1.2.0") },
 		VersionedNetwork { network: Network::PolkadotAssetHub, version: String::from("1.2.0") },
