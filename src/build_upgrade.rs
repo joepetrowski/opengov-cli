@@ -3,7 +3,7 @@ use clap::Parser as ClapParser;
 use std::fs;
 use std::path::Path;
 
-/// Generate a single call that will upgrade a Relay Chain and all of its system parachains.
+/// Generate a single call that will upgrade all system chains in a given network.
 #[derive(Debug, ClapParser)]
 pub(crate) struct UpgradeArgs {
 	/// Network on which to submit the referendum. `polkadot` or `kusama`.
@@ -79,11 +79,10 @@ pub(crate) async fn build_upgrade(prefs: UpgradeArgs) {
 	// 3. Construct the `utility.with_weight(system.set_code(..), ..)` call on the Relay Chain.
 	let relay_upgrade = generate_relay_upgrade_call(&upgrade_details);
 
-	// 4. Call the runtime API of each parachain and get the needed `Transact` weight.
-	// 5. Construct a `force_batch` call with everything.
+	// 4. Construct a `force_batch` call with everything.
 	let batch = construct_batch(&upgrade_details, relay_upgrade, authorization_calls).await;
 
-	// 6. Write this call as a file that can then be passed to `submit_referendum`.
+	// 5. Write this call as a file that can then be passed to `submit_referendum`.
 	write_batch(&upgrade_details, batch);
 }
 
@@ -610,32 +609,30 @@ async fn construct_polkadot_batch(
 async fn send_as_superuser_from_kusama(auth: &CallInfo) -> KusamaRuntimeCall {
 	use kusama_relay::runtime_types::{
 		pallet_xcm::pallet::Call as XcmCall,
-		sp_weights::weight_v2::Weight as KusamaWeight,
-		staging_xcm::v4::{
+		staging_xcm::v5::{
 			junction::Junction::Parachain, junctions::Junctions::X1, location::Location,
 			Instruction, Xcm,
 		},
 		xcm::{
 			double_encoded::DoubleEncoded, v3::OriginKind, v3::WeightLimit, VersionedLocation,
-			VersionedXcm::V4,
+			VersionedXcm::V5,
 		},
 	};
 
-	let (ref_time, proof_size) = get_weight(auth).await;
 	let para_id = auth.network.get_para_id().unwrap();
 	KusamaRuntimeCall::XcmPallet(XcmCall::send {
-		dest: Box::new(VersionedLocation::V4(Location {
+		dest: Box::new(VersionedLocation::V5(Location {
 			parents: 0,
 			interior: X1([Parachain(para_id)]),
 		})),
-		message: Box::new(V4(Xcm(vec![
+		message: Box::new(V5(Xcm(vec![
 			Instruction::UnpaidExecution {
 				weight_limit: WeightLimit::Unlimited,
 				check_origin: None,
 			},
 			Instruction::Transact {
 				origin_kind: OriginKind::Superuser,
-				require_weight_at_most: KusamaWeight { ref_time, proof_size },
+				fallback_max_weight: None,
 				call: DoubleEncoded { encoded: auth.encoded.clone() },
 			},
 		]))),
@@ -647,58 +644,34 @@ async fn send_as_superuser_from_kusama(auth: &CallInfo) -> KusamaRuntimeCall {
 async fn send_as_superuser_from_polkadot(auth: &CallInfo) -> PolkadotRuntimeCall {
 	use polkadot_relay::runtime_types::{
 		pallet_xcm::pallet::Call as XcmCall,
-		sp_weights::weight_v2::Weight as PolkadotWeight,
-		staging_xcm::v4::{
+		staging_xcm::v5::{
 			junction::Junction::Parachain, junctions::Junctions::X1, location::Location,
 			Instruction, Xcm,
 		},
 		xcm::{
 			double_encoded::DoubleEncoded, v3::OriginKind, v3::WeightLimit, VersionedLocation,
-			VersionedXcm::V4,
+			VersionedXcm::V5,
 		},
 	};
 
-	let (ref_time, proof_size) = get_weight(auth).await;
 	let para_id = auth.network.get_para_id().unwrap();
 	PolkadotRuntimeCall::XcmPallet(XcmCall::send {
-		dest: Box::new(VersionedLocation::V4(Location {
+		dest: Box::new(VersionedLocation::V5(Location {
 			parents: 0,
 			interior: X1([Parachain(para_id)]),
 		})),
-		message: Box::new(V4(Xcm(vec![
+		message: Box::new(V5(Xcm(vec![
 			Instruction::UnpaidExecution {
 				weight_limit: WeightLimit::Unlimited,
 				check_origin: None,
 			},
 			Instruction::Transact {
 				origin_kind: OriginKind::Superuser,
-				require_weight_at_most: PolkadotWeight { ref_time, proof_size },
+				fallback_max_weight: None,
 				call: DoubleEncoded { encoded: auth.encoded.clone() },
 			},
 		]))),
 	})
-}
-
-// Get the weight needed to successfully `Transact` on a foreign chain.
-async fn get_weight(call: &CallInfo) -> (u64, u64) {
-	// Do some weight calculation for execution of Transact on a parachain.
-	let weight_from = &call.network;
-	let max_ref_time: u64 = 500_000_000_000 - 1;
-	let max_proof_size: u64 = 3 * 1024 * 1024 - 1;
-	let weight_needed = call
-		.get_transact_weight_needed(
-			weight_from,
-			Weight { ref_time: 1_000_000_000, proof_size: 1024 },
-		)
-		.await;
-	// Double the weight needed, just to be safe from a runtime upgrade that could change
-	// things during the referendum period.
-	(
-		(2 * weight_needed.ref_time).min(max_ref_time),
-		(2 * weight_needed.proof_size).max(1024).min(max_proof_size),
-		//                            ^^^^^^^^^^
-		// sometimes it gives a proof size of 0, which is scary. make it 1024.
-	)
 }
 
 // Write the call needed to disk and provide instructions to the user about how to propose it.

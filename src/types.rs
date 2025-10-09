@@ -148,10 +148,6 @@ pub(super) struct ProposalDetails {
 	// Whether or not to group all calls into a batch. Uses `force_batch` in case the account does
 	// not have funds for pre-image deposits or is not a fellow.
 	pub(super) print_batch: bool,
-	// `Some` if you want to manually set the `require_weight_at_most` parameter used in any
-	// `Transact` instruction. If `None`, then the program will fetch the required weight (plus a 2x
-	// factor of safety) and construct the instruction with that.
-	pub(super) transact_weight_override: Option<Weight>,
 }
 
 // Info and preferences provided by the user for runtime upgrade construction.

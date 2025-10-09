@@ -121,15 +121,7 @@ fn parse_inputs(prefs: ReferendumArgs) -> ProposalDetails {
 		AppsUiLink
 	};
 
-	ProposalDetails {
-		proposal,
-		track,
-		dispatch,
-		output,
-		output_len_limit,
-		print_batch,
-		transact_weight_override: None,
-	}
+	ProposalDetails { proposal, track, dispatch, output, output_len_limit, print_batch }
 }
 
 // Generate all the calls needed.
@@ -338,10 +330,10 @@ async fn polkadot_fellowship_referenda(
 		pallet_preimage::pallet::Call as CollectivesPreimageCall,
 		pallet_referenda::pallet::Call as CollectivesReferendaCall,
 		pallet_xcm::pallet::Call as CollectivesXcmCall,
-		staging_xcm::v4::{junctions::Junctions::Here, location::Location, Instruction, Xcm},
+		staging_xcm::v5::{junctions::Junctions::Here, location::Location, Instruction, Xcm},
 		xcm::{
 			double_encoded::DoubleEncoded, v3::OriginKind, v3::WeightLimit, VersionedLocation,
-			VersionedXcm::V4,
+			VersionedXcm::V5,
 		},
 	};
 	use polkadot_relay::runtime_types::{
@@ -384,39 +376,18 @@ async fn polkadot_fellowship_referenda(
 			WhitelistCall::whitelist_call { call_hash: H256(proposal_call_info.hash) },
 		)));
 
-	let (ref_time, proof_size) =
-		// The user may want to override the computed values, e.g. for deterministic
-		// testing.
-		if let Some(weight_override) = &proposal_details.transact_weight_override {
-			(weight_override.ref_time, weight_override.proof_size)
-		} else {
-			// Do some weight calculation for execution of Transact on the Relay Chain.
-			let max_ref_time: u64 = 2_000_000_000_000 - 1;
-			let max_proof_size: u64 = 5 * 1024 * 1024 - 1;
-			let relay_weight_needed = whitelist_call.get_transact_weight_needed(
-				&Network::Polkadot,
-				Weight { ref_time: 1_000_000_000, proof_size: 10_000 }
-			).await;
-			// Double the weight needed, just to be safe from a runtime upgrade that could change
-			// things during the referendum period.
-			(
-				(2 * relay_weight_needed.ref_time).min(max_ref_time),
-				(2 * relay_weight_needed.proof_size).min(max_proof_size),
-			)
-		};
-
 	// This is what the Fellowship will actually vote on enacting.
 	let whitelist_over_xcm = CallInfo::from_runtime_call(NetworkRuntimeCall::PolkadotCollectives(
 		CollectivesRuntimeCall::PolkadotXcm(CollectivesXcmCall::send {
-			dest: Box::new(VersionedLocation::V4(Location { parents: 1, interior: Here })),
-			message: Box::new(V4(Xcm(vec![
+			dest: Box::new(VersionedLocation::V5(Location { parents: 1, interior: Here })),
+			message: Box::new(V5(Xcm(vec![
 				Instruction::UnpaidExecution {
 					weight_limit: WeightLimit::Unlimited,
 					check_origin: None,
 				},
 				Instruction::Transact {
 					origin_kind: OriginKind::Xcm,
-					require_weight_at_most: Weight { ref_time, proof_size },
+					fallback_max_weight: None,
 					call: DoubleEncoded { encoded: whitelist_call.encoded },
 				},
 			]))),

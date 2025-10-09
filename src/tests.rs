@@ -3,7 +3,7 @@ use crate::polkadot_relay::runtime_types::frame_system::pallet::Call as Polkadot
 use crate::{
 	build_upgrade, submit_referendum::generate_calls, CallInfo, CallOrHash, KusamaOpenGovOrigin,
 	Network, NetworkRuntimeCall, PolkadotOpenGovOrigin, PolkadotRuntimeCall, ProposalDetails,
-	UpgradeArgs, VersionedNetwork, Weight,
+	UpgradeArgs, VersionedNetwork,
 };
 
 fn polkadot_whitelist_remark_user_input() -> ProposalDetails {
@@ -18,7 +18,6 @@ fn polkadot_whitelist_remark_user_input() -> ProposalDetails {
 		output: AppsUiLink,
 		output_len_limit: 1_000,
 		print_batch: true,
-		transact_weight_override: Some(Weight { ref_time: 1_000_000_000, proof_size: 1_000_000 }),
 	}
 }
 
@@ -34,7 +33,6 @@ fn polkadot_staking_validator_user_input() -> ProposalDetails {
 		output: AppsUiLink,
 		output_len_limit: 1_000,
 		print_batch: true,
-		transact_weight_override: Some(Weight { ref_time: 1_000_000_000, proof_size: 1_000_000 }),
 	}
 }
 
@@ -50,7 +48,6 @@ fn polkadot_root_remark_user_input() -> ProposalDetails {
 		output: AppsUiLink,
 		output_len_limit: 1_000,
 		print_batch: true,
-		transact_weight_override: Some(Weight { ref_time: 1_000_000_000, proof_size: 1_000_000 }),
 	}
 }
 
@@ -66,7 +63,6 @@ fn kusama_whitelist_remark_user_input() -> ProposalDetails {
 		output: AppsUiLink,
 		output_len_limit: 1_000,
 		print_batch: true,
-		transact_weight_override: Some(Weight { ref_time: 1_000_000_000, proof_size: 1_000_000 }),
 	}
 }
 
@@ -82,7 +78,6 @@ fn kusama_staking_validator_user_input() -> ProposalDetails {
 		output: AppsUiLink,
 		output_len_limit: 1_000,
 		print_batch: true,
-		transact_weight_override: Some(Weight { ref_time: 1_000_000_000, proof_size: 1_000_000 }),
 	}
 }
 
@@ -98,7 +93,6 @@ fn kusama_root_remark_user_input() -> ProposalDetails {
 		output: AppsUiLink,
 		output_len_limit: 1_000,
 		print_batch: true,
-		transact_weight_override: Some(Weight { ref_time: 1_000_000_000, proof_size: 1_000_000 }),
 	}
 }
 
@@ -114,7 +108,6 @@ fn limited_length_user_input() -> ProposalDetails {
 		output: AppsUiLink,
 		output_len_limit: 5, // very limiting
 		print_batch: true,
-		transact_weight_override: Some(Weight { ref_time: 1_000_000_000, proof_size: 1_000_000 }),
 	}
 }
 
@@ -252,13 +245,13 @@ async fn it_starts_polkadot_non_fellowship_referenda_correctly() {
 #[tokio::test]
 async fn it_starts_polkadot_fellowship_referenda_correctly() {
 	// Fellowship XCM Send
-	// 0x1f0003010003082f0000060302286bee02093d008817008821e8db19b8e34b62ee8bc618a5ed3eecb9761d7d81349b00aa5ce5dfca2534
+	// 0x1f0005010005082f00000603008817008821e8db19b8e34b62ee8bc618a5ed3eecb9761d7d81349b00aa5ce5dfca2534
 	// 0xadb9e4e4165f92f984690cac8816898978b7dfc8aff6db735ffd5ec9b0430097
 	let proposal_details = polkadot_whitelist_remark_user_input();
 	let calls = generate_calls(&proposal_details).await;
 
-	let fellowship_preimage = hex::decode("0x2b00dc1f0004010004082f0000060302286bee02093d008817008821e8db19b8e34b62ee8bc618a5ed3eecb9761d7d81349b00aa5ce5dfca2534".trim_start_matches("0x")).expect("Valid call");
-	let fellowship_referendum = hex::decode("0x3d003e020270ace20636863d9122dea540102dda7df4a52d3a0fe5eaf673e4eca7598aeeca37000000010a000000".trim_start_matches("0x")).expect("Valid call");
+	let fellowship_preimage = hex::decode("0x2b00c01f0005010005082f00000603008817008821e8db19b8e34b62ee8bc618a5ed3eecb9761d7d81349b00aa5ce5dfca2534".trim_start_matches("0x")).expect("Valid call");
+	let fellowship_referendum = hex::decode("0x3d003e0202a6107466ddd4abe0933e8388f879c75dca7089820dd530c3e8acb766fc0eb31d30000000010a000000".trim_start_matches("0x")).expect("Valid call");
 	let public_preimage = hex::decode(
 		"0x0a0060170300004c6f70656e676f762d7375626d69742074657374".trim_start_matches("0x"),
 	)
@@ -271,7 +264,7 @@ async fn it_starts_polkadot_fellowship_referenda_correctly() {
 			CallOrHash::Call(fellowship_preimage_generated) => {
 				let call_info = CallInfo::from_runtime_call(fellowship_preimage_generated);
 				assert_eq!(call_info.encoded, fellowship_preimage);
-				assert_eq!(length, 58u32);
+				assert_eq!(length, 51u32);
 			},
 			CallOrHash::Hash(_) => panic!("call length within the limit"),
 		}
