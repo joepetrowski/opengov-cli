@@ -142,7 +142,7 @@ pub(crate) async fn generate_calls(proposal_details: &ProposalDetails) -> Possib
 			match kusama_track {
 				// Whitelisted calls are special.
 				KusamaOpenGovOrigin::WhitelistedCaller =>
-					kusama_fellowship_referenda(proposal_details),
+					kusama_fellowship_referenda(proposal_details).await,
 
 				// All other Kusama origins.
 				_ => kusama_non_fellowship_referenda(
@@ -177,57 +177,118 @@ pub(crate) async fn generate_calls(proposal_details: &ProposalDetails) -> Possib
 	}
 }
 
-// Generate the calls needed for a proposal to pass through the Kusama Fellowship.
-fn kusama_fellowship_referenda(proposal_details: &ProposalDetails) -> PossibleCallsToSubmit {
-	use kusama_relay::runtime_types::{
+// Generate the calls needed for a proposal to pass through the Fellowship.
+async fn kusama_fellowship_referenda(proposal_details: &ProposalDetails) -> PossibleCallsToSubmit {
+	use kusama_asset_hub::runtime_types::{
 		frame_support::traits::{preimages::Bounded::Lookup, schedule::DispatchTime},
 		pallet_preimage::pallet::Call as PreimageCall,
 		pallet_referenda::pallet::Call as ReferendaCall,
 		pallet_whitelist::pallet::Call as WhitelistCall,
 	};
-	// First we need to whitelist this proposal. We will need:
-	//   1. To wrap the proposal hash in `whitelist.whitelist_call()` and submit this as a preimage.
-	//   2. To submit a referendum to the Fellowship Referenda pallet to dispatch this preimage.
+	use kusama_relay::runtime_types::{
+		frame_support::traits::{
+			preimages::Bounded::Inline, schedule::DispatchTime as KusamaDispatchTime,
+		},
+		// Since the Relay Chain and Asset Hub may be on different versions of Preimage,
+		// Referenda, and XCM pallets, we need to define their `Call` enum separately.
+		pallet_referenda::pallet::Call as KusamaReferendaCall,
+		pallet_xcm::pallet::Call as KusamaXcmCall,
+		staging_xcm::v5::{
+			junction::Junction::Parachain, junctions::Junctions::X1, location::Location,
+			Instruction, Xcm,
+		},
+		xcm::{
+			double_encoded::DoubleEncoded, v3::OriginKind, v3::WeightLimit, VersionedLocation,
+			VersionedXcm::V5,
+		},
+	};
+	// Fellowship is on the Relay Chain, so things are a bit different here.
+	//
+	// 1. Create a whitelist call on Asset Hub:
+	//
+	//    let whitelist_call =
+	//        KusamaAssetHubRuntimeCall::Whitelist(WhitelistCall::whitelist_call {
+	//            call_hash: H256(proposal_hash),
+	//    });
+	//
+	// 2. Create an XCM to send this from the Relay Chain:
+	//    let send_whitelist = KusamaRuntimeCall::XcmPallet(
+	//        PolkadotXcmCall::send {
+	//            dest: Location { parents: 0, interior: X1([Parachain(1000)]) },
+	//            message: vec![UnpaidExecution, Transact {call: whitelist_call, ..}],
+	//        }
+	//    );
+	//
+	// 3. Make a Fellowship referendum for `send_whitelist`.
+	//
+	// 4. Make a public referendum on Asset Hub.
 	let proposal_bytes = get_proposal_bytes(proposal_details.proposal.clone());
-	let proposal_call_info = CallInfo::from_bytes(&proposal_bytes, Network::Kusama);
+	let proposal_call_info = CallInfo::from_bytes(&proposal_bytes, Network::Polkadot);
 
 	let public_referendum_dispatch_time = match proposal_details.dispatch {
 		DispatchTimeWrapper::At(block) => DispatchTime::At(block),
 		DispatchTimeWrapper::After(block) => DispatchTime::After(block),
 	};
 
-	let whitelist_call =
-		CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(KusamaRuntimeCall::Whitelist(
-			WhitelistCall::whitelist_call { call_hash: H256(proposal_call_info.hash) },
-		)));
-	let preimage_for_whitelist_call = CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(
-		KusamaRuntimeCall::Preimage(PreimageCall::note_preimage { bytes: whitelist_call.encoded }),
+	let whitelist_call = CallInfo::from_runtime_call(NetworkRuntimeCall::KusamaAssetHub(
+		KusamaAssetHubRuntimeCall::Whitelist(WhitelistCall::whitelist_call {
+			call_hash: H256(proposal_call_info.hash),
+		}),
 	));
 
+	// This is what the Fellowship will actually vote on enacting.
+	let whitelist_over_xcm = CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(
+		KusamaRuntimeCall::XcmPallet(KusamaXcmCall::send {
+			dest: Box::new(VersionedLocation::V5(Location {
+				parents: 0,
+				interior: X1([Parachain(1000)]),
+			})),
+			message: Box::new(V5(Xcm(vec![
+				Instruction::UnpaidExecution {
+					weight_limit: WeightLimit::Unlimited,
+					check_origin: None,
+				},
+				Instruction::Transact {
+					origin_kind: OriginKind::Xcm,
+					fallback_max_weight: None,
+					call: DoubleEncoded { encoded: whitelist_call.encoded },
+				},
+			]))),
+		}),
+	));
+
+	// The actual Fellowship referendum submission.
 	let fellowship_proposal = CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(
-		KusamaRuntimeCall::FellowshipReferenda(ReferendaCall::submit {
+		KusamaRuntimeCall::FellowshipReferenda(KusamaReferendaCall::submit {
 			proposal_origin: Box::new(KusamaOriginCaller::Origins(KusamaOpenGovOrigin::Fellows)),
-			proposal: Lookup { hash: H256(whitelist_call.hash), len: whitelist_call.length },
-			enactment_moment: DispatchTime::After(10),
+			proposal: Inline(whitelist_over_xcm.encoded),
+			enactment_moment: KusamaDispatchTime::After(10u32),
 		}),
 	));
 
 	// Now we put together the public referendum part. This still needs separate logic because the
 	// actual proposal gets wrapped in a Whitelist call.
-	let dispatch_whitelisted_call = CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(
-		KusamaRuntimeCall::Whitelist(WhitelistCall::dispatch_whitelisted_call_with_preimage {
-			call: Box::new(proposal_call_info.get_kusama_call().expect("kusama")),
-		}),
-	));
+	let dispatch_whitelisted_call = CallInfo::from_runtime_call(
+		NetworkRuntimeCall::KusamaAssetHub(KusamaAssetHubRuntimeCall::Whitelist(
+			WhitelistCall::dispatch_whitelisted_call_with_preimage {
+				call: Box::new(
+					proposal_call_info
+						.get_kusama_asset_hub_call()
+						.expect("it is a kusama asset hub call"),
+				),
+			},
+		)),
+	);
 
-	let preimage_for_dispatch_whitelisted_call =
-		CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(KusamaRuntimeCall::Preimage(
+	let preimage_for_dispatch_whitelisted_call = CallInfo::from_runtime_call(
+		NetworkRuntimeCall::KusamaAssetHub(KusamaAssetHubRuntimeCall::Preimage(
 			PreimageCall::note_preimage { bytes: dispatch_whitelisted_call.encoded.clone() },
-		)));
-	let public_proposal = CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(
-		KusamaRuntimeCall::Referenda(ReferendaCall::submit {
-			proposal_origin: Box::new(KusamaOriginCaller::Origins(
-				KusamaOpenGovOrigin::WhitelistedCaller,
+		)),
+	);
+	let public_proposal = CallInfo::from_runtime_call(NetworkRuntimeCall::KusamaAssetHub(
+		KusamaAssetHubRuntimeCall::Referenda(ReferendaCall::submit {
+			proposal_origin: Box::new(KusamaAssetHubOriginCaller::Origins(
+				KusamaAssetHubOpenGovOrigin::WhitelistedCaller,
 			)),
 			proposal: Lookup {
 				hash: H256(dispatch_whitelisted_call.hash),
@@ -238,8 +299,6 @@ fn kusama_fellowship_referenda(proposal_details: &ProposalDetails) -> PossibleCa
 	));
 
 	// Check the lengths and prepare preimages for printing.
-	let (whitelist_preimage_print, whitelist_preimage_print_len) =
-		preimage_for_whitelist_call.create_print_output(proposal_details.output_len_limit);
 	let (dispatch_preimage_print, dispatch_preimage_print_len) =
 		preimage_for_dispatch_whitelisted_call
 			.create_print_output(proposal_details.output_len_limit);
@@ -250,22 +309,22 @@ fn kusama_fellowship_referenda(proposal_details: &ProposalDetails) -> PossibleCa
 		CallOrHash::Hash(_) => {
 			let mut info_to_write = "0x".to_owned();
 			info_to_write.push_str(hex::encode(dispatch_whitelisted_call.encoded).as_str());
-			fs::write("kusama_relay_public_referendum_preimage_to_note.call", info_to_write)
+			fs::write("kusama_asset_hub_public_referendum_preimage_to_note.call", info_to_write)
 				.expect("it should write");
 		},
 	}
 
 	PossibleCallsToSubmit {
-		preimage_for_whitelist_call: Some((whitelist_preimage_print, whitelist_preimage_print_len)),
+		preimage_for_whitelist_call: None,
 		preimage_for_public_referendum: Some((
 			dispatch_preimage_print,
 			dispatch_preimage_print_len,
 		)),
 		fellowship_referendum_submission: Some(NetworkRuntimeCall::Kusama(
-			fellowship_proposal.get_kusama_call().expect("kusama"),
+			fellowship_proposal.get_kusama_call().expect("kusama relay"),
 		)),
-		public_referendum_submission: Some(NetworkRuntimeCall::Kusama(
-			public_proposal.get_kusama_call().expect("kusama"),
+		public_referendum_submission: Some(NetworkRuntimeCall::KusamaAssetHub(
+			public_proposal.get_kusama_asset_hub_call().expect("kusama asset hub"),
 		)),
 	}
 }
@@ -576,17 +635,20 @@ fn deliver_output(proposal_details: ProposalDetails, calls: PossibleCallsToSubmi
 // Takes a vec of calls, which could be intended for use on different networks, sorts them into the
 // appropriate network, and provides a single batch call for each network.
 fn handle_batch_of_calls(output: &Output, batch: Vec<NetworkRuntimeCall>) {
+	use kusama_asset_hub::runtime_types::pallet_utility::pallet::Call as KusamaAssetHubUtilityCall;
 	use kusama_relay::runtime_types::pallet_utility::pallet::Call as KusamaUtilityCall;
 	use polkadot_collectives::runtime_types::pallet_utility::pallet::Call as CollectivesUtilityCall;
 	use polkadot_relay::runtime_types::pallet_utility::pallet::Call as PolkadotRelayUtilityCall;
 
 	let mut kusama_relay_batch = Vec::new();
+	let mut kusama_asset_hub_batch = Vec::new();
 	let mut polkadot_relay_batch = Vec::new();
 	let mut polkadot_collectives_batch = Vec::new();
 
 	for network_call in batch {
 		match network_call {
 			NetworkRuntimeCall::Kusama(cc) => kusama_relay_batch.push(cc),
+			NetworkRuntimeCall::KusamaAssetHub(cc) => kusama_asset_hub_batch.push(cc),
 			NetworkRuntimeCall::Polkadot(cc) => polkadot_relay_batch.push(cc),
 			NetworkRuntimeCall::PolkadotCollectives(cc) => polkadot_collectives_batch.push(cc),
 			_ => panic!("no other chains are needed for this"),
@@ -598,6 +660,13 @@ fn handle_batch_of_calls(output: &Output, batch: Vec<NetworkRuntimeCall>) {
 		});
 		println!("\nBatch to submit on Kusama Relay Chain:");
 		print_output(output, &NetworkRuntimeCall::Kusama(batch));
+	}
+	if !kusama_asset_hub_batch.is_empty() {
+		let batch = KusamaAssetHubRuntimeCall::Utility(KusamaAssetHubUtilityCall::force_batch {
+			calls: kusama_asset_hub_batch,
+		});
+		println!("\nBatch to submit on Kusama Relay Chain:");
+		print_output(output, &NetworkRuntimeCall::KusamaAssetHub(batch));
 	}
 	if !polkadot_relay_batch.is_empty() {
 		let batch = PolkadotRuntimeCall::Utility(PolkadotRelayUtilityCall::force_batch {

@@ -14,9 +14,15 @@ pub(super) use kusama_relay::runtime_types::staging_kusama_runtime::{
 	OriginCaller as KusamaOriginCaller, RuntimeCall as KusamaRuntimeCall,
 };
 
-#[subxt::subxt(runtime_metadata_path = "metadata/kusama_asset_hub.scale")]
+#[subxt::subxt(
+	runtime_metadata_path = "metadata/kusama_asset_hub.scale",
+	derive_for_all_types = "PartialEq, Clone"
+)]
 pub mod kusama_asset_hub {}
-pub(super) use kusama_asset_hub::runtime_types::asset_hub_kusama_runtime::RuntimeCall as KusamaAssetHubRuntimeCall;
+pub(super) use kusama_asset_hub::runtime_types::asset_hub_kusama_runtime::{
+	governance::origins::pallet_custom_origins::Origin as KusamaAssetHubOpenGovOrigin,
+	OriginCaller as KusamaAssetHubOriginCaller, RuntimeCall as KusamaAssetHubRuntimeCall,
+};
 
 #[subxt::subxt(runtime_metadata_path = "metadata/kusama_bridge_hub.scale")]
 pub mod kusama_bridge_hub {}

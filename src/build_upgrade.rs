@@ -267,7 +267,7 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 		let runtime_version = semver_to_intver(&chain.version);
 		match chain.network {
 			Network::Kusama => {
-				use kusama_relay::runtime_types::frame_system::pallet::Call as SystemCall;
+				use kusama_asset_hub::runtime_types::frame_system::pallet::Call as SystemCall;
 				let path = format!(
 					"{}kusama_runtime-v{}.compact.compressed.wasm",
 					upgrade_details.directory, runtime_version
@@ -276,8 +276,8 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 				let runtime_hash = blake2_256(&runtime);
 				println!("Kusama Relay Chain Runtime Hash: 0x{}", hex::encode(runtime_hash));
 
-				let call = CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(
-					KusamaRuntimeCall::System(SystemCall::authorize_upgrade {
+				let call = CallInfo::from_runtime_call(NetworkRuntimeCall::KusamaAssetHub(
+					KusamaAssetHubRuntimeCall::System(SystemCall::authorize_upgrade {
 						code_hash: H256(runtime_hash),
 					}),
 				));
@@ -494,27 +494,27 @@ async fn construct_kusama_batch(
 	para_calls: Vec<CallInfo>,
 	additional: Option<CallInfo>,
 ) -> CallInfo {
-	use kusama_relay::runtime_types::pallet_utility::pallet::Call as UtilityCall;
+	use kusama_asset_hub::runtime_types::pallet_utility::pallet::Call as UtilityCall;
 
 	let mut batch_calls = Vec::new();
 	for auth in para_calls {
-		if auth.network.is_kusama_para() {
-			let send_auth = send_as_superuser_from_kusama(&auth).await;
-			batch_calls.push(send_auth);
+		if matches!(auth.network, Network::KusamaAssetHub) {
+			batch_calls.push(auth.get_kusama_asset_hub_call().expect("We just constructed this"));
 		} else {
-			// Relay doesn't need an xcm.
-			batch_calls.push(auth.get_kusama_call().expect("We just constructed this"));
+			let send_auth = send_as_superuser_kusama(&auth).await;
+			batch_calls.push(send_auth);
 		}
 	}
 	if let Some(a) = additional {
-		batch_calls.push(a.get_kusama_call().expect("kusama call"))
+		batch_calls.push(a.get_kusama_asset_hub_call().expect("kusama call"))
 	}
 	match &batch_calls.len() {
 		0 => panic!("no calls"),
-		1 => CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(batch_calls[0].clone())),
-		_ => CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(KusamaRuntimeCall::Utility(
-			UtilityCall::force_batch { calls: batch_calls },
-		))),
+		1 =>
+			CallInfo::from_runtime_call(NetworkRuntimeCall::KusamaAssetHub(batch_calls[0].clone())),
+		_ => CallInfo::from_runtime_call(NetworkRuntimeCall::KusamaAssetHub(
+			KusamaAssetHubRuntimeCall::Utility(UtilityCall::force_batch { calls: batch_calls }),
+		)),
 	}
 }
 
@@ -548,13 +548,13 @@ async fn construct_polkadot_batch(
 }
 
 // Take a call, which includes its intended destination, and wrap it in XCM instructions to `send`
-// it from the Kusama Relay Chain, with `Root` origin, and have it execute on its destination.
-async fn send_as_superuser_from_kusama(auth: &CallInfo) -> KusamaRuntimeCall {
-	use kusama_relay::runtime_types::{
+// it from Kusama Asset Hub, with `Root` origin, and have it execute on its destination.
+async fn send_as_superuser_kusama(auth: &CallInfo) -> KusamaAssetHubRuntimeCall {
+	use kusama_asset_hub::runtime_types::{
 		pallet_xcm::pallet::Call as XcmCall,
 		staging_xcm::v5::{
-			junction::Junction::Parachain, junctions::Junctions::X1, location::Location,
-			Instruction, Xcm,
+			junction::Junction::Parachain, junctions::Junctions::Here, junctions::Junctions::X1,
+			location::Location, Instruction, Xcm,
 		},
 		xcm::{
 			double_encoded::DoubleEncoded, v3::OriginKind, v3::WeightLimit, VersionedLocation,
@@ -562,12 +562,13 @@ async fn send_as_superuser_from_kusama(auth: &CallInfo) -> KusamaRuntimeCall {
 		},
 	};
 
-	let para_id = auth.network.get_para_id().unwrap();
-	KusamaRuntimeCall::XcmPallet(XcmCall::send {
-		dest: Box::new(VersionedLocation::V5(Location {
-			parents: 0,
-			interior: X1([Parachain(para_id)]),
-		})),
+	let location = match auth.network.get_para_id() {
+		Ok(para_id) => Location { parents: 1, interior: X1([Parachain(para_id)]) },
+		Err(_) => Location { parents: 1, interior: Here },
+	};
+
+	KusamaAssetHubRuntimeCall::PolkadotXcm(XcmCall::send {
+		dest: Box::new(VersionedLocation::V5(location)),
 		message: Box::new(V5(Xcm(vec![
 			Instruction::UnpaidExecution {
 				weight_limit: WeightLimit::Unlimited,
