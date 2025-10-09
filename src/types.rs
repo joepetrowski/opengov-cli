@@ -52,12 +52,9 @@ pub(super) use polkadot_asset_hub::runtime_types::asset_hub_polkadot_runtime::Ru
 
 #[subxt::subxt(runtime_metadata_path = "metadata/polkadot_collectives.scale")]
 pub mod polkadot_collectives {}
-pub(super) use polkadot_collectives::runtime_types::{
-	collectives_polkadot_runtime::{
-		fellowship::origins::pallet_origins::Origin as FellowshipOrigins,
-		RuntimeCall as CollectivesRuntimeCall,
-	},
-	sp_weights::weight_v2::Weight,
+pub(super) use polkadot_collectives::runtime_types::collectives_polkadot_runtime::{
+	fellowship::origins::pallet_origins::Origin as FellowshipOrigins,
+	RuntimeCall as CollectivesRuntimeCall,
 };
 
 #[subxt::subxt(runtime_metadata_path = "metadata/polkadot_bridge_hub.scale")]
@@ -443,42 +440,6 @@ impl CallInfo {
 			},
 			_ => Err("not a polkadot coretime call"),
 		}
-	}
-
-	pub(super) async fn get_transact_weight_needed(
-		&self,
-		network: &Network,
-		fallback_weight: Weight,
-	) -> Weight {
-		// `PolkadotConfig` is a bit confusing. It should work across everything. It contains
-		// basic types like `Nonce`, etc.
-		use subxt::{OnlineClient, PolkadotConfig};
-
-		let url = match network {
-			Network::Kusama => "wss://kusama-rpc.n.dwellir.com:443",
-			Network::KusamaAssetHub => "wss://kusama-asset-hub-rpc.polkadot.io:443",
-			Network::KusamaBridgeHub => "wss://kusama-bridge-hub-rpc.polkadot.io:443",
-			Network::KusamaPeople => "wss://kusama-people-rpc.polkadot.io:443",
-			Network::KusamaCoretime => "wss://kusama-coretime-rpc.polkadot.io:443",
-			Network::KusamaEncointer => "wss://encointer-kusama-rpc.n.dwellir.com:443",
-			Network::Polkadot => "wss://polkadot-rpc.n.dwellir.com:443",
-			Network::PolkadotAssetHub => "wss://polkadot-asset-hub-rpc.polkadot.io:443",
-			Network::PolkadotCollectives => "wss://polkadot-collectives-rpc.polkadot.io:443",
-			Network::PolkadotBridgeHub => "wss://polkadot-bridge-hub-rpc.polkadot.io:443",
-			Network::PolkadotPeople => "wss://polkadot-people-rpc.polkadot.io:443",
-			Network::PolkadotCoretime => "wss://polkadot-coretime-rpc.polkadot.io:443",
-		};
-
-		let mut args = self.encoded.clone();
-		self.length.encode_to(&mut args);
-
-		let relay_api = OnlineClient::<PolkadotConfig>::from_url(url).await.expect("an api");
-		let runtime_apis = relay_api.runtime_api().at_latest().await.expect("latest block");
-		let (weight_needed, _, _): (Weight, u8, u128) = runtime_apis
-			.call_raw("TransactionPaymentCallApi_query_call_info", Some(&args))
-			.await
-			.unwrap_or((fallback_weight, 0u8, 0u128));
-		weight_needed
 	}
 
 	// Take `Self` and a length limit as input. If the call length exceeds the limit, just return
