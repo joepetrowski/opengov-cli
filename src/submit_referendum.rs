@@ -666,7 +666,7 @@ fn handle_batch_of_calls(output: &Output, batch: Vec<NetworkRuntimeCall>) {
 		let batch = KusamaAssetHubRuntimeCall::Utility(KusamaAssetHubUtilityCall::force_batch {
 			calls: kusama_asset_hub_batch,
 		});
-		println!("\nBatch to submit on Kusama Relay Chain:");
+		println!("\nBatch to submit on Kusama Asset Hub:");
 		print_output(output, &NetworkRuntimeCall::KusamaAssetHub(batch));
 	}
 	if !polkadot_relay_batch.is_empty() {
@@ -689,7 +689,18 @@ fn handle_batch_of_calls(output: &Output, batch: Vec<NetworkRuntimeCall>) {
 fn print_output(output: &Output, network_call: &NetworkRuntimeCall) {
 	match network_call {
 		NetworkRuntimeCall::Kusama(call) => {
-			let rpc: &'static str = "wss%3A%2F%2Fkusama-rpc.dwellir.com";
+			let rpc: &'static str = "wss%3A%2F%2Fkusama-rpc.n.dwellir.com";
+			match output {
+				Output::CallData => println!("0x{}", hex::encode(call.encode())),
+				Output::AppsUiLink => println!(
+					"https://polkadot.js.org/apps/?rpc={}#/extrinsics/decode/0x{}",
+					rpc,
+					hex::encode(call.encode())
+				),
+			}
+		},
+		NetworkRuntimeCall::KusamaAssetHub(call) => {
+			let rpc: &'static str = "wss%3A%2F%2Fasset-hub-kusama-rpc.n.dwellir.com";
 			match output {
 				Output::CallData => println!("0x{}", hex::encode(call.encode())),
 				Output::AppsUiLink => println!(

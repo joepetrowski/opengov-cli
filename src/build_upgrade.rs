@@ -267,7 +267,7 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 		let runtime_version = semver_to_intver(&chain.version);
 		match chain.network {
 			Network::Kusama => {
-				use kusama_asset_hub::runtime_types::frame_system::pallet::Call as SystemCall;
+				use kusama_relay::runtime_types::frame_system::pallet::Call as SystemCall;
 				let path = format!(
 					"{}kusama_runtime-v{}.compact.compressed.wasm",
 					upgrade_details.directory, runtime_version
@@ -276,8 +276,8 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 				let runtime_hash = blake2_256(&runtime);
 				println!("Kusama Relay Chain Runtime Hash: 0x{}", hex::encode(runtime_hash));
 
-				let call = CallInfo::from_runtime_call(NetworkRuntimeCall::KusamaAssetHub(
-					KusamaAssetHubRuntimeCall::System(SystemCall::authorize_upgrade {
+				let call = CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(
+					KusamaRuntimeCall::System(SystemCall::authorize_upgrade {
 						code_hash: H256(runtime_hash),
 					}),
 				));
@@ -498,6 +498,7 @@ async fn construct_kusama_batch(
 
 	let mut batch_calls = Vec::new();
 	for auth in para_calls {
+		dbg!(&auth.network);
 		if matches!(auth.network, Network::KusamaAssetHub) {
 			batch_calls.push(auth.get_kusama_asset_hub_call().expect("We just constructed this"));
 		} else {
