@@ -113,15 +113,6 @@ impl Network {
 		}
 	}
 
-	/// Returns `true` if the network is a Kusama _parachain_.
-	pub(super) fn is_kusama_para(&self) -> bool {
-		use Network::*;
-		matches!(
-			self,
-			KusamaAssetHub | KusamaBridgeHub | KusamaPeople | KusamaCoretime | KusamaEncointer
-		)
-	}
-
 	/// Returns `true` if the network is a Polkadot _parachain_.
 	pub(super) fn is_polkadot_para(&self) -> bool {
 		use Network::*;

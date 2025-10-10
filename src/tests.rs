@@ -331,8 +331,8 @@ async fn it_starts_kusama_non_fellowship_referenda_correctly() {
 	let calls = generate_calls(&proposal_details).await;
 
 	let public_preimage =
-		hex::decode("0x20000c060ac8".trim_start_matches("0x")).expect("Valid call");
-	let public_referendum = hex::decode("0x15002b00028fd8848a8f93980f5cea2de1c11f29ed7dced592aa207218a2e0ae5b78b9fffb030000000000e1f505".trim_start_matches("0x")).expect("Valid call");
+		hex::decode("0x06000c590ac8".trim_start_matches("0x")).expect("Valid call");
+	let public_referendum = hex::decode("0x5c005d0002c0fb827aa729fbbe3a616f564c0d3bb01d5a44b9a2f6ce9db6f0e934b938f91b030000000000e1f505".trim_start_matches("0x")).expect("Valid call");
 
 	assert!(calls.preimage_for_whitelist_call.is_none(), "it must not generate this call");
 	assert!(calls.fellowship_referendum_submission.is_none(), "it must not generate this call");
