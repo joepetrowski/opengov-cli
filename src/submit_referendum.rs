@@ -369,8 +369,8 @@ fn kusama_non_fellowship_referenda(
 		preimage_for_whitelist_call: None,
 		preimage_for_public_referendum: Some((preimage_print, preimage_print_len)),
 		fellowship_referendum_submission: None,
-		public_referendum_submission: Some(NetworkRuntimeCall::Kusama(
-			public_proposal.get_kusama_call().expect("kusama"),
+		public_referendum_submission: Some(NetworkRuntimeCall::KusamaAssetHub(
+			public_proposal.get_kusama_asset_hub_call().expect("kusama asset hub"),
 		)),
 	}
 }

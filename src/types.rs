@@ -459,6 +459,11 @@ impl CallInfo {
 					let kusama_call = self.get_kusama_call().expect("kusama");
 					CallOrHash::Call(NetworkRuntimeCall::Kusama(kusama_call))
 				},
+				Network::KusamaAssetHub => {
+					let kusama_asset_hub_call =
+						self.get_kusama_asset_hub_call().expect("kusama asset hub");
+					CallOrHash::Call(NetworkRuntimeCall::KusamaAssetHub(kusama_asset_hub_call))
+				},
 				Network::Polkadot => {
 					let polkadot_call = self.get_polkadot_call().expect("polkadot");
 					CallOrHash::Call(NetworkRuntimeCall::Polkadot(polkadot_call))
