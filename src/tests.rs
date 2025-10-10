@@ -1,9 +1,9 @@
 use crate::get_proposal_bytes;
 use crate::polkadot_relay::runtime_types::frame_system::pallet::Call as PolkadotRelaySystemCall;
 use crate::{
-	build_upgrade, submit_referendum::generate_calls, CallInfo, CallOrHash, KusamaOpenGovOrigin,
-	Network, NetworkRuntimeCall, PolkadotOpenGovOrigin, PolkadotRuntimeCall, ProposalDetails,
-	UpgradeArgs, VersionedNetwork,
+	build_upgrade, submit_referendum::generate_calls, CallInfo, CallOrHash,
+	KusamaAssetHubOpenGovOrigin, Network, NetworkRuntimeCall, PolkadotOpenGovOrigin,
+	PolkadotRuntimeCall, ProposalDetails, UpgradeArgs, VersionedNetwork,
 };
 
 fn polkadot_whitelist_remark_user_input() -> ProposalDetails {
@@ -58,7 +58,7 @@ fn kusama_whitelist_remark_user_input() -> ProposalDetails {
 	ProposalDetails {
 		// `system.remark("opengov-submit test")`
 		proposal: String::from("0x00004c6f70656e676f762d7375626d69742074657374"),
-		track: Kusama(KusamaOpenGovOrigin::WhitelistedCaller),
+		track: Kusama(KusamaAssetHubOpenGovOrigin::WhitelistedCaller),
 		dispatch: At(100_000_000),
 		output: AppsUiLink,
 		output_len_limit: 1_000,
@@ -73,7 +73,7 @@ fn kusama_staking_validator_user_input() -> ProposalDetails {
 	ProposalDetails {
 		// `staking.increase_validator_count(50)`
 		proposal: String::from("0x060ac8"),
-		track: Kusama(KusamaOpenGovOrigin::StakingAdmin),
+		track: Kusama(KusamaAssetHubOpenGovOrigin::StakingAdmin),
 		dispatch: At(100_000_000),
 		output: AppsUiLink,
 		output_len_limit: 1_000,

@@ -179,7 +179,7 @@ pub(super) struct VersionedNetwork {
 // The network and OpenGov track this proposal should be voted on.
 pub(super) enum NetworkTrack {
 	KusamaRoot,
-	Kusama(KusamaOpenGovOrigin),
+	Kusama(KusamaAssetHubOpenGovOrigin),
 	PolkadotRoot,
 	Polkadot(PolkadotOpenGovOrigin),
 }
