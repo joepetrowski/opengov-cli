@@ -185,6 +185,7 @@ async fn kusama_fellowship_referenda(proposal_details: &ProposalDetails) -> Poss
 		pallet_referenda::pallet::Call as ReferendaCall,
 		pallet_whitelist::pallet::Call as WhitelistCall,
 	};
+	use kusama_relay::runtime_types::bounded_collections::bounded_vec::BoundedVec;
 	use kusama_relay::runtime_types::{
 		frame_support::traits::{
 			preimages::Bounded::Inline, schedule::DispatchTime as KusamaDispatchTime,
@@ -261,7 +262,7 @@ async fn kusama_fellowship_referenda(proposal_details: &ProposalDetails) -> Poss
 	let fellowship_proposal = CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(
 		KusamaRuntimeCall::FellowshipReferenda(KusamaReferendaCall::submit {
 			proposal_origin: Box::new(KusamaOriginCaller::Origins(KusamaOpenGovOrigin::Fellows)),
-			proposal: Inline(whitelist_over_xcm.encoded),
+			proposal: Inline(BoundedVec(whitelist_over_xcm.encoded)),
 			enactment_moment: KusamaDispatchTime::After(10u32),
 		}),
 	));
