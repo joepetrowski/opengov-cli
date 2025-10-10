@@ -224,7 +224,7 @@ async fn kusama_fellowship_referenda(proposal_details: &ProposalDetails) -> Poss
 	//
 	// 4. Make a public referendum on Asset Hub.
 	let proposal_bytes = get_proposal_bytes(proposal_details.proposal.clone());
-	let proposal_call_info = CallInfo::from_bytes(&proposal_bytes, Network::Polkadot);
+	let proposal_call_info = CallInfo::from_bytes(&proposal_bytes, Network::KusamaAssetHub);
 
 	let public_referendum_dispatch_time = match proposal_details.dispatch {
 		DispatchTimeWrapper::At(block) => DispatchTime::At(block),
