@@ -14,6 +14,11 @@ pub(crate) struct UpgradeArgs {
 	#[clap(long = "only")]
 	pub(crate) only: bool,
 
+	/// Use local WASM files instead of downloading from GitHub. Files are assumed to already be in
+	/// the upgrade directory.
+	#[clap(long = "local")]
+	pub(crate) local: bool,
+
 	/// The Fellowship release version. Should be semver and correspond to the release published.
 	#[clap(long = "relay-version")]
 	pub(crate) relay_version: Option<String>,
@@ -61,10 +66,15 @@ pub(crate) struct UpgradeArgs {
 // The sub-command's "main" function.
 pub(crate) async fn build_upgrade(prefs: UpgradeArgs) {
 	// 0. Find out what to do.
+	let use_local = prefs.local;
 	let upgrade_details = parse_inputs(prefs);
 
-	// 1. Download all the Wasm files needed from the release pages.
-	download_runtimes(&upgrade_details).await;
+	// 1. Download all the Wasm files needed from the release pages (unless using local files).
+	if use_local {
+		println!("\nUsing local WASM files from {}\n", upgrade_details.directory);
+	} else {
+		download_runtimes(&upgrade_details).await;
+	}
 
 	// 2. Construct the `authorize_upgrade` call on each chain.
 	let authorization_calls = generate_authorize_upgrade_calls(&upgrade_details);
