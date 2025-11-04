@@ -47,9 +47,7 @@ pub(super) use kusama_coretime::runtime_types::coretime_kusama_runtime::RuntimeC
 	derive_for_all_types = "PartialEq, Clone"
 )]
 pub mod polkadot_relay {}
-pub(super) use polkadot_relay::runtime_types::polkadot_runtime::{
-	OriginCaller as PolkadotOriginCaller, RuntimeCall as PolkadotRuntimeCall,
-};
+pub(super) use polkadot_relay::runtime_types::polkadot_runtime::RuntimeCall as PolkadotRuntimeCall;
 
 #[subxt::subxt(
 	runtime_metadata_path = "metadata/polkadot_asset_hub.scale",
