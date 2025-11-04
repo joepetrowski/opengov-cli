@@ -534,26 +534,27 @@ async fn construct_polkadot_batch(
 	para_calls: Vec<CallInfo>,
 	additional: Option<CallInfo>,
 ) -> CallInfo {
-	use polkadot_relay::runtime_types::pallet_utility::pallet::Call as UtilityCall;
+	use polkadot_asset_hub::runtime_types::pallet_utility::pallet::Call as UtilityCall;
 
 	let mut batch_calls = Vec::new();
 	for auth in para_calls {
-		if auth.network.is_polkadot_para() {
-			let send_auth = send_as_superuser_from_polkadot(&auth).await;
-			batch_calls.push(send_auth);
+		if matches!(auth.network, Network::PolkadotAssetHub) {
+			batch_calls.push(auth.get_polkadot_asset_hub_call().expect("We just constructed this"));
 		} else {
-			// Relay doesn't need an xcm.
-			batch_calls.push(auth.get_polkadot_call().expect("We just constructed this."));
+			let send_auth = send_as_superuser_polkadot(&auth).await;
+			batch_calls.push(send_auth);
 		}
 	}
 	if let Some(a) = additional {
-		batch_calls.push(a.get_polkadot_call().expect("polkadot call"))
+		batch_calls.push(a.get_polkadot_asset_hub_call().expect("polkadot call"))
 	}
 	match &batch_calls.len() {
 		0 => panic!("no calls"),
-		1 => CallInfo::from_runtime_call(NetworkRuntimeCall::Polkadot(batch_calls[0].clone())),
-		_ => CallInfo::from_runtime_call(NetworkRuntimeCall::Polkadot(
-			PolkadotRuntimeCall::Utility(UtilityCall::force_batch { calls: batch_calls }),
+		1 => CallInfo::from_runtime_call(NetworkRuntimeCall::PolkadotAssetHub(
+			batch_calls[0].clone(),
+		)),
+		_ => CallInfo::from_runtime_call(NetworkRuntimeCall::PolkadotAssetHub(
+			PolkadotAssetHubRuntimeCall::Utility(UtilityCall::force_batch { calls: batch_calls }),
 		)),
 	}
 }
@@ -596,12 +597,12 @@ async fn send_as_superuser_kusama(auth: &CallInfo) -> KusamaAssetHubRuntimeCall 
 
 // Take a call, which includes its intended destination, and wrap it in XCM instructions to `send`
 // it from the Polkadot Relay Chain, with `Root` origin, and have it execute on its destination.
-async fn send_as_superuser_from_polkadot(auth: &CallInfo) -> PolkadotRuntimeCall {
-	use polkadot_relay::runtime_types::{
+async fn send_as_superuser_polkadot(auth: &CallInfo) -> PolkadotAssetHubRuntimeCall {
+	use polkadot_asset_hub::runtime_types::{
 		pallet_xcm::pallet::Call as XcmCall,
 		staging_xcm::v5::{
-			junction::Junction::Parachain, junctions::Junctions::X1, location::Location,
-			Instruction, Xcm,
+			junction::Junction::Parachain, junctions::Junctions::Here, junctions::Junctions::X1,
+			location::Location, Instruction, Xcm,
 		},
 		xcm::{
 			double_encoded::DoubleEncoded, v3::OriginKind, v3::WeightLimit, VersionedLocation,
@@ -609,12 +610,13 @@ async fn send_as_superuser_from_polkadot(auth: &CallInfo) -> PolkadotRuntimeCall
 		},
 	};
 
-	let para_id = auth.network.get_para_id().unwrap();
-	PolkadotRuntimeCall::XcmPallet(XcmCall::send {
-		dest: Box::new(VersionedLocation::V5(Location {
-			parents: 0,
-			interior: X1([Parachain(para_id)]),
-		})),
+	let location = match auth.network.get_para_id() {
+		Ok(para_id) => Location { parents: 1, interior: X1([Parachain(para_id)]) },
+		Err(_) => Location { parents: 1, interior: Here },
+	};
+
+	PolkadotAssetHubRuntimeCall::PolkadotXcm(XcmCall::send {
+		dest: Box::new(VersionedLocation::V5(location)),
 		message: Box::new(V5(Xcm(vec![
 			Instruction::UnpaidExecution {
 				weight_limit: WeightLimit::Unlimited,

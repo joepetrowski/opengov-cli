@@ -48,13 +48,18 @@ pub(super) use kusama_coretime::runtime_types::coretime_kusama_runtime::RuntimeC
 )]
 pub mod polkadot_relay {}
 pub(super) use polkadot_relay::runtime_types::polkadot_runtime::{
-	governance::origins::pallet_custom_origins::Origin as PolkadotOpenGovOrigin,
 	OriginCaller as PolkadotOriginCaller, RuntimeCall as PolkadotRuntimeCall,
 };
 
-#[subxt::subxt(runtime_metadata_path = "metadata/polkadot_asset_hub.scale")]
+#[subxt::subxt(
+	runtime_metadata_path = "metadata/polkadot_asset_hub.scale",
+	derive_for_all_types = "PartialEq, Clone"
+)]
 pub mod polkadot_asset_hub {}
-pub(super) use polkadot_asset_hub::runtime_types::asset_hub_polkadot_runtime::RuntimeCall as PolkadotAssetHubRuntimeCall;
+pub(super) use polkadot_asset_hub::runtime_types::asset_hub_polkadot_runtime::{
+	governance::origins::pallet_custom_origins::Origin as PolkadotAssetHubOpenGovOrigin,
+	OriginCaller as PolkadotAssetHubOriginCaller, RuntimeCall as PolkadotAssetHubRuntimeCall,
+};
 
 #[subxt::subxt(runtime_metadata_path = "metadata/polkadot_collectives.scale")]
 pub mod polkadot_collectives {}
@@ -112,18 +117,6 @@ impl Network {
 			PolkadotCoretime => Ok(1_005),
 		}
 	}
-
-	/// Returns `true` if the network is a Polkadot _parachain_.
-	pub(super) fn is_polkadot_para(&self) -> bool {
-		use Network::*;
-		matches!(
-			self,
-			PolkadotAssetHub
-				| PolkadotCollectives
-				| PolkadotBridgeHub
-				| PolkadotPeople | PolkadotCoretime
-		)
-	}
 }
 
 // Info and preferences provided by the user for proposal submission.
@@ -172,7 +165,7 @@ pub(super) enum NetworkTrack {
 	KusamaRoot,
 	Kusama(KusamaAssetHubOpenGovOrigin),
 	PolkadotRoot,
-	Polkadot(PolkadotOpenGovOrigin),
+	Polkadot(PolkadotAssetHubOpenGovOrigin),
 }
 
 // A runtime call wrapped in the network it should execute on.
@@ -458,6 +451,11 @@ impl CallInfo {
 				Network::Polkadot => {
 					let polkadot_call = self.get_polkadot_call().expect("polkadot");
 					CallOrHash::Call(NetworkRuntimeCall::Polkadot(polkadot_call))
+				},
+				Network::PolkadotAssetHub => {
+					let polkadot_asset_hub_call =
+						self.get_polkadot_asset_hub_call().expect("polkadot asset hub");
+					CallOrHash::Call(NetworkRuntimeCall::PolkadotAssetHub(polkadot_asset_hub_call))
 				},
 				Network::PolkadotCollectives => {
 					let collectives_call =

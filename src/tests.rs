@@ -2,7 +2,7 @@ use crate::get_proposal_bytes;
 use crate::polkadot_relay::runtime_types::frame_system::pallet::Call as PolkadotRelaySystemCall;
 use crate::{
 	build_upgrade, submit_referendum::generate_calls, CallInfo, CallOrHash,
-	KusamaAssetHubOpenGovOrigin, Network, NetworkRuntimeCall, PolkadotOpenGovOrigin,
+	KusamaAssetHubOpenGovOrigin, Network, NetworkRuntimeCall, PolkadotAssetHubOpenGovOrigin,
 	PolkadotRuntimeCall, ProposalDetails, UpgradeArgs, VersionedNetwork,
 };
 
@@ -13,7 +13,7 @@ fn polkadot_whitelist_remark_user_input() -> ProposalDetails {
 	ProposalDetails {
 		// `system.remark("opengov-submit test")`
 		proposal: String::from("0x00004c6f70656e676f762d7375626d69742074657374"),
-		track: Polkadot(PolkadotOpenGovOrigin::WhitelistedCaller),
+		track: Polkadot(PolkadotAssetHubOpenGovOrigin::WhitelistedCaller),
 		dispatch: After(10),
 		output: AppsUiLink,
 		output_len_limit: 1_000,
@@ -28,7 +28,7 @@ fn polkadot_staking_validator_user_input() -> ProposalDetails {
 	ProposalDetails {
 		// `staking.increase_validator_count(50)`
 		proposal: String::from("0x070ac8"),
-		track: Polkadot(PolkadotOpenGovOrigin::StakingAdmin),
+		track: Polkadot(PolkadotAssetHubOpenGovOrigin::StakingAdmin),
 		dispatch: After(10),
 		output: AppsUiLink,
 		output_len_limit: 1_000,
@@ -103,7 +103,7 @@ fn limited_length_user_input() -> ProposalDetails {
 	ProposalDetails {
 		// `system.remark("opengov-submit test")`
 		proposal: String::from("0x00004c6f70656e676f762d7375626d69742074657374"),
-		track: Polkadot(PolkadotOpenGovOrigin::StakingAdmin),
+		track: Polkadot(PolkadotAssetHubOpenGovOrigin::StakingAdmin),
 		dispatch: After(10),
 		output: AppsUiLink,
 		output_len_limit: 5, // very limiting
