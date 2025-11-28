@@ -107,7 +107,7 @@ fn parse_inputs(prefs: ReferendumArgs) -> ProposalDetails {
 		(None, Some(after)) => After(after),
 	};
 
-	let output_len_limit = if let Some(input) = prefs.output_len_limit { input } else { 1_000 };
+	let output_len_limit = prefs.output_len_limit.unwrap_or(1_000);
 
 	let print_batch = !prefs.no_batch;
 
@@ -609,8 +609,7 @@ fn deliver_output(proposal_details: ProposalDetails, calls: PossibleCallsToSubmi
 			},
 			CallOrHash::Hash(h) => {
 				println!(
-					"\nPreimage for the public whitelist call too large ({} bytes). Not included in batch.",
-					len
+					"\nPreimage for the public whitelist call too large ({len} bytes). Not included in batch."
 				);
 				println!("Submission should have the hash: 0x{}", hex::encode(h));
 			},
@@ -630,8 +629,7 @@ fn deliver_output(proposal_details: ProposalDetails, calls: PossibleCallsToSubmi
 			},
 			CallOrHash::Hash(h) => {
 				println!(
-					"\nPreimage for the public referendum too large ({} bytes). Not included in batch.",
-					len
+					"\nPreimage for the public referendum too large ({len} bytes). Not included in batch."
 				);
 				println!("A file was created that you can upload in `preimage.note_preimage` in Apps UI.");
 				println!("Submission should have the hash: 0x{}", hex::encode(h));

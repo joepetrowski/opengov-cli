@@ -194,9 +194,10 @@ pub(crate) fn parse_inputs(prefs: UpgradeArgs) -> UpgradeDetails {
 	// Set up a directory to store information fetched/written during this program.
 	let directory = format!("./upgrade-{}-{}/", &prefs.network, &version);
 	let output_file = if let Some(user_filename) = prefs.filename {
-		format!("{}{}", directory, user_filename)
+		format!("{directory}{user_filename}")
 	} else {
-		format!("{}{}-{}.call", directory, prefs.network, version)
+		let network = &prefs.network;
+		format!("{directory}{network}-{version}.call")
 	};
 
 	make_version_directory(directory.as_str());
@@ -223,7 +224,7 @@ fn semver_to_intver(semver: &str) -> String {
 	let minor = &semver[points[0] + 1..points[1]];
 	let patch = &semver[points[1] + 1..];
 
-	format!("{}{:0>3}{:0>3}", major, minor, patch)
+	format!("{major}{minor:0>3}{patch:0>3}")
 }
 
 // Fetch all the runtime Wasm blobs from a Fellowship release.
@@ -251,16 +252,17 @@ async fn download_runtimes(upgrade_details: &UpgradeDetails) {
 			Network::PolkadotCoretime => "coretime-polkadot",
 		};
 		let runtime_version = semver_to_intver(&chain.version);
-		let fname = format!("{}_runtime-v{}.compact.compressed.wasm", chain_name, runtime_version);
+		let fname = format!("{chain_name}_runtime-v{runtime_version}.compact.compressed.wasm");
 
+		let version = &chain.version;
 		let download_url = format!(
-			"https://github.com/polkadot-fellows/runtimes/releases/download/v{}/{}",
-			&chain.version, fname
+			"https://github.com/polkadot-fellows/runtimes/releases/download/v{version}/{fname}"
 		);
 
 		let download_url = download_url.as_str();
-		let path_name = format!("{}{}", upgrade_details.directory, fname);
-		println!("Downloading... {}", fname.as_str());
+		let directory = &upgrade_details.directory;
+		let path_name = format!("{directory}{fname}");
+		println!("Downloading... {fname}");
 		let response = reqwest::get(download_url).await.expect("we need files to work");
 		let runtime = response.bytes().await.expect("need bytes");
 		// todo: we could actually just hash the file, mutate UpgradeDetails, and not write it.
@@ -639,7 +641,7 @@ fn write_batch(upgrade_details: &UpgradeDetails, batch: CallInfo) {
 	info_to_write.push_str(hex::encode(batch.encoded).as_str());
 	fs::write(fname, info_to_write).expect("it should write");
 
-	println!("\nSuccess! The call data was written to {}", fname);
+	println!("\nSuccess! The call data was written to {fname}");
 	println!("To submit this as a referendum in OpenGov, run:");
 	let network = match upgrade_details.relay {
 		Network::Kusama => "kusama",
@@ -647,6 +649,6 @@ fn write_batch(upgrade_details: &UpgradeDetails, batch: CallInfo) {
 		_ => panic!("not a relay network"),
 	};
 	println!("\nopengov-cli submit-referendum \\");
-	println!("    --proposal \"{}\" \\", fname);
-	println!("    --network \"{}\" --track <\"root\" or \"whitelistedcaller\">", network);
+	println!("    --proposal \"{fname}\" \\");
+	println!("    --network \"{network}\" --track <\"root\" or \"whitelistedcaller\">");
 }

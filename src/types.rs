@@ -197,6 +197,8 @@ pub(super) enum DispatchTimeWrapper {
 }
 
 // A call or a hash. Used for printing (or rather, to avoid printing large calls).
+// The Hash variant is only used when calls exceed the output length limit, which is rare.
+#[allow(clippy::large_enum_variant)]
 pub(super) enum CallOrHash {
 	Call(NetworkRuntimeCall),
 	Hash([u8; 32]),
