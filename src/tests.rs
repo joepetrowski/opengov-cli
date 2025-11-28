@@ -115,6 +115,7 @@ fn upgrade_args_for_only_relay() -> UpgradeArgs {
 	UpgradeArgs {
 		network: String::from("polkadot"),
 		only: true,
+		local: false,
 		relay_version: Some(String::from("v1.2.0")),
 		asset_hub: None,
 		bridge_hub: None,
@@ -131,6 +132,7 @@ fn upgrade_args_for_only_asset_hub() -> UpgradeArgs {
 	UpgradeArgs {
 		network: String::from("polkadot"),
 		only: true,
+		local: false,
 		relay_version: None,
 		asset_hub: Some(String::from("v1.2.0")),
 		bridge_hub: None,
@@ -147,6 +149,7 @@ fn upgrade_args_for_all() -> UpgradeArgs {
 	UpgradeArgs {
 		network: String::from("polkadot"),
 		only: false,
+		local: false,
 		relay_version: Some(String::from("v1.2.0")),
 		asset_hub: None,
 		bridge_hub: None,
@@ -214,8 +217,8 @@ async fn it_starts_polkadot_non_fellowship_referenda_correctly() {
 	let calls = generate_calls(&proposal_details).await;
 
 	let public_preimage =
-		hex::decode("0x0a000c070ac8".trim_start_matches("0x")).expect("Valid call");
-	let public_referendum = hex::decode("0x1500160002439a93279b25a49bf366c9fe1b06d4fc342f46b5a3b2734dcffe0c56c12b28ef03000000010a000000".trim_start_matches("0x")).expect("Valid call");
+		hex::decode("0x05000c070ac8".trim_start_matches("0x")).expect("Valid call");
+	let public_referendum = hex::decode("0x3e003f0002439a93279b25a49bf366c9fe1b06d4fc342f46b5a3b2734dcffe0c56c12b28ef03000000010a000000".trim_start_matches("0x")).expect("Valid call");
 
 	assert!(calls.preimage_for_whitelist_call.is_none(), "it must not generate this call");
 	assert!(calls.fellowship_referendum_submission.is_none(), "it must not generate this call");
@@ -241,19 +244,17 @@ async fn it_starts_polkadot_non_fellowship_referenda_correctly() {
 
 #[tokio::test]
 async fn it_starts_polkadot_fellowship_referenda_correctly() {
-	// Fellowship XCM Send
-	// 0x1f0005010005082f00000603008817008821e8db19b8e34b62ee8bc618a5ed3eecb9761d7d81349b00aa5ce5dfca2534
-	// 0xadb9e4e4165f92f984690cac8816898978b7dfc8aff6db735ffd5ec9b0430097
+	// Fellowship is on Collectives, send XCM to Asset Hub to whitelist.
 	let proposal_details = polkadot_whitelist_remark_user_input();
 	let calls = generate_calls(&proposal_details).await;
 
-	let fellowship_preimage = hex::decode("0x2b00c01f0005010005082f00000603008817008821e8db19b8e34b62ee8bc618a5ed3eecb9761d7d81349b00aa5ce5dfca2534".trim_start_matches("0x")).expect("Valid call");
-	let fellowship_referendum = hex::decode("0x3d003e0202a6107466ddd4abe0933e8388f879c75dca7089820dd530c3e8acb766fc0eb31d30000000010a000000".trim_start_matches("0x")).expect("Valid call");
+	let fellowship_preimage = hex::decode("0x2b00cc1f0005010100a10f05082f00000603008840008821e8db19b8e34b62ee8bc618a5ed3eecb9761d7d81349b00aa5ce5dfca2534".trim_start_matches("0x")).expect("Valid call");
 	let public_preimage = hex::decode(
-		"0x0a0060170300004c6f70656e676f762d7375626d69742074657374".trim_start_matches("0x"),
+		"0x050060400300004c6f70656e676f762d7375626d69742074657374".trim_start_matches("0x"),
 	)
 	.expect("Valid call");
-	let public_referendum = hex::decode("0x1500160d02e1ee5465c2c6cf6c8249591e1ddccb7b435e7797e4f58108b170d8ad43a313a918000000010a000000".trim_start_matches("0x")).expect("Valid call");
+	let fellowship_referendum = hex::decode("0x3d003e02026a1a24f45a37eb576f443444b1b4666b14ba71dd8d97445e3d1fd3a0fc9513ba33000000010a000000".trim_start_matches("0x")).expect("Valid call");
+	let public_referendum = hex::decode("0x3e003f0d02a322f65fd03ba368587f997b14e306211f6fb3c30b06a5be472f2f96b3b27e1e18000000010a000000".trim_start_matches("0x")).expect("Valid call");
 
 	assert!(calls.preimage_for_whitelist_call.is_some(), "it must generate this call");
 	if let Some((coh, length)) = calls.preimage_for_whitelist_call {
@@ -261,7 +262,7 @@ async fn it_starts_polkadot_fellowship_referenda_correctly() {
 			CallOrHash::Call(fellowship_preimage_generated) => {
 				let call_info = CallInfo::from_runtime_call(fellowship_preimage_generated);
 				assert_eq!(call_info.encoded, fellowship_preimage);
-				assert_eq!(length, 51u32);
+				assert_eq!(length, 54u32);
 			},
 			CallOrHash::Hash(_) => panic!("call length within the limit"),
 		}
@@ -298,10 +299,10 @@ async fn it_starts_polkadot_root_referenda_correctly() {
 	let calls = generate_calls(&proposal_details).await;
 
 	let public_preimage = hex::decode(
-		"0x0a005800004c6f70656e676f762d7375626d69742074657374".trim_start_matches("0x"),
+		"0x05005800004c6f70656e676f762d7375626d69742074657374".trim_start_matches("0x"),
 	)
 	.expect("Valid call");
-	let public_referendum = hex::decode("0x15000000028821e8db19b8e34b62ee8bc618a5ed3eecb9761d7d81349b00aa5ce5dfca253416000000010a000000".trim_start_matches("0x")).expect("Valid call");
+	let public_referendum = hex::decode("0x3e000000028821e8db19b8e34b62ee8bc618a5ed3eecb9761d7d81349b00aa5ce5dfca253416000000010a000000".trim_start_matches("0x")).expect("Valid call");
 
 	assert!(calls.preimage_for_whitelist_call.is_none(), "it must not generate this call");
 	assert!(calls.fellowship_referendum_submission.is_none(), "it must not generate this call");
@@ -331,8 +332,8 @@ async fn it_starts_kusama_non_fellowship_referenda_correctly() {
 	let calls = generate_calls(&proposal_details).await;
 
 	let public_preimage =
-		hex::decode("0x06000c590ac8".trim_start_matches("0x")).expect("Valid call");
-	let public_referendum = hex::decode("0x5c005d0002c0fb827aa729fbbe3a616f564c0d3bb01d5a44b9a2f6ce9db6f0e934b938f91b030000000000e1f505".trim_start_matches("0x")).expect("Valid call");
+		hex::decode("0x06000c060ac8".trim_start_matches("0x")).expect("Valid call");
+	let public_referendum = hex::decode("0x5c005d00028fd8848a8f93980f5cea2de1c11f29ed7dced592aa207218a2e0ae5b78b9fffb030000000000e1f505".trim_start_matches("0x")).expect("Valid call");
 
 	assert!(calls.preimage_for_whitelist_call.is_none(), "it must not generate this call");
 	assert!(calls.fellowship_referendum_submission.is_none(), "it must not generate this call");
@@ -361,29 +362,21 @@ async fn it_starts_kusama_fellowship_referenda_correctly() {
 	let proposal_details = kusama_whitelist_remark_user_input();
 	let calls = generate_calls(&proposal_details).await;
 
-	let fellowship_preimage = hex::decode(
-		"0x2000882c008821e8db19b8e34b62ee8bc618a5ed3eecb9761d7d81349b00aa5ce5dfca2534"
-			.trim_start_matches("0x"),
-	)
-	.expect("Valid call");
-	let fellowship_referendum = hex::decode("0x17002b0f02749aff5c635d7ebf11a5199f92cf566d7ae0244fa6c26da5c6e70a215a35c59522000000010a000000".trim_start_matches("0x")).expect("Valid call");
+	// On Kusama, the fellowship is on the Relay Chain and uses inline calls,
+	// so preimage_for_whitelist_call is None. The fellowship referendum is submitted
+	// on the Relay Chain and sends XCM to Asset Hub to whitelist.
 	let public_preimage = hex::decode(
-		"0x2000602c0300004c6f70656e676f762d7375626d69742074657374".trim_start_matches("0x"),
+		"0x0600605e0300004c6f70656e676f762d7375626d69742074657374".trim_start_matches("0x"),
 	)
 	.expect("Valid call");
-	let public_referendum = hex::decode("0x15002b0d022c1a994725955d3635ce1969e52f25b79b4f8c9685637e63e8eff59ba3f8a9d0180000000000e1f505".trim_start_matches("0x")).expect("Valid call");
+	let fellowship_referendum = hex::decode("0x17002b0f01cc630005000100a10f05082f0000060300885e008821e8db19b8e34b62ee8bc618a5ed3eecb9761d7d81349b00aa5ce5dfca2534010a000000".trim_start_matches("0x")).expect("Valid call");
+	let public_referendum = hex::decode("0x5c005d0d02dd86316423e1bc1ca2ac30b36d9384c7edea7b4e033a2b81c1a45c75091c2f15180000000000e1f505".trim_start_matches("0x")).expect("Valid call");
 
-	assert!(calls.preimage_for_whitelist_call.is_some(), "it must generate this call");
-	if let Some((coh, length)) = calls.preimage_for_whitelist_call {
-		match coh {
-			CallOrHash::Call(fellowship_preimage_generated) => {
-				let call_info = CallInfo::from_runtime_call(fellowship_preimage_generated);
-				assert_eq!(call_info.encoded, fellowship_preimage);
-				assert_eq!(length, 37u32);
-			},
-			CallOrHash::Hash(_) => panic!("call length within the limit"),
-		}
-	}
+	// Kusama fellowship uses inline preimage, so no separate preimage note call
+	assert!(
+		calls.preimage_for_whitelist_call.is_none(),
+		"kusama uses inline preimages for fellowship"
+	);
 
 	assert!(calls.preimage_for_public_referendum.is_some(), "it must generate this call");
 	if let Some((coh, length)) = calls.preimage_for_public_referendum {
