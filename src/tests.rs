@@ -1,9 +1,11 @@
 use crate::get_proposal_bytes;
+use crate::polkadot_asset_hub::runtime_types::frame_system::pallet::Call as PolkadotAssetHubSystemCall;
 use crate::polkadot_relay::runtime_types::frame_system::pallet::Call as PolkadotRelaySystemCall;
 use crate::{
 	build_upgrade, submit_referendum::generate_calls, CallInfo, CallOrHash,
 	KusamaAssetHubOpenGovOrigin, Network, NetworkRuntimeCall, PolkadotAssetHubOpenGovOrigin,
-	PolkadotRuntimeCall, ProposalDetails, UpgradeArgs, VersionedNetwork,
+	PolkadotAssetHubRuntimeCall, PolkadotRuntimeCall, ProposalDetails, UpgradeArgs,
+	VersionedNetwork,
 };
 
 fn polkadot_whitelist_remark_user_input() -> ProposalDetails {
@@ -159,6 +161,24 @@ fn upgrade_args_for_all() -> UpgradeArgs {
 		coretime: None,
 		filename: None,
 		additional: None,
+	}
+}
+
+fn upgrade_args_with_additional() -> UpgradeArgs {
+	UpgradeArgs {
+		network: String::from("polkadot"),
+		only: true,
+		local: false,
+		relay_version: Some(String::from("v1.2.0")),
+		asset_hub: None,
+		bridge_hub: None,
+		collectives: None,
+		encointer: None,
+		people: None,
+		coretime: None,
+		filename: None,
+		// `system.remark("test")` on Polkadot Asset Hub
+		additional: Some(String::from("0x00001074657374")),
 	}
 }
 
@@ -475,6 +495,27 @@ fn upgrade_everything_works_with_just_relay_version() {
 	];
 	assert_eq!(details.networks, expected_networks);
 	assert!(details.additional.is_none());
+}
+
+#[test]
+fn additional_call_decodes_correctly() {
+	let args = upgrade_args_with_additional();
+	let details = build_upgrade::parse_inputs(args);
+
+	assert!(details.additional.is_some(), "additional should be set");
+	let additional = details.additional.unwrap();
+
+	// Verify the call decodes to the expected remark on Asset Hub
+	let expected_remark = PolkadotAssetHubRuntimeCall::System(PolkadotAssetHubSystemCall::remark {
+		remark: b"test".to_vec(),
+	});
+	assert_eq!(
+		additional.get_polkadot_asset_hub_call().expect("polkadot asset hub call"),
+		expected_remark
+	);
+
+	// Verify length (0x00001074657374 = 7 bytes)
+	assert_eq!(additional.length, 7u32);
 }
 
 #[test]

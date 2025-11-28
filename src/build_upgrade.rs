@@ -173,10 +173,11 @@ pub(crate) fn parse_inputs(prefs: UpgradeArgs) -> UpgradeDetails {
 		Some(c) => {
 			let additional_bytes = get_proposal_bytes(c.clone());
 			match relay {
+				// This match isn't as intuitive post-ahm, as these are AH calls.
 				Network::Polkadot =>
-					Some(CallInfo::from_bytes(&additional_bytes, Network::Polkadot)),
-				Network::Kusama => Some(CallInfo::from_bytes(&additional_bytes, Network::Kusama)),
-				// for now, only support additional on the relay chain
+					Some(CallInfo::from_bytes(&additional_bytes, Network::PolkadotAssetHub)),
+				Network::Kusama =>
+					Some(CallInfo::from_bytes(&additional_bytes, Network::KusamaAssetHub)),
 				_ => panic!("`network` must be `polkadot` or `kusama`"),
 			}
 		},
