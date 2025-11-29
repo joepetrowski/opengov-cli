@@ -714,56 +714,56 @@ fn handle_batch_of_calls(output: &Output, batch: Vec<NetworkRuntimeCall>) {
 fn print_output(output: &Output, network_call: &NetworkRuntimeCall) {
 	match network_call {
 		NetworkRuntimeCall::Kusama(call) => {
-			let rpc: &'static str = "wss%3A%2F%2Fkusama-rpc.n.dwellir.com";
+			let endpoint = "wss%3A%2F%2Fkusama-rpc.dwellir.com";
+			let network_id = "kusama";
 			match output {
 				Output::CallData => println!("0x{}", hex::encode(call.encode())),
 				Output::AppsUiLink => println!(
-					"https://polkadot.js.org/apps/?rpc={}#/extrinsics/decode/0x{}",
-					rpc,
+					"https://dev.papi.how/extrinsics#data=0x{}&networkId={network_id}&endpoint={endpoint}",
 					hex::encode(call.encode())
 				),
 			}
 		},
 		NetworkRuntimeCall::KusamaAssetHub(call) => {
-			let rpc: &'static str = "wss%3A%2F%2Fasset-hub-kusama-rpc.n.dwellir.com";
+			let endpoint = "wss%3A%2F%2Fasset-hub-kusama-rpc.dwellir.com";
+			let network_id = "kusama_asset_hub";
 			match output {
 				Output::CallData => println!("0x{}", hex::encode(call.encode())),
 				Output::AppsUiLink => println!(
-					"https://polkadot.js.org/apps/?rpc={}#/extrinsics/decode/0x{}",
-					rpc,
+					"https://dev.papi.how/extrinsics#data=0x{}&networkId={network_id}&endpoint={endpoint}",
 					hex::encode(call.encode())
 				),
 			}
 		},
 		NetworkRuntimeCall::Polkadot(call) => {
-			let rpc: &'static str = "wss%3A%2F%2Fpolkadot-rpc.dwellir.com";
+			let endpoint = "wss%3A%2F%2Fpolkadot-rpc.dwellir.com";
+			let network_id = "polkadot";
 			match output {
 				Output::CallData => println!("0x{}", hex::encode(call.encode())),
 				Output::AppsUiLink => println!(
-					"https://polkadot.js.org/apps/?rpc={}#/extrinsics/decode/0x{}",
-					rpc,
+					"https://dev.papi.how/extrinsics#data=0x{}&networkId={network_id}&endpoint={endpoint}",
 					hex::encode(call.encode())
 				),
 			}
 		},
 		NetworkRuntimeCall::PolkadotAssetHub(call) => {
-			let rpc: &'static str = "wss%3A%2F%2Fasset-hub-polkadot-rpc.n.dwellir.com";
+			let endpoint = "wss%3A%2F%2Fasset-hub-polkadot-rpc.dwellir.com";
+			let network_id = "polkadot_asset_hub";
 			match output {
 				Output::CallData => println!("0x{}", hex::encode(call.encode())),
 				Output::AppsUiLink => println!(
-					"https://polkadot.js.org/apps/?rpc={}#/extrinsics/decode/0x{}",
-					rpc,
+					"https://dev.papi.how/extrinsics#data=0x{}&networkId={network_id}&endpoint={endpoint}",
 					hex::encode(call.encode())
 				),
 			}
 		},
 		NetworkRuntimeCall::PolkadotCollectives(call) => {
-			let rpc: &'static str = "wss%3A%2F%2Fpolkadot-collectives-rpc.polkadot.io";
+			let endpoint = "wss%3A%2F%2Fpolkadot-collectives-rpc.polkadot.io";
+			let network_id = "polkadot_collectives";
 			match output {
 				Output::CallData => println!("0x{}", hex::encode(call.encode())),
 				Output::AppsUiLink => println!(
-					"https://polkadot.js.org/apps/?rpc={}#/extrinsics/decode/0x{}",
-					rpc,
+					"https://dev.papi.how/extrinsics#data=0x{}&networkId={network_id}&endpoint={endpoint}",
 					hex::encode(call.encode())
 				),
 			}
