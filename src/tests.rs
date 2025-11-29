@@ -275,25 +275,16 @@ async fn it_starts_polkadot_fellowship_referenda_correctly() {
 	let proposal_details = polkadot_whitelist_remark_user_input();
 	let calls = generate_calls(&proposal_details).await;
 
-	let fellowship_preimage = hex::decode("0x2b00cc1f0005010100a10f05082f00000603008840008821e8db19b8e34b62ee8bc618a5ed3eecb9761d7d81349b00aa5ce5dfca2534".trim_start_matches("0x")).expect("Valid call");
 	let public_preimage = hex::decode(
 		"0x050060400300004c6f70656e676f762d7375626d69742074657374".trim_start_matches("0x"),
 	)
 	.expect("Valid call");
-	let fellowship_referendum = hex::decode("0x3d003e02026a1a24f45a37eb576f443444b1b4666b14ba71dd8d97445e3d1fd3a0fc9513ba33000000010a000000".trim_start_matches("0x")).expect("Valid call");
+	// Fellowship referendum now uses Inline, so it contains the XCM call directly.
+	let fellowship_referendum = hex::decode("0x3d003e0201cc1f0005010100a10f05082f00000603008840008821e8db19b8e34b62ee8bc618a5ed3eecb9761d7d81349b00aa5ce5dfca2534010a000000".trim_start_matches("0x")).expect("Valid call");
 	let public_referendum = hex::decode("0x3e003f0d02a322f65fd03ba368587f997b14e306211f6fb3c30b06a5be472f2f96b3b27e1e18000000010a000000".trim_start_matches("0x")).expect("Valid call");
 
-	assert!(calls.preimage_for_whitelist_call.is_some(), "it must generate this call");
-	if let Some((coh, length)) = calls.preimage_for_whitelist_call {
-		match coh {
-			CallOrHash::Call(fellowship_preimage_generated) => {
-				let call_info = CallInfo::from_runtime_call(fellowship_preimage_generated);
-				assert_eq!(call_info.encoded, fellowship_preimage);
-				assert_eq!(length, 54u32);
-			},
-			CallOrHash::Hash(_) => panic!("call length within the limit"),
-		}
-	}
+	// No preimage needed for whitelist call - it's inlined in the fellowship referendum.
+	assert!(calls.preimage_for_whitelist_call.is_none(), "should be None with Inline");
 
 	assert!(calls.preimage_for_public_referendum.is_some(), "it must generate this call");
 	if let Some((coh, length)) = calls.preimage_for_public_referendum {

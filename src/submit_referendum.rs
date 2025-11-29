@@ -127,7 +127,15 @@ fn parse_inputs(prefs: ReferendumArgs) -> ProposalDetails {
 
 	let use_light_client = prefs.light_client;
 
-	ProposalDetails { proposal, track, dispatch, output, output_len_limit, print_batch, use_light_client }
+	ProposalDetails {
+		proposal,
+		track,
+		dispatch,
+		output,
+		output_len_limit,
+		print_batch,
+		use_light_client,
+	}
 }
 
 // Generate all the calls needed.
@@ -264,6 +272,13 @@ async fn kusama_fellowship_referenda(proposal_details: &ProposalDetails) -> Poss
 		}),
 	));
 
+	// The Inline limit is 128 bytes.
+	assert!(
+		whitelist_over_xcm.length <= 128,
+		"Fellowship proposal exceeds Inline limit of 128 bytes ({} bytes). There is no longer a preimage pallet on Kusama Relay Chain, try again as a root ref.",
+		whitelist_over_xcm.length
+	);
+
 	// The actual Fellowship referendum submission.
 	let fellowship_proposal = CallInfo::from_runtime_call(NetworkRuntimeCall::Kusama(
 		KusamaRuntimeCall::FellowshipReferenda(KusamaReferendaCall::submit {
@@ -392,9 +407,10 @@ async fn polkadot_fellowship_referenda(
 		pallet_whitelist::pallet::Call as WhitelistCall,
 	};
 	use polkadot_collectives::runtime_types::{
+		bounded_collections::bounded_vec::BoundedVec as CollectivesBoundedVec,
 		collectives_polkadot_runtime::OriginCaller as CollectivesOriginCaller,
 		frame_support::traits::{
-			preimages::Bounded::Lookup as CollectivesLookup,
+			preimages::Bounded::{Inline as CollectivesInline, Lookup as CollectivesLookup},
 			schedule::DispatchTime as CollectivesDispatchTime,
 		},
 		// Since Asset Hub and Collectives may be on different versions of Preimage,
@@ -467,25 +483,39 @@ async fn polkadot_fellowship_referenda(
 		}),
 	));
 
-	let preimage_for_whitelist_over_xcm = CallInfo::from_runtime_call(
-		NetworkRuntimeCall::PolkadotCollectives(CollectivesRuntimeCall::Preimage(
-			CollectivesPreimageCall::note_preimage { bytes: whitelist_over_xcm.encoded },
-		)),
-	);
-
-	// The actual Fellowship referendum submission.
-	let fellowship_proposal = CallInfo::from_runtime_call(NetworkRuntimeCall::PolkadotCollectives(
-		CollectivesRuntimeCall::FellowshipReferenda(CollectivesReferendaCall::submit {
-			proposal_origin: Box::new(CollectivesOriginCaller::FellowshipOrigins(
-				FellowshipOrigins::Fellows,
-			)),
-			proposal: CollectivesLookup {
-				hash: H256(whitelist_over_xcm.hash),
-				len: whitelist_over_xcm.length,
-			},
-			enactment_moment: CollectivesDispatchTime::After(10u32),
-		}),
-	));
+	// The Inline limit is 128 bytes. Use Inline if within limit, otherwise fall back to Lookup.
+	let (fellowship_proposal, preimage_for_whitelist_over_xcm) = if whitelist_over_xcm.length <= 128
+	{
+		let proposal = CallInfo::from_runtime_call(NetworkRuntimeCall::PolkadotCollectives(
+			CollectivesRuntimeCall::FellowshipReferenda(CollectivesReferendaCall::submit {
+				proposal_origin: Box::new(CollectivesOriginCaller::FellowshipOrigins(
+					FellowshipOrigins::Fellows,
+				)),
+				proposal: CollectivesInline(CollectivesBoundedVec(whitelist_over_xcm.encoded)),
+				enactment_moment: CollectivesDispatchTime::After(10u32),
+			}),
+		));
+		(proposal, None)
+	} else {
+		let preimage = CallInfo::from_runtime_call(NetworkRuntimeCall::PolkadotCollectives(
+			CollectivesRuntimeCall::Preimage(CollectivesPreimageCall::note_preimage {
+				bytes: whitelist_over_xcm.encoded.clone(),
+			}),
+		));
+		let proposal = CallInfo::from_runtime_call(NetworkRuntimeCall::PolkadotCollectives(
+			CollectivesRuntimeCall::FellowshipReferenda(CollectivesReferendaCall::submit {
+				proposal_origin: Box::new(CollectivesOriginCaller::FellowshipOrigins(
+					FellowshipOrigins::Fellows,
+				)),
+				proposal: CollectivesLookup {
+					hash: H256(whitelist_over_xcm.hash),
+					len: whitelist_over_xcm.length,
+				},
+				enactment_moment: CollectivesDispatchTime::After(10u32),
+			}),
+		));
+		(proposal, Some(preimage))
+	};
 
 	// Now we put together the public referendum part. This still needs separate logic because the
 	// actual proposal gets wrapped in a Whitelist call.
@@ -520,8 +550,8 @@ async fn polkadot_fellowship_referenda(
 	));
 
 	// Check the lengths and prepare preimages for printing.
-	let (whitelist_over_xcm_preimage_print, whitelist_over_xcm_preimage_print_len) =
-		preimage_for_whitelist_over_xcm.create_print_output(proposal_details.output_len_limit);
+	let whitelist_preimage_print = preimage_for_whitelist_over_xcm
+		.map(|p| p.create_print_output(proposal_details.output_len_limit));
 	let (dispatch_preimage_print, dispatch_preimage_print_len) =
 		preimage_for_dispatch_whitelisted_call
 			.create_print_output(proposal_details.output_len_limit);
@@ -538,10 +568,7 @@ async fn polkadot_fellowship_referenda(
 	}
 
 	PossibleCallsToSubmit {
-		preimage_for_whitelist_call: Some((
-			whitelist_over_xcm_preimage_print,
-			whitelist_over_xcm_preimage_print_len,
-		)),
+		preimage_for_whitelist_call: whitelist_preimage_print,
 		preimage_for_public_referendum: Some((
 			dispatch_preimage_print,
 			dispatch_preimage_print_len,
@@ -649,7 +676,11 @@ fn deliver_output(proposal_details: ProposalDetails, calls: PossibleCallsToSubmi
 	}
 
 	if proposal_details.print_batch {
-		handle_batch_of_calls(&proposal_details.output, batch_of_calls, proposal_details.use_light_client);
+		handle_batch_of_calls(
+			&proposal_details.output,
+			batch_of_calls,
+			proposal_details.use_light_client,
+		);
 	}
 }
 
@@ -720,7 +751,11 @@ fn handle_batch_of_calls(output: &Output, batch: Vec<NetworkRuntimeCall>, use_li
 fn print_output(output: &Output, network_call: &NetworkRuntimeCall, use_light_client: bool) {
 	match network_call {
 		NetworkRuntimeCall::Kusama(call) => {
-			let endpoint = if use_light_client { "light-client" } else { "wss%3A%2F%2Fkusama-rpc.dwellir.com" };
+			let endpoint = if use_light_client {
+				"light-client"
+			} else {
+				"wss%3A%2F%2Fkusama-rpc.dwellir.com"
+			};
 			let network_id = "kusama";
 			match output {
 				Output::CallData => println!("0x{}", hex::encode(call.encode())),
@@ -731,7 +766,11 @@ fn print_output(output: &Output, network_call: &NetworkRuntimeCall, use_light_cl
 			}
 		},
 		NetworkRuntimeCall::KusamaAssetHub(call) => {
-			let endpoint = if use_light_client { "light-client" } else { "wss%3A%2F%2Fasset-hub-kusama-rpc.dwellir.com" };
+			let endpoint = if use_light_client {
+				"light-client"
+			} else {
+				"wss%3A%2F%2Fasset-hub-kusama-rpc.dwellir.com"
+			};
 			let network_id = "kusama_asset_hub";
 			match output {
 				Output::CallData => println!("0x{}", hex::encode(call.encode())),
@@ -742,7 +781,11 @@ fn print_output(output: &Output, network_call: &NetworkRuntimeCall, use_light_cl
 			}
 		},
 		NetworkRuntimeCall::Polkadot(call) => {
-			let endpoint = if use_light_client { "light-client" } else { "wss%3A%2F%2Fpolkadot-rpc.dwellir.com" };
+			let endpoint = if use_light_client {
+				"light-client"
+			} else {
+				"wss%3A%2F%2Fpolkadot-rpc.dwellir.com"
+			};
 			let network_id = "polkadot";
 			match output {
 				Output::CallData => println!("0x{}", hex::encode(call.encode())),
@@ -753,7 +796,11 @@ fn print_output(output: &Output, network_call: &NetworkRuntimeCall, use_light_cl
 			}
 		},
 		NetworkRuntimeCall::PolkadotAssetHub(call) => {
-			let endpoint = if use_light_client { "light-client" } else { "wss%3A%2F%2Fasset-hub-polkadot-rpc.dwellir.com" };
+			let endpoint = if use_light_client {
+				"light-client"
+			} else {
+				"wss%3A%2F%2Fasset-hub-polkadot-rpc.dwellir.com"
+			};
 			let network_id = "polkadot_asset_hub";
 			match output {
 				Output::CallData => println!("0x{}", hex::encode(call.encode())),
@@ -764,7 +811,11 @@ fn print_output(output: &Output, network_call: &NetworkRuntimeCall, use_light_cl
 			}
 		},
 		NetworkRuntimeCall::PolkadotCollectives(call) => {
-			let endpoint = if use_light_client { "light-client" } else { "wss%3A%2F%2Fpolkadot-collectives-rpc.polkadot.io" };
+			let endpoint = if use_light_client {
+				"light-client"
+			} else {
+				"wss%3A%2F%2Fpolkadot-collectives-rpc.polkadot.io"
+			};
 			let network_id = "polkadot_collectives";
 			match output {
 				Output::CallData => println!("0x{}", hex::encode(call.encode())),
