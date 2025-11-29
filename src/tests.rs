@@ -20,6 +20,7 @@ fn polkadot_whitelist_remark_user_input() -> ProposalDetails {
 		output: AppsUiLink,
 		output_len_limit: 1_000,
 		print_batch: true,
+		use_light_client: false,
 	}
 }
 
@@ -35,6 +36,7 @@ fn polkadot_staking_validator_user_input() -> ProposalDetails {
 		output: AppsUiLink,
 		output_len_limit: 1_000,
 		print_batch: true,
+		use_light_client: false,
 	}
 }
 
@@ -50,6 +52,7 @@ fn polkadot_root_remark_user_input() -> ProposalDetails {
 		output: AppsUiLink,
 		output_len_limit: 1_000,
 		print_batch: true,
+		use_light_client: false,
 	}
 }
 
@@ -65,6 +68,7 @@ fn kusama_whitelist_remark_user_input() -> ProposalDetails {
 		output: AppsUiLink,
 		output_len_limit: 1_000,
 		print_batch: true,
+		use_light_client: false,
 	}
 }
 
@@ -80,6 +84,7 @@ fn kusama_staking_validator_user_input() -> ProposalDetails {
 		output: AppsUiLink,
 		output_len_limit: 1_000,
 		print_batch: true,
+		use_light_client: false,
 	}
 }
 
@@ -95,6 +100,7 @@ fn kusama_root_remark_user_input() -> ProposalDetails {
 		output: AppsUiLink,
 		output_len_limit: 1_000,
 		print_batch: true,
+		use_light_client: false,
 	}
 }
 
@@ -110,6 +116,7 @@ fn limited_length_user_input() -> ProposalDetails {
 		output: AppsUiLink,
 		output_len_limit: 5, // very limiting
 		print_batch: true,
+		use_light_client: false,
 	}
 }
 

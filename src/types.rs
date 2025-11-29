@@ -133,6 +133,8 @@ pub(super) struct ProposalDetails {
 	// Whether or not to group all calls into a batch. Uses `force_batch` in case the account does
 	// not have funds for pre-image deposits or is not a fellow.
 	pub(super) print_batch: bool,
+	// Whether to use light client endpoints in PAPI links (default true).
+	pub(super) use_light_client: bool,
 }
 
 // Info and preferences provided by the user for runtime upgrade construction.

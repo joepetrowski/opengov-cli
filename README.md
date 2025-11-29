@@ -53,6 +53,8 @@ Options:
           Do not print batch calls. Defaults to false
       --output <OUTPUT>
           Form of output. `AppsUiLink` or `CallData`. Defaults to Apps UI
+      --light-client
+          Use light client endpoints instead of RPC for PAPI links
   -h, --help
           Print help
 ```

@@ -37,6 +37,10 @@ pub(crate) struct ReferendumArgs {
 	/// Form of output. `AppsUiLink` or `CallData`. Defaults to Apps UI.
 	#[clap(long = "output")]
 	output: Option<String>,
+
+	/// Use light client endpoints instead of RPC for PAPI links.
+	#[clap(long = "light-client")]
+	light_client: bool,
 }
 
 // The sub-command's "main" function.
@@ -121,7 +125,9 @@ fn parse_inputs(prefs: ReferendumArgs) -> ProposalDetails {
 		AppsUiLink
 	};
 
-	ProposalDetails { proposal, track, dispatch, output, output_len_limit, print_batch }
+	let use_light_client = prefs.light_client;
+
+	ProposalDetails { proposal, track, dispatch, output, output_len_limit, print_batch, use_light_client }
 }
 
 // Generate all the calls needed.
@@ -604,7 +610,7 @@ fn deliver_output(proposal_details: ProposalDetails, calls: PossibleCallsToSubmi
 		match call_or_hash {
 			CallOrHash::Call(c) => {
 				println!("\nSubmit the preimage for the Fellowship referendum:");
-				print_output(&proposal_details.output, &c);
+				print_output(&proposal_details.output, &c, proposal_details.use_light_client);
 				batch_of_calls.push(c);
 			},
 			CallOrHash::Hash(h) => {
@@ -617,14 +623,14 @@ fn deliver_output(proposal_details: ProposalDetails, calls: PossibleCallsToSubmi
 	}
 	if let Some(c) = calls.fellowship_referendum_submission {
 		println!("\nOpen a Fellowship referendum to whitelist the call:");
-		print_output(&proposal_details.output, &c);
+		print_output(&proposal_details.output, &c, proposal_details.use_light_client);
 		batch_of_calls.push(c);
 	}
 	if let Some((call_or_hash, len)) = calls.preimage_for_public_referendum {
 		match call_or_hash {
 			CallOrHash::Call(c) => {
 				println!("\nSubmit the preimage for the public referendum:");
-				print_output(&proposal_details.output, &c);
+				print_output(&proposal_details.output, &c, proposal_details.use_light_client);
 				batch_of_calls.push(c);
 			},
 			CallOrHash::Hash(h) => {
@@ -638,18 +644,18 @@ fn deliver_output(proposal_details: ProposalDetails, calls: PossibleCallsToSubmi
 	}
 	if let Some(c) = calls.public_referendum_submission {
 		println!("\nOpen a public referendum to dispatch the call:");
-		print_output(&proposal_details.output, &c);
+		print_output(&proposal_details.output, &c, proposal_details.use_light_client);
 		batch_of_calls.push(c);
 	}
 
 	if proposal_details.print_batch {
-		handle_batch_of_calls(&proposal_details.output, batch_of_calls);
+		handle_batch_of_calls(&proposal_details.output, batch_of_calls, proposal_details.use_light_client);
 	}
 }
 
 // Takes a vec of calls, which could be intended for use on different networks, sorts them into the
 // appropriate network, and provides a single batch call for each network.
-fn handle_batch_of_calls(output: &Output, batch: Vec<NetworkRuntimeCall>) {
+fn handle_batch_of_calls(output: &Output, batch: Vec<NetworkRuntimeCall>, use_light_client: bool) {
 	use kusama_asset_hub::runtime_types::pallet_utility::pallet::Call as KusamaAssetHubUtilityCall;
 	use kusama_relay::runtime_types::pallet_utility::pallet::Call as KusamaUtilityCall;
 	use polkadot_asset_hub::runtime_types::pallet_utility::pallet::Call as PolkadotAssetHubUtilityCall;
@@ -677,21 +683,21 @@ fn handle_batch_of_calls(output: &Output, batch: Vec<NetworkRuntimeCall>) {
 			calls: kusama_relay_batch,
 		});
 		println!("\nBatch to submit on Kusama Relay Chain:");
-		print_output(output, &NetworkRuntimeCall::Kusama(batch));
+		print_output(output, &NetworkRuntimeCall::Kusama(batch), use_light_client);
 	}
 	if !kusama_asset_hub_batch.is_empty() {
 		let batch = KusamaAssetHubRuntimeCall::Utility(KusamaAssetHubUtilityCall::force_batch {
 			calls: kusama_asset_hub_batch,
 		});
 		println!("\nBatch to submit on Kusama Asset Hub:");
-		print_output(output, &NetworkRuntimeCall::KusamaAssetHub(batch));
+		print_output(output, &NetworkRuntimeCall::KusamaAssetHub(batch), use_light_client);
 	}
 	if !polkadot_relay_batch.is_empty() {
 		let batch = PolkadotRuntimeCall::Utility(PolkadotRelayUtilityCall::force_batch {
 			calls: polkadot_relay_batch,
 		});
 		println!("\nBatch to submit on Polkadot Relay Chain:");
-		print_output(output, &NetworkRuntimeCall::Polkadot(batch));
+		print_output(output, &NetworkRuntimeCall::Polkadot(batch), use_light_client);
 	}
 	if !polkadot_asset_hub_batch.is_empty() {
 		let batch =
@@ -699,22 +705,22 @@ fn handle_batch_of_calls(output: &Output, batch: Vec<NetworkRuntimeCall>) {
 				calls: polkadot_asset_hub_batch,
 			});
 		println!("\nBatch to submit on Polkadot Asset Hub:");
-		print_output(output, &NetworkRuntimeCall::PolkadotAssetHub(batch));
+		print_output(output, &NetworkRuntimeCall::PolkadotAssetHub(batch), use_light_client);
 	}
 	if !polkadot_collectives_batch.is_empty() {
 		let batch = CollectivesRuntimeCall::Utility(CollectivesUtilityCall::force_batch {
 			calls: polkadot_collectives_batch,
 		});
 		println!("\nBatch to submit on Polkadot Collectives Chain:");
-		print_output(output, &NetworkRuntimeCall::PolkadotCollectives(batch));
+		print_output(output, &NetworkRuntimeCall::PolkadotCollectives(batch), use_light_client);
 	}
 }
 
 // Format the data to print to console.
-fn print_output(output: &Output, network_call: &NetworkRuntimeCall) {
+fn print_output(output: &Output, network_call: &NetworkRuntimeCall, use_light_client: bool) {
 	match network_call {
 		NetworkRuntimeCall::Kusama(call) => {
-			let endpoint = "wss%3A%2F%2Fkusama-rpc.dwellir.com";
+			let endpoint = if use_light_client { "light-client" } else { "wss%3A%2F%2Fkusama-rpc.dwellir.com" };
 			let network_id = "kusama";
 			match output {
 				Output::CallData => println!("0x{}", hex::encode(call.encode())),
@@ -725,7 +731,7 @@ fn print_output(output: &Output, network_call: &NetworkRuntimeCall) {
 			}
 		},
 		NetworkRuntimeCall::KusamaAssetHub(call) => {
-			let endpoint = "wss%3A%2F%2Fasset-hub-kusama-rpc.dwellir.com";
+			let endpoint = if use_light_client { "light-client" } else { "wss%3A%2F%2Fasset-hub-kusama-rpc.dwellir.com" };
 			let network_id = "kusama_asset_hub";
 			match output {
 				Output::CallData => println!("0x{}", hex::encode(call.encode())),
@@ -736,7 +742,7 @@ fn print_output(output: &Output, network_call: &NetworkRuntimeCall) {
 			}
 		},
 		NetworkRuntimeCall::Polkadot(call) => {
-			let endpoint = "wss%3A%2F%2Fpolkadot-rpc.dwellir.com";
+			let endpoint = if use_light_client { "light-client" } else { "wss%3A%2F%2Fpolkadot-rpc.dwellir.com" };
 			let network_id = "polkadot";
 			match output {
 				Output::CallData => println!("0x{}", hex::encode(call.encode())),
@@ -747,7 +753,7 @@ fn print_output(output: &Output, network_call: &NetworkRuntimeCall) {
 			}
 		},
 		NetworkRuntimeCall::PolkadotAssetHub(call) => {
-			let endpoint = "wss%3A%2F%2Fasset-hub-polkadot-rpc.dwellir.com";
+			let endpoint = if use_light_client { "light-client" } else { "wss%3A%2F%2Fasset-hub-polkadot-rpc.dwellir.com" };
 			let network_id = "polkadot_asset_hub";
 			match output {
 				Output::CallData => println!("0x{}", hex::encode(call.encode())),
@@ -758,7 +764,7 @@ fn print_output(output: &Output, network_call: &NetworkRuntimeCall) {
 			}
 		},
 		NetworkRuntimeCall::PolkadotCollectives(call) => {
-			let endpoint = "wss%3A%2F%2Fpolkadot-collectives-rpc.polkadot.io";
+			let endpoint = if use_light_client { "light-client" } else { "wss%3A%2F%2Fpolkadot-collectives-rpc.polkadot.io" };
 			let network_id = "polkadot_collectives";
 			match output {
 				Output::CallData => println!("0x{}", hex::encode(call.encode())),
