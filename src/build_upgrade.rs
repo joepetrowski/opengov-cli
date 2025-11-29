@@ -491,26 +491,22 @@ fn generate_authorize_upgrade_calls(upgrade_details: &UpgradeDetails) -> Vec<Cal
 // Take the parachain authorization calls and the Relay Chain call, and batch them into one call
 // that can be executed on the Relay Chain. The call returned here is the proposal to put to
 // referendum.
-async fn construct_batch(upgrade_details: &UpgradeDetails, para_calls: Vec<CallInfo>) -> CallInfo {
+async fn construct_batch(upgrade_details: &UpgradeDetails, calls: Vec<CallInfo>) -> CallInfo {
 	println!("\nBatching calls.");
 	match upgrade_details.relay {
-		Network::Kusama =>
-			construct_kusama_batch(para_calls, upgrade_details.additional.clone()).await,
+		Network::Kusama => construct_kusama_batch(calls, upgrade_details.additional.clone()).await,
 		Network::Polkadot =>
-			construct_polkadot_batch(para_calls, upgrade_details.additional.clone()).await,
+			construct_polkadot_batch(calls, upgrade_details.additional.clone()).await,
 		_ => panic!("Not a Relay Chain"),
 	}
 }
 
 // Construct the batch needed on Kusama.
-async fn construct_kusama_batch(
-	para_calls: Vec<CallInfo>,
-	additional: Option<CallInfo>,
-) -> CallInfo {
+async fn construct_kusama_batch(calls: Vec<CallInfo>, additional: Option<CallInfo>) -> CallInfo {
 	use kusama_asset_hub::runtime_types::pallet_utility::pallet::Call as UtilityCall;
 
 	let mut batch_calls = Vec::new();
-	for auth in para_calls {
+	for auth in calls {
 		dbg!(&auth.network);
 		if matches!(auth.network, Network::KusamaAssetHub) {
 			batch_calls.push(auth.get_kusama_asset_hub_call().expect("We just constructed this"));
@@ -533,14 +529,11 @@ async fn construct_kusama_batch(
 }
 
 // Construct the batch needed on Polkadot.
-async fn construct_polkadot_batch(
-	para_calls: Vec<CallInfo>,
-	additional: Option<CallInfo>,
-) -> CallInfo {
+async fn construct_polkadot_batch(calls: Vec<CallInfo>, additional: Option<CallInfo>) -> CallInfo {
 	use polkadot_asset_hub::runtime_types::pallet_utility::pallet::Call as UtilityCall;
 
 	let mut batch_calls = Vec::new();
-	for auth in para_calls {
+	for auth in calls {
 		if matches!(auth.network, Network::PolkadotAssetHub) {
 			batch_calls.push(auth.get_polkadot_asset_hub_call().expect("We just constructed this"));
 		} else {
