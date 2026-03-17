@@ -39,10 +39,10 @@ pub(crate) struct ReferendumArgs {
 	#[clap(long = "output")]
 	output: Option<String>,
 
-	/// Optional: Run chopsticks test with the specified test file (.js or .ts).
+	/// Optional: Run chopsticks test with the specified test file (.js or .mjs).
 	#[clap(long = "test")]
 	test: Option<String>,
-  
+
 	/// Use light client endpoints instead of RPC for PAPI links.
 	#[clap(long = "light-client")]
 	light_client: bool,
@@ -55,15 +55,15 @@ pub(crate) async fn submit_referendum(prefs: ReferendumArgs) {
 	let proposal_details = parse_inputs(prefs);
 	// Generate the calls necessary.
 	let calls = generate_calls(&proposal_details).await;
-	
-	// If test file is provided, run chopsticks tests
+
+	// If test file is provided, run chopsticks tests after showing output.
 	if let Some(test_file_path) = test_file {
-		println!("Running chopsticks tests with file: {}", test_file_path);
+		// Extract what we need for chopsticks before deliver_output consumes the data.
 		run_chopsticks_tests(&proposal_details, &calls, &test_file_path).await;
-	} else {
-		// Tell the user what to do.
-		deliver_output(proposal_details, calls);
 	}
+
+	// Tell the user what to do.
+	deliver_output(proposal_details, calls);
 }
 
 // Parse the CLI inputs and return a typed struct with all the details needed.
