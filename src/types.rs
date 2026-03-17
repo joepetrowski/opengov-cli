@@ -123,10 +123,7 @@ pub struct PlaceholderExposurePage<T, U>(PhantomData<(T, U)>);
 	)
 )]
 pub mod westend_relay {}
-pub(super) use westend_relay::runtime_types::westend_runtime::{
-	OriginCaller as WestendOriginCaller, RuntimeCall as WestendRuntimeCall,
-	governance::origins::pallet_custom_origins::Origin as WestendOpenGovOrigin,
-};
+pub(super) use westend_relay::runtime_types::westend_runtime::RuntimeCall as WestendRuntimeCall;
 
 #[subxt::subxt(
 	runtime_metadata_insecure_url = "wss://westend-asset-hub-rpc.polkadot.io:443",
@@ -216,6 +213,7 @@ impl Network {
 			WestendCoretime => Ok(1_005),
 		}
 	}
+
 }
 
 // Info and preferences provided by the user for proposal submission.
@@ -267,6 +265,8 @@ pub(super) enum NetworkTrack {
 	Kusama(KusamaAssetHubOpenGovOrigin),
 	PolkadotRoot,
 	Polkadot(PolkadotAssetHubOpenGovOrigin),
+	WestendRoot,
+	Westend(WestendAssetHubOpenGovOrigin),
 }
 
 // A runtime call wrapped in the network it should execute on.
@@ -546,6 +546,47 @@ impl CallInfo {
 		}
 	}
 
+	pub(super) fn get_westend_call(&self) -> Result<WestendRuntimeCall, &'static str> {
+		match &self.network {
+			Network::Westend => {
+				let bytes = &self.encoded;
+				Ok(<WestendRuntimeCall as parity_scale_codec::Decode>::decode(&mut &bytes[..])
+					.unwrap())
+			},
+			_ => Err("not a westend call"),
+		}
+	}
+
+	pub(super) fn get_westend_asset_hub_call(
+		&self,
+	) -> Result<WestendAssetHubRuntimeCall, &'static str> {
+		match &self.network {
+			Network::WestendAssetHub => {
+				let bytes = &self.encoded;
+				Ok(<WestendAssetHubRuntimeCall as parity_scale_codec::Decode>::decode(
+					&mut &bytes[..],
+				)
+				.unwrap())
+			},
+			_ => Err("not a westend asset hub call"),
+		}
+	}
+
+	pub(super) fn get_westend_collectives_call(
+		&self,
+	) -> Result<WestendCollectivesRuntimeCall, &'static str> {
+		match &self.network {
+			Network::WestendCollectives => {
+				let bytes = &self.encoded;
+				Ok(<WestendCollectivesRuntimeCall as parity_scale_codec::Decode>::decode(
+					&mut &bytes[..],
+				)
+				.unwrap())
+			},
+			_ => Err("not a westend collectives call"),
+		}
+	}
+
 	// Take `Self` and a length limit as input. If the call length exceeds the limit, just return
 	// its hash. Call length is recomputed and will be 2 bytes longer than the actual preimage
 	// length. This is because the call is `preimage.note_preimage(call)`, so the outer pallet/call
@@ -586,6 +627,13 @@ impl CallInfo {
 					let westend_asset_hub_call =
 						self.get_westend_asset_hub_call().expect("westend asset hub");
 					CallOrHash::Call(NetworkRuntimeCall::WestendAssetHub(westend_asset_hub_call))
+				},
+				Network::WestendCollectives => {
+					let westend_collectives_call =
+						self.get_westend_collectives_call().expect("westend collectives");
+					CallOrHash::Call(NetworkRuntimeCall::WestendCollectives(
+						westend_collectives_call,
+					))
 				},
 				_ => panic!("to do"),
 			}

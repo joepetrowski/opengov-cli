@@ -5,7 +5,7 @@ use crate::{
 	build_upgrade, submit_referendum::generate_calls, CallInfo, CallOrHash,
 	KusamaAssetHubOpenGovOrigin, Network, NetworkRuntimeCall, PolkadotAssetHubOpenGovOrigin,
 	PolkadotAssetHubRuntimeCall, PolkadotRuntimeCall, ProposalDetails, UpgradeArgs,
-	VersionedNetwork,
+	VersionedNetwork, WestendAssetHubOpenGovOrigin,
 };
 
 fn polkadot_whitelist_remark_user_input() -> ProposalDetails {
@@ -108,16 +108,15 @@ fn westend_whitelist_remark_user_input() -> ProposalDetails {
 	use crate::DispatchTimeWrapper::*;
 	use crate::NetworkTrack::*;
 	use crate::Output::*;
-	use crate::WestendOpenGovOrigin;
 	ProposalDetails {
 		// `system.remark("opengov-submit test")`
 		proposal: String::from("0x00004c6f70656e676f762d7375626d69742074657374"),
-		track: Westend(WestendOpenGovOrigin::WhitelistedCaller),
+		track: Westend(WestendAssetHubOpenGovOrigin::WhitelistedCaller),
 		dispatch: After(10),
 		output: AppsUiLink,
 		output_len_limit: 1_000,
 		print_batch: true,
-		transact_weight_override: Some(Weight { ref_time: 1_000_000_000, proof_size: 1_000_000 }),
+		use_light_client: false,
 	}
 }
 
@@ -125,16 +124,15 @@ fn westend_staking_validator_user_input() -> ProposalDetails {
 	use crate::DispatchTimeWrapper::*;
 	use crate::NetworkTrack::*;
 	use crate::Output::*;
-	use crate::WestendOpenGovOrigin;
 	ProposalDetails {
 		// `staking.increase_validator_count(50)`
 		proposal: String::from("0x070ac8"),
-		track: Westend(WestendOpenGovOrigin::StakingAdmin),
+		track: Westend(WestendAssetHubOpenGovOrigin::StakingAdmin),
 		dispatch: After(10),
 		output: AppsUiLink,
 		output_len_limit: 1_000,
 		print_batch: true,
-		transact_weight_override: Some(Weight { ref_time: 1_000_000_000, proof_size: 1_000_000 }),
+		use_light_client: false,
 	}
 }
 
@@ -150,7 +148,7 @@ fn westend_root_remark_user_input() -> ProposalDetails {
 		output: AppsUiLink,
 		output_len_limit: 1_000,
 		print_batch: true,
-		transact_weight_override: Some(Weight { ref_time: 1_000_000_000, proof_size: 1_000_000 }),
+		use_light_client: false,
 	}
 }
 
@@ -505,6 +503,48 @@ async fn it_starts_kusama_root_referenda_correctly() {
 }
 
 #[tokio::test]
+async fn it_starts_westend_fellowship_referenda_correctly() {
+	let proposal_details = westend_whitelist_remark_user_input();
+	let calls = generate_calls(&proposal_details).await;
+
+	let public_preimage = hex::decode(
+		"0x0700605d0300004c6f70656e676f762d7375626d69742074657374".trim_start_matches("0x"),
+	)
+	.expect("Valid call");
+	let fellowship_referendum = hex::decode("0x3d003e0201cc1f0005010100a10f05082f0000060300885d008821e8db19b8e34b62ee8bc618a5ed3eecb9761d7d81349b00aa5ce5dfca2534010a000000".trim_start_matches("0x")).expect("Valid call");
+	let public_referendum = hex::decode("0x5b005c0d02289d87181dec615694e96bacc5e2765d7ac4657f2655403f207faeb2beff33d518000000010a000000".trim_start_matches("0x")).expect("Valid call");
+
+	assert!(
+		calls.preimage_for_whitelist_call.is_none(),
+		"westend uses inline preimages for fellowship"
+	);
+
+	assert!(calls.preimage_for_public_referendum.is_some(), "it must generate this call");
+	if let Some((coh, length)) = calls.preimage_for_public_referendum {
+		match coh {
+			CallOrHash::Call(public_preimage_generated) => {
+				let call_info = CallInfo::from_runtime_call(public_preimage_generated);
+				assert_eq!(call_info.encoded, public_preimage);
+				assert_eq!(length, 27u32);
+			},
+			CallOrHash::Hash(_) => panic!("call length within the limit"),
+		}
+	}
+
+	assert!(calls.fellowship_referendum_submission.is_some(), "it must generate this call");
+	if let Some(fellowship_referendum_generated) = calls.fellowship_referendum_submission {
+		let call_info = CallInfo::from_runtime_call(fellowship_referendum_generated);
+		assert_eq!(call_info.encoded, fellowship_referendum);
+	}
+
+	assert!(calls.public_referendum_submission.is_some(), "it must generate this call");
+	if let Some(public_referendum_generated) = calls.public_referendum_submission {
+		let call_info = CallInfo::from_runtime_call(public_referendum_generated);
+		assert_eq!(call_info.encoded, public_referendum);
+	}
+}
+
+#[tokio::test]
 async fn it_starts_westend_non_fellowship_referenda_correctly() {
 	let proposal_details = westend_staking_validator_user_input();
 	let calls = generate_calls(&proposal_details).await;
@@ -654,21 +694,24 @@ fn it_creates_constrained_print_output() {
 
 #[test]
 fn westend_referendum_structure() {
-	use crate::{DispatchTimeWrapper, NetworkTrack, Output, WestendOpenGovOrigin};
-	
+	use crate::{DispatchTimeWrapper, NetworkTrack, Output};
+
 	// Create a mock ProposalDetails for Westend
 	let proposal_details = ProposalDetails {
 		proposal: "0x00004c6f70656e676f762d7375626d69742074657374".to_string(),
-		track: NetworkTrack::Westend(WestendOpenGovOrigin::WhitelistedCaller),
+		track: NetworkTrack::Westend(WestendAssetHubOpenGovOrigin::WhitelistedCaller),
 		dispatch: DispatchTimeWrapper::After(10),
 		output: Output::AppsUiLink,
 		output_len_limit: 1000,
 		print_batch: true,
-		transact_weight_override: None,
+		use_light_client: false,
 	};
-	
+
 	// Verify Westend-specific parsing
-	assert!(matches!(proposal_details.track, NetworkTrack::Westend(WestendOpenGovOrigin::WhitelistedCaller)));
+	assert!(matches!(
+		proposal_details.track,
+		NetworkTrack::Westend(WestendAssetHubOpenGovOrigin::WhitelistedCaller)
+	));
 	assert!(matches!(proposal_details.dispatch, DispatchTimeWrapper::After(10)));
 	assert!(matches!(proposal_details.output, Output::AppsUiLink));
 }
