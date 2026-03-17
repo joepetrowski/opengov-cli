@@ -23,7 +23,7 @@ pub(crate) struct ReferendumArgs {
 	#[clap(long = "at")]
 	at: Option<u32>,
 
-	/// Optional: Enact at a particular wall clock time (format: DD-MM-YYThhmm, e.g. 25-05-21T0800).
+	/// Optional: Enact at a particular wall clock time (format: YY-MM-DDThhmm, e.g. 25-05-21T0800 for 21st May 2025 at 08:00).
 	/// This will create an estimated block number based on the target block production rate. Note that as some block production slots are inevitably missed, this is the earliest time at which the referendum will enact.
 	#[clap(long = "at-date")]
 	at_date: Option<String>,
@@ -121,7 +121,13 @@ async fn parse_inputs(prefs: ReferendumArgs) -> ProposalDetails {
 			let block = wall_clock_to_block_number(&at_date, &prefs.network)
 				.await
 				.expect("Failed to convert wall clock time to block number");
-			println!("\nConverted wall clock time {} to block number {}\n", at_date, block);
+			let subscan_subdomain = match prefs.network.to_ascii_lowercase().as_str() {
+				"polkadot" => "assethub-polkadot",
+				"kusama" => "assethub-kusama",
+				_ => panic!("`network` must be `polkadot` or `kusama`"),
+			};
+			println!("\nConverted wall clock time {} to estimated Asset Hub block number {}", at_date, block);
+			println!("Subscan: https://{}.subscan.io/block/{}\n", subscan_subdomain, block);
 			At(block)
 		},
 		(None, None, Some(after)) => After(after),
