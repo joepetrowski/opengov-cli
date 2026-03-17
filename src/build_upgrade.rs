@@ -204,7 +204,7 @@ pub(crate) fn parse_inputs(prefs: UpgradeArgs) -> UpgradeDetails {
 
 	make_version_directory(directory.as_str());
 
-	UpgradeDetails { relay, networks, directory, output_file, additional }
+	UpgradeDetails { relay, relay_version, networks, directory, output_file, additional }
 }
 
 // Create a directory into which to place runtime blobs and the final call data.
@@ -280,7 +280,8 @@ async fn download_runtimes(upgrade_details: &UpgradeDetails) {
 				println!("Release Notes:\n{}", release_info.notes);
 				println!("\nRelease URL: {}", release_info.url);
 
-				let mut found_any_hash = false;
+				let mut verified = 0usize;
+				let mut failed = 0usize;
 
 				// Download and verify each runtime
 				for chain in &upgrade_details.networks {
@@ -319,17 +320,27 @@ async fn download_runtimes(upgrade_details: &UpgradeDetails) {
 						// Look for hash in release notes
 						if release_info.notes.contains(&hash_hex) {
 							println!("✓ Hash verified: 0x{}, {}", hash_hex, fname);
-							found_any_hash = true;
+							verified += 1;
+						} else {
+							println!("⚠ Hash 0x{} NOT found in release notes for {}", hash_hex, fname);
+							failed += 1;
 						}
 
 						// Save the runtime file
 						let path_name = format!("{}{}", upgrade_details.directory, fname);
 						fs::write(path_name, runtime).expect("Failed to write runtime file");
+					} else {
+						println!("⚠ Asset {} not found in release, skipping", fname);
+						failed += 1;
 					}
 				}
 
-				if !found_any_hash {
-					panic!("No hashes found in release notes");
+				println!("\nVerification: {} passed, {} failed", verified, failed);
+				if failed > 0 {
+					panic!(
+						"Hash verification failed for {} runtime(s). Aborting.",
+						failed
+					);
 				}
 			},
 			Err(e) => {
