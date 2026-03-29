@@ -21,6 +21,7 @@ fn polkadot_whitelist_remark_user_input() -> ProposalDetails {
 		output_len_limit: 1_000,
 		print_batch: true,
 		use_light_client: false,
+		fellowship_on_polkadot: false,
 	}
 }
 
@@ -37,6 +38,7 @@ fn polkadot_staking_validator_user_input() -> ProposalDetails {
 		output_len_limit: 1_000,
 		print_batch: true,
 		use_light_client: false,
+		fellowship_on_polkadot: false,
 	}
 }
 
@@ -53,6 +55,7 @@ fn polkadot_root_remark_user_input() -> ProposalDetails {
 		output_len_limit: 1_000,
 		print_batch: true,
 		use_light_client: false,
+		fellowship_on_polkadot: false,
 	}
 }
 
@@ -69,6 +72,24 @@ fn kusama_whitelist_remark_user_input() -> ProposalDetails {
 		output_len_limit: 1_000,
 		print_batch: true,
 		use_light_client: false,
+		fellowship_on_polkadot: false,
+	}
+}
+
+fn kusama_whitelist_polkadot_fellowship_user_input() -> ProposalDetails {
+	use crate::DispatchTimeWrapper::*;
+	use crate::NetworkTrack::*;
+	use crate::Output::*;
+	ProposalDetails {
+		// `system.remark("opengov-submit test")`
+		proposal: String::from("0x00004c6f70656e676f762d7375626d69742074657374"),
+		track: Kusama(KusamaAssetHubOpenGovOrigin::WhitelistedCaller),
+		dispatch: At(100_000_000),
+		output: AppsUiLink,
+		output_len_limit: 1_000,
+		print_batch: true,
+		use_light_client: false,
+		fellowship_on_polkadot: true,
 	}
 }
 
@@ -85,6 +106,7 @@ fn kusama_staking_validator_user_input() -> ProposalDetails {
 		output_len_limit: 1_000,
 		print_batch: true,
 		use_light_client: false,
+		fellowship_on_polkadot: false,
 	}
 }
 
@@ -101,6 +123,7 @@ fn kusama_root_remark_user_input() -> ProposalDetails {
 		output_len_limit: 1_000,
 		print_batch: true,
 		use_light_client: false,
+		fellowship_on_polkadot: false,
 	}
 }
 
@@ -117,6 +140,7 @@ fn limited_length_user_input() -> ProposalDetails {
 		output_len_limit: 5, // very limiting
 		print_batch: true,
 		use_light_client: false,
+		fellowship_on_polkadot: false,
 	}
 }
 
@@ -419,6 +443,45 @@ async fn it_starts_kusama_fellowship_referenda_correctly() {
 		let call_info = CallInfo::from_runtime_call(public_referendum_generated);
 		assert_eq!(call_info.encoded, public_referendum);
 	}
+}
+
+#[tokio::test]
+async fn it_starts_polkadot_fellowship_whitelisted_kusama_referenda_correctly() {
+	let proposal_details = kusama_whitelist_polkadot_fellowship_user_input();
+	let calls = generate_calls(&proposal_details).await;
+
+	// The fellowship referendum should be on Polkadot Collectives.
+	assert!(
+		calls.fellowship_referendum_submission.is_some(),
+		"it must generate a fellowship referendum"
+	);
+	if let Some(ref fellowship_ref) = calls.fellowship_referendum_submission {
+		match fellowship_ref {
+			NetworkRuntimeCall::PolkadotCollectives(_) => (),
+			other => panic!(
+				"Fellowship referendum should be on PolkadotCollectives, got {:?}",
+				std::mem::discriminant(other)
+			),
+		}
+	}
+
+	// The public referendum should be on Kusama Asset Hub.
+	assert!(calls.public_referendum_submission.is_some(), "it must generate a public referendum");
+	if let Some(ref public_ref) = calls.public_referendum_submission {
+		match public_ref {
+			NetworkRuntimeCall::KusamaAssetHub(_) => (),
+			other => panic!(
+				"Public referendum should be on KusamaAssetHub, got {:?}",
+				std::mem::discriminant(other)
+			),
+		}
+	}
+
+	// The preimage for public referendum should exist.
+	assert!(
+		calls.preimage_for_public_referendum.is_some(),
+		"it must generate the preimage for the public referendum"
+	);
 }
 
 #[tokio::test]

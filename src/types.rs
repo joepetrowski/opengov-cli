@@ -135,6 +135,9 @@ pub(super) struct ProposalDetails {
 	pub(super) print_batch: bool,
 	// Whether to use light client endpoints in PAPI links (default true).
 	pub(super) use_light_client: bool,
+	// Whether to use the Polkadot Fellowship (on Collectives) instead of the Kusama Fellowship.
+	// Only applicable for Kusama WhitelistedCaller track.
+	pub(super) fellowship_on_polkadot: bool,
 }
 
 // Info and preferences provided by the user for runtime upgrade construction.
