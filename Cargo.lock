@@ -2554,6 +2554,7 @@ dependencies = [
  "hex",
  "parity-scale-codec",
  "reqwest",
+ "serde_json",
  "sp-core",
  "subxt",
  "tokio",

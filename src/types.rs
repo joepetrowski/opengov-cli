@@ -144,6 +144,8 @@ pub(super) struct ProposalDetails {
 pub(super) struct UpgradeDetails {
 	// The Relay Network for this upgrade, Polkadot or Kusama.
 	pub(super) relay: Network,
+	// The Fellowship release version (semver, e.g. "1.4.0").
+	pub(super) relay_version: Option<String>,
 	// All networks to upgrade.
 	pub(super) networks: Vec<VersionedNetwork>,
 	// The directory into which to write information needed.
