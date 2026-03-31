@@ -10,7 +10,7 @@ pub(crate) struct ReferendumArgs {
 	#[clap(long = "proposal", short)]
 	proposal: String,
 
-	/// Network on which to submit the referendum. `polkadot` or `kusama`.
+	/// Network on which to submit the referendum. `polkadot`, `kusama`, or `westend`.
 	#[clap(long = "network", short)]
 	network: String,
 
@@ -100,7 +100,27 @@ fn parse_inputs(prefs: ReferendumArgs) -> ProposalDetails {
 				Kusama(KusamaAssetHubOpenGovOrigin::ReferendumCanceller),
 			_ => panic!("Unsupported track! Tracks should be in the form `general-admin` or `generaladmin`."),
 		},
-		_ => panic!("`network` must be `polkadot` or `kusama`"),
+		"westend" => match prefs.track.to_ascii_lowercase().as_str() {
+			"root" => WestendRoot,
+			"whitelisted-caller" | "whitelistedcaller" =>
+				Westend(WestendAssetHubOpenGovOrigin::WhitelistedCaller),
+			"staking-admin" | "stakingadmin" => Westend(WestendAssetHubOpenGovOrigin::StakingAdmin),
+			"treasurer" => Westend(WestendAssetHubOpenGovOrigin::Treasurer),
+			"lease-admin" | "leaseadmin" => Westend(WestendAssetHubOpenGovOrigin::LeaseAdmin),
+			"fellowship-admin" | "fellowshipadmin" =>
+				Westend(WestendAssetHubOpenGovOrigin::FellowshipAdmin),
+			"general-admin" | "generaladmin" => Westend(WestendAssetHubOpenGovOrigin::GeneralAdmin),
+			"auction-admin" | "auctionadmin" =>
+				Westend(WestendAssetHubOpenGovOrigin::AuctionAdmin),
+			"referendum-killer" | "referendumkiller" =>
+				Westend(WestendAssetHubOpenGovOrigin::ReferendumKiller),
+			"referendum-canceller" | "referendumcanceller" =>
+				Westend(WestendAssetHubOpenGovOrigin::ReferendumCanceller),
+			_ => panic!(
+				"Unsupported track! Tracks should be in the form `general-admin` or `generaladmin`."
+			),
+		},
+		_ => panic!("`network` must be `polkadot`, `kusama`, or `westend`"),
 	};
 
 	let dispatch = match (prefs.at, prefs.after) {
@@ -124,7 +144,9 @@ fn parse_inputs(prefs: ReferendumArgs) -> ProposalDetails {
 		match input.to_ascii_lowercase().as_str() {
 			"calldata" | "call-data" => CallData,
 			"appsuilink" | "apps-ui-link" => AppsUiLink,
-			_ => panic!("`output` must be `calldata` or `appsuilink`. If not specified, the default is `appsuilink`."),
+			_ => panic!(
+				"`output` must be `calldata` or `appsuilink`. If not specified, the default is `appsuilink`."
+			),
 		}
 	} else {
 		AppsUiLink
@@ -159,6 +181,215 @@ fn parse_inputs(prefs: ReferendumArgs) -> ProposalDetails {
 		print_batch,
 		use_light_client,
 		fellowship_on_polkadot,
+	}
+}
+
+// Generate the calls needed for a proposal to pass on Westend without the Fellowship.
+fn westend_non_fellowship_referenda(
+	proposal_details: &ProposalDetails,
+	origin: WestendAssetHubOriginCaller,
+) -> PossibleCallsToSubmit {
+	use westend_asset_hub::runtime_types::{
+		frame_support::traits::{preimages::Bounded::Lookup, schedule::DispatchTime},
+		pallet_preimage::pallet::Call as PreimageCall,
+		pallet_referenda::pallet::Call as ReferendaCall,
+	};
+
+	let proposal_bytes = get_proposal_bytes(proposal_details.proposal.clone());
+	let proposal_call_info = CallInfo::from_bytes(&proposal_bytes, Network::WestendAssetHub);
+
+	let public_referendum_dispatch_time = match proposal_details.dispatch {
+		DispatchTimeWrapper::At(block) => DispatchTime::At(block),
+		DispatchTimeWrapper::After(block) => DispatchTime::After(block),
+	};
+
+	let note_proposal_preimage = CallInfo::from_runtime_call(NetworkRuntimeCall::WestendAssetHub(
+		WestendAssetHubRuntimeCall::Preimage(PreimageCall::note_preimage { bytes: proposal_bytes }),
+	));
+	let public_proposal = CallInfo::from_runtime_call(NetworkRuntimeCall::WestendAssetHub(
+		WestendAssetHubRuntimeCall::Referenda(ReferendaCall::submit {
+			proposal_origin: Box::new(origin),
+			proposal: Lookup {
+				hash: H256(proposal_call_info.hash),
+				len: proposal_call_info.length,
+			},
+			enactment_moment: public_referendum_dispatch_time,
+		}),
+	));
+	let (preimage_print, preimage_print_len) =
+		note_proposal_preimage.create_print_output(proposal_details.output_len_limit);
+
+	PossibleCallsToSubmit {
+		preimage_for_whitelist_call: None,
+		preimage_for_public_referendum: Some((preimage_print, preimage_print_len)),
+		fellowship_referendum_submission: None,
+		public_referendum_submission: Some(NetworkRuntimeCall::WestendAssetHub(
+			public_proposal.get_westend_asset_hub_call().expect("westend asset hub"),
+		)),
+	}
+}
+
+async fn westend_fellowship_referenda(
+	proposal_details: &ProposalDetails,
+) -> PossibleCallsToSubmit {
+	use westend_asset_hub::runtime_types::{
+		frame_support::traits::{preimages::Bounded::Lookup, schedule::DispatchTime},
+		pallet_preimage::pallet::Call as PreimageCall,
+		pallet_referenda::pallet::Call as ReferendaCall,
+		pallet_whitelist::pallet::Call as WhitelistCall,
+	};
+	use westend_collectives::runtime_types::{
+		bounded_collections::bounded_vec::BoundedVec as CollectivesBoundedVec,
+		collectives_westend_runtime::OriginCaller as WestendCollectivesOriginCaller,
+		frame_support::traits::{
+			preimages::Bounded::{Inline as CollectivesInline, Lookup as CollectivesLookup},
+			schedule::DispatchTime as CollectivesDispatchTime,
+		},
+		pallet_preimage::pallet::Call as CollectivesPreimageCall,
+		pallet_referenda::pallet::Call as CollectivesReferendaCall,
+		pallet_xcm::pallet::Call as CollectivesXcmCall,
+		staging_xcm::v5::{
+			junction::Junction::Parachain, junctions::Junctions::X1, location::Location,
+			Instruction, Xcm,
+		},
+		xcm::{
+			double_encoded::DoubleEncoded, v3::OriginKind, v3::WeightLimit, VersionedLocation,
+			VersionedXcm::V5,
+		},
+	};
+
+	let proposal_bytes = get_proposal_bytes(proposal_details.proposal.clone());
+	let proposal_call_info = CallInfo::from_bytes(&proposal_bytes, Network::WestendAssetHub);
+
+	let public_referendum_dispatch_time = match proposal_details.dispatch {
+		DispatchTimeWrapper::At(block) => DispatchTime::At(block),
+		DispatchTimeWrapper::After(block) => DispatchTime::After(block),
+	};
+	let whitelist_call = CallInfo::from_runtime_call(NetworkRuntimeCall::WestendAssetHub(
+		WestendAssetHubRuntimeCall::Whitelist(WhitelistCall::whitelist_call {
+			call_hash: H256(proposal_call_info.hash),
+		}),
+	));
+
+	let whitelist_over_xcm =
+		CallInfo::from_runtime_call(NetworkRuntimeCall::WestendCollectives(
+			WestendCollectivesRuntimeCall::PolkadotXcm(CollectivesXcmCall::send {
+				dest: Box::new(VersionedLocation::V5(Location {
+					parents: 1,
+					interior: X1([Parachain(1000)]),
+				})),
+				message: Box::new(V5(Xcm(vec![
+					Instruction::UnpaidExecution {
+						weight_limit: WeightLimit::Unlimited,
+						check_origin: None,
+					},
+					Instruction::Transact {
+						origin_kind: OriginKind::Xcm,
+						fallback_max_weight: None,
+						call: DoubleEncoded { encoded: whitelist_call.encoded },
+					},
+				]))),
+			}),
+		));
+
+	let (fellowship_proposal, preimage_for_whitelist_over_xcm) = if whitelist_over_xcm.length <= 128
+	{
+		let proposal = CallInfo::from_runtime_call(NetworkRuntimeCall::WestendCollectives(
+			WestendCollectivesRuntimeCall::FellowshipReferenda(CollectivesReferendaCall::submit {
+				proposal_origin: Box::new(
+					WestendCollectivesOriginCaller::FellowshipOrigins(
+						WestendFellowshipOrigins::Fellows,
+					),
+				),
+				proposal: CollectivesInline(CollectivesBoundedVec(whitelist_over_xcm.encoded)),
+				enactment_moment: CollectivesDispatchTime::After(10u32),
+			}),
+		));
+		(proposal, None)
+	} else {
+		let preimage = CallInfo::from_runtime_call(NetworkRuntimeCall::WestendCollectives(
+			WestendCollectivesRuntimeCall::Preimage(CollectivesPreimageCall::note_preimage {
+				bytes: whitelist_over_xcm.encoded.clone(),
+			}),
+		));
+		let proposal = CallInfo::from_runtime_call(NetworkRuntimeCall::WestendCollectives(
+			WestendCollectivesRuntimeCall::FellowshipReferenda(CollectivesReferendaCall::submit {
+				proposal_origin: Box::new(
+					WestendCollectivesOriginCaller::FellowshipOrigins(
+						WestendFellowshipOrigins::Fellows,
+					),
+				),
+				proposal: CollectivesLookup {
+					hash: H256(whitelist_over_xcm.hash),
+					len: whitelist_over_xcm.length,
+				},
+				enactment_moment: CollectivesDispatchTime::After(10u32),
+			}),
+		));
+		(proposal, Some(preimage))
+	};
+
+	let dispatch_whitelisted_call = CallInfo::from_runtime_call(
+		NetworkRuntimeCall::WestendAssetHub(WestendAssetHubRuntimeCall::Whitelist(
+			WhitelistCall::dispatch_whitelisted_call_with_preimage {
+				call: Box::new(
+					proposal_call_info
+						.get_westend_asset_hub_call()
+						.expect("it is a westend asset hub call"),
+				),
+			},
+		)),
+	);
+
+	let preimage_for_dispatch_whitelisted_call = CallInfo::from_runtime_call(
+		NetworkRuntimeCall::WestendAssetHub(WestendAssetHubRuntimeCall::Preimage(
+			PreimageCall::note_preimage { bytes: dispatch_whitelisted_call.encoded.clone() },
+		)),
+	);
+	let public_proposal = CallInfo::from_runtime_call(NetworkRuntimeCall::WestendAssetHub(
+		WestendAssetHubRuntimeCall::Referenda(ReferendaCall::submit {
+			proposal_origin: Box::new(WestendAssetHubOriginCaller::Origins(
+				WestendAssetHubOpenGovOrigin::WhitelistedCaller,
+			)),
+			proposal: Lookup {
+				hash: H256(dispatch_whitelisted_call.hash),
+				len: dispatch_whitelisted_call.length,
+			},
+			enactment_moment: public_referendum_dispatch_time,
+		}),
+	));
+
+	let whitelist_preimage_print = preimage_for_whitelist_over_xcm
+		.map(|p| p.create_print_output(proposal_details.output_len_limit));
+	let (dispatch_preimage_print, dispatch_preimage_print_len) =
+		preimage_for_dispatch_whitelisted_call
+			.create_print_output(proposal_details.output_len_limit);
+
+	// If it's a hash, let's write the data to a file you can upload.
+	match dispatch_preimage_print {
+		CallOrHash::Call(_) => (),
+		CallOrHash::Hash(_) => {
+			let mut info_to_write = "0x".to_owned();
+			info_to_write.push_str(hex::encode(dispatch_whitelisted_call.encoded).as_str());
+			fs::write("westend_asset_hub_public_referendum_preimage_to_note.call", info_to_write)
+				.expect("it should write");
+		},
+	}
+
+	PossibleCallsToSubmit {
+		preimage_for_whitelist_call: whitelist_preimage_print,
+		preimage_for_public_referendum: Some((
+			dispatch_preimage_print,
+			dispatch_preimage_print_len,
+		)),
+		fellowship_referendum_submission: Some(NetworkRuntimeCall::WestendCollectives(
+			fellowship_proposal
+				.get_westend_collectives_call()
+				.expect("westend collectives"),
+		)),
+		public_referendum_submission: Some(NetworkRuntimeCall::WestendAssetHub(
+			public_proposal.get_westend_asset_hub_call().expect("westend asset hub"),
+		)),
 	}
 }
 
@@ -213,6 +444,26 @@ pub(crate) async fn generate_calls(proposal_details: &ProposalDetails) -> Possib
 				_ => polkadot_non_fellowship_referenda(
 					proposal_details,
 					PolkadotAssetHubOriginCaller::Origins(polkadot_track.clone()),
+				),
+			}
+		},
+
+		NetworkTrack::WestendRoot => {
+			use westend_asset_hub::runtime_types::frame_support::dispatch::RawOrigin;
+			westend_non_fellowship_referenda(
+				proposal_details,
+				WestendAssetHubOriginCaller::system(RawOrigin::Root),
+			)
+		},
+
+		// All special Westend origins.
+		NetworkTrack::Westend(westend_track) => {
+			match westend_track {
+				WestendAssetHubOpenGovOrigin::WhitelistedCaller =>
+					westend_fellowship_referenda(proposal_details).await,
+				_ => westend_non_fellowship_referenda(
+					proposal_details,
+					WestendAssetHubOriginCaller::Origins(westend_track.clone()),
 				),
 			}
 		},
@@ -892,7 +1143,9 @@ fn deliver_output(proposal_details: ProposalDetails, calls: PossibleCallsToSubmi
 				println!(
 					"\nPreimage for the public referendum too large ({len} bytes). Not included in batch."
 				);
-				println!("A file was created that you can upload in `preimage.note_preimage` in Apps UI.");
+				println!(
+					"A file was created that you can upload in `preimage.note_preimage` in Apps UI."
+				);
 				println!("Submission should have the hash: 0x{}", hex::encode(h));
 			},
 		}
@@ -926,6 +1179,8 @@ fn handle_batch_of_calls(output: &Output, batch: Vec<NetworkRuntimeCall>, use_li
 	let mut polkadot_asset_hub_batch = Vec::new();
 	let mut polkadot_relay_batch = Vec::new();
 	let mut polkadot_collectives_batch = Vec::new();
+	let mut westend_asset_hub_batch = Vec::new();
+	let mut westend_collectives_batch = Vec::new();
 
 	for network_call in batch {
 		match network_call {
@@ -934,6 +1189,8 @@ fn handle_batch_of_calls(output: &Output, batch: Vec<NetworkRuntimeCall>, use_li
 			NetworkRuntimeCall::Polkadot(cc) => polkadot_relay_batch.push(cc),
 			NetworkRuntimeCall::PolkadotAssetHub(cc) => polkadot_asset_hub_batch.push(cc),
 			NetworkRuntimeCall::PolkadotCollectives(cc) => polkadot_collectives_batch.push(cc),
+			NetworkRuntimeCall::WestendAssetHub(cc) => westend_asset_hub_batch.push(cc),
+			NetworkRuntimeCall::WestendCollectives(cc) => westend_collectives_batch.push(cc),
 			_ => panic!("no other chains are needed for this"),
 		}
 	}
@@ -972,6 +1229,24 @@ fn handle_batch_of_calls(output: &Output, batch: Vec<NetworkRuntimeCall>, use_li
 		});
 		println!("\nBatch to submit on Polkadot Collectives Chain:");
 		print_output(output, &NetworkRuntimeCall::PolkadotCollectives(batch), use_light_client);
+	}
+	if !westend_asset_hub_batch.is_empty() {
+		use westend_asset_hub::runtime_types::pallet_utility::pallet::Call as WestendAssetHubUtilityCall;
+		let batch = WestendAssetHubRuntimeCall::Utility(WestendAssetHubUtilityCall::force_batch {
+			calls: westend_asset_hub_batch,
+		});
+		println!("\nBatch to submit on Westend Asset Hub:");
+		print_output(output, &NetworkRuntimeCall::WestendAssetHub(batch), use_light_client);
+	}
+	if !westend_collectives_batch.is_empty() {
+		use westend_collectives::runtime_types::pallet_utility::pallet::Call as WestendCollectivesUtilityCall;
+		let batch = WestendCollectivesRuntimeCall::Utility(
+			WestendCollectivesUtilityCall::force_batch {
+				calls: westend_collectives_batch,
+			},
+		);
+		println!("\nBatch to submit on Westend Collectives Chain:");
+		print_output(output, &NetworkRuntimeCall::WestendCollectives(batch), use_light_client);
 	}
 }
 
@@ -1045,6 +1320,36 @@ fn print_output(output: &Output, network_call: &NetworkRuntimeCall, use_light_cl
 				"wss%3A%2F%2Fpolkadot-collectives-rpc.polkadot.io"
 			};
 			let network_id = "polkadot_collectives";
+			match output {
+				Output::CallData => println!("0x{}", hex::encode(call.encode())),
+				Output::AppsUiLink => println!(
+					"https://dev.papi.how/extrinsics#data=0x{}&networkId={network_id}&endpoint={endpoint}",
+					hex::encode(call.encode())
+				),
+			}
+		},
+		NetworkRuntimeCall::WestendAssetHub(call) => {
+			let endpoint = if use_light_client {
+				"light-client"
+			} else {
+				"wss%3A%2F%2Fwestend-asset-hub-rpc.polkadot.io"
+			};
+			let network_id = "westend_asset_hub";
+			match output {
+				Output::CallData => println!("0x{}", hex::encode(call.encode())),
+				Output::AppsUiLink => println!(
+					"https://dev.papi.how/extrinsics#data=0x{}&networkId={network_id}&endpoint={endpoint}",
+					hex::encode(call.encode())
+				),
+			}
+		},
+		NetworkRuntimeCall::WestendCollectives(call) => {
+			let endpoint = if use_light_client {
+				"light-client"
+			} else {
+				"wss%3A%2F%2Fwestend-collectives-rpc.polkadot.io"
+			};
+			let network_id = "westend_collectives";
 			match output {
 				Output::CallData => println!("0x{}", hex::encode(call.encode())),
 				Output::AppsUiLink => println!(
