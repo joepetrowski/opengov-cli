@@ -152,7 +152,7 @@ First, generate the registration calls:
 
 ```
 $ ./target/release/opengov-cli register-system-para \
-	--wasm ./bulletin_runtime.wasm \
+	--wasm ./my_parachain_runtime.wasm \
 	--genesis-head ./genesis-head.hex \
 	--para-id 1010 \
 	--network polkadot \
@@ -208,7 +208,7 @@ Open a public referendum to dispatch the call:
 0x3e003f0d02ec...
 ```
 
-This produces three calls to submit (in any order):
+This produces three calls to submit (submissions can happen in any order, but the preimage on the relay chain must be stored before the Asset Hub referendum enacts):
 
 1. **Relay Chain** (permissionless): Use `force_register_call.hex` as the bytes for `Preimage.note_preimage` in any wallet. This stores the ~1.1 MB `force_register` call on-chain.
 2. **Collectives Chain** (any Fellow): Submit the Fellowship referendum call. When Fellows approve, it whitelists the Asset Hub proposal.

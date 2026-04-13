@@ -76,8 +76,8 @@ pub(crate) fn build_polkadot_register_calls(params: RegisterSystemParaParams) ->
 		pallet_xcm::pallet::Call as XcmCall,
 		staging_xcm::v5::{junctions::Junctions::Here, location::Location, Instruction, Xcm},
 		xcm::{
-			double_encoded::DoubleEncoded, v3::OriginKind, v3::WeightLimit, VersionedLocation,
-			VersionedXcm::V5,
+			double_encoded::DoubleEncoded, v3::MaybeErrorCode, v3::OriginKind, v3::WeightLimit,
+			VersionedLocation, VersionedXcm::V5,
 		},
 	};
 	use polkadot_relay::runtime_types::{
@@ -135,6 +135,7 @@ pub(crate) fn build_polkadot_register_calls(params: RegisterSystemParaParams) ->
 				fallback_max_weight: None,
 				call: DoubleEncoded { encoded: whitelist_info.encoded },
 			},
+			Instruction::ExpectTransactStatus(MaybeErrorCode::Success),
 		]))),
 	});
 
@@ -150,6 +151,7 @@ pub(crate) fn build_polkadot_register_calls(params: RegisterSystemParaParams) ->
 				fallback_max_weight: None,
 				call: DoubleEncoded { encoded: dispatch_info.encoded },
 			},
+			Instruction::ExpectTransactStatus(MaybeErrorCode::Success),
 		]))),
 	});
 
