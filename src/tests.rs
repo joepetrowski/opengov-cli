@@ -1,6 +1,9 @@
 use crate::get_proposal_bytes;
 use crate::polkadot_asset_hub::runtime_types::frame_system::pallet::Call as PolkadotAssetHubSystemCall;
 use crate::polkadot_relay::runtime_types::frame_system::pallet::Call as PolkadotRelaySystemCall;
+use crate::register_system_para::{
+	build_polkadot_register_calls, RegisterSystemParaParams,
+};
 use crate::{
 	build_upgrade, submit_referendum::generate_calls, CallInfo, CallOrHash,
 	KusamaAssetHubOpenGovOrigin, Network, NetworkRuntimeCall, PolkadotAssetHubOpenGovOrigin,
@@ -599,4 +602,180 @@ fn it_creates_constrained_print_output() {
 		},
 	}
 	assert_eq!(length, proposal_call_info.length);
+}
+
+// ---------------------------------------------------------------------------
+// Register System Para tests
+// ---------------------------------------------------------------------------
+
+/// Small synthetic test params (avoids needing real WASM files).
+fn small_register_params() -> RegisterSystemParaParams {
+	RegisterSystemParaParams {
+		wasm_bytes: vec![0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00, 0x00], // minimal wasm-like
+		genesis_head_bytes: vec![0x01, 0x02, 0x03, 0x04],
+		para_id: 1234,
+		manager_bytes: [0u8; 32], // zero account
+		deposit: 0,
+		ref_time: 60_000_000_000,
+		proof_size: 10_000,
+	}
+}
+
+#[test]
+fn register_force_register_call_encodes_correctly() {
+	let params = small_register_params();
+	let output = build_polkadot_register_calls(params);
+
+	// force_register is a relay chain call
+	assert_eq!(output.force_register_info.network, Network::Polkadot);
+	// Encoded bytes should start with Registrar pallet + force_register call index
+	assert!(output.force_register_info.length > 0);
+	// Hash should be 32 bytes
+	assert_eq!(output.force_register_info.hash.len(), 32);
+	// Should be decodable back to a Polkadot call
+	assert!(output.force_register_info.get_polkadot_call().is_ok());
+}
+
+#[test]
+fn register_proposal_is_asset_hub_call() {
+	let params = small_register_params();
+	let output = build_polkadot_register_calls(params);
+
+	// Proposal is an Asset Hub call (batch_all)
+	assert_eq!(output.proposal.network, Network::PolkadotAssetHub);
+	// Should be decodable as a Polkadot Asset Hub call
+	assert!(output.proposal.get_polkadot_asset_hub_call().is_ok());
+}
+
+#[test]
+fn register_proposal_is_within_ump_limit() {
+	let params = small_register_params();
+	let output = build_polkadot_register_calls(params);
+
+	// The proposal must be small enough to eventually travel as an XCM UMP message.
+	// The proposal itself is a batch_all of two polkadotXcm.send calls.
+	// It should be well under 128 KB (the UMP limit).
+	assert!(
+		output.proposal.length < 1024,
+		"Proposal is {} bytes, expected < 1024 for small inputs",
+		output.proposal.length
+	);
+}
+
+#[test]
+fn register_whitelist_hash_matches_force_register_hash() {
+	let params = small_register_params();
+	let output = build_polkadot_register_calls(params);
+
+	// Verify the proposal is decodable and contains the force_register hash.
+	let _proposal_call = output.proposal.get_polkadot_asset_hub_call().expect("valid AH call");
+
+	// The proposal is batch_all([xcm_send_whitelist, xcm_send_dispatch]).
+	// We verify the force_register hash is embedded in the proposal by checking
+	// that the proposal bytes contain the force_register hash.
+	let hash_bytes = output.force_register_info.hash;
+	let proposal_bytes = &output.proposal.encoded;
+
+	// The hash should appear twice in the proposal (once in whitelist_call, once in dispatch)
+	let hash_occurrences = proposal_bytes
+		.windows(32)
+		.filter(|w| *w == hash_bytes)
+		.count();
+	assert_eq!(
+		hash_occurrences, 2,
+		"force_register hash should appear exactly twice in proposal (whitelist + dispatch)"
+	);
+}
+
+#[test]
+fn register_deterministic_output() {
+	// Same inputs should produce identical output.
+	let output1 = build_polkadot_register_calls(small_register_params());
+	let output2 = build_polkadot_register_calls(small_register_params());
+
+	assert_eq!(output1.force_register_info.encoded, output2.force_register_info.encoded);
+	assert_eq!(output1.force_register_info.hash, output2.force_register_info.hash);
+	assert_eq!(output1.proposal.encoded, output2.proposal.encoded);
+}
+
+#[tokio::test]
+async fn register_proposal_works_with_submit_referendum() {
+	// Build the registration proposal, then feed it into submit-referendum
+	// to verify the full pipeline works.
+	let params = small_register_params();
+	let output = build_polkadot_register_calls(params);
+
+	// Create a ProposalDetails as if the user piped the proposal into submit-referendum
+	use crate::DispatchTimeWrapper::*;
+	use crate::NetworkTrack::*;
+	use crate::Output::*;
+
+	let proposal_hex = format!("0x{}", hex::encode(&output.proposal.encoded));
+
+	let proposal_details = ProposalDetails {
+		proposal: proposal_hex,
+		track: Polkadot(PolkadotAssetHubOpenGovOrigin::WhitelistedCaller),
+		dispatch: After(10),
+		output: CallData,
+		output_len_limit: 1_000,
+		print_batch: false,
+		use_light_client: false,
+		fellowship_on_polkadot: false,
+	};
+
+	let calls = generate_calls(&proposal_details).await;
+
+	// Should generate fellowship referendum (on Collectives)
+	assert!(
+		calls.fellowship_referendum_submission.is_some(),
+		"must generate fellowship referendum"
+	);
+	if let Some(ref fellowship_ref) = calls.fellowship_referendum_submission {
+		match fellowship_ref {
+			NetworkRuntimeCall::PolkadotCollectives(_) => (),
+			other => panic!(
+				"Fellowship referendum should be on PolkadotCollectives, got {:?}",
+				std::mem::discriminant(other)
+			),
+		}
+	}
+
+	// Should generate public referendum preimage (on Asset Hub)
+	assert!(
+		calls.preimage_for_public_referendum.is_some(),
+		"must generate public referendum preimage"
+	);
+
+	// Should generate public referendum (on Asset Hub)
+	assert!(
+		calls.public_referendum_submission.is_some(),
+		"must generate public referendum"
+	);
+	if let Some(ref public_ref) = calls.public_referendum_submission {
+		match public_ref {
+			NetworkRuntimeCall::PolkadotAssetHub(_) => (),
+			other => panic!(
+				"Public referendum should be on PolkadotAssetHub, got {:?}",
+				std::mem::discriminant(other)
+			),
+		}
+	}
+}
+
+#[test]
+fn register_dispatch_whitelisted_has_correct_length() {
+	let params = small_register_params();
+	let output = build_polkadot_register_calls(params);
+
+	// The dispatch_whitelisted_call inside the XCM should reference the correct
+	// call_encoded_len matching the force_register call length.
+	let force_register_len = output.force_register_info.length;
+
+	// call_encoded_len is a u32, SCALE-encoded as 4 bytes little-endian
+	let len_le = force_register_len.to_le_bytes();
+	assert!(
+		output.proposal.encoded.windows(4).any(|w| w == len_le),
+		"force_register length ({}, le bytes {:?}) should appear in the proposal",
+		force_register_len, len_le,
+	);
 }

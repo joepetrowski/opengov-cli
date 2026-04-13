@@ -2,7 +2,7 @@
 
 This program's primary purpose is to construct all the needed calls to submit a proposal as an OpenGov referendum on Kusama or Polkadot. It assumes that you construct the proposal (i.e., the privileged call you want to execute) elsewhere (e.g. Polkadot JS Apps UI Extrinsics tab). It will return all the calls that you will need to sign and submit (also using, e.g., the Apps UI Extrinsics tab). Note that you may need to submit calls on multiple chains.
 
-It also provides a utility to construct a runtime upgrade call that will batch the upgrades of the Kusama or Polkadot Relay Chain with the upgrades of all their respective system parachains.
+It also provides utilities to construct a runtime upgrade call that will batch the upgrades of the Kusama or Polkadot Relay Chain with all their respective system parachains, and to register new system parachains via the whitelist+preimage pattern.
 
 ## CLI
 
@@ -18,9 +18,10 @@ Utilities for submitting OpenGov referenda and constructing tedious calls
 Usage: opengov-cli <COMMAND>
 
 Commands:
-  build-upgrade      Generate a single call that will upgrade a Relay Chain and all of its system parachains
-  submit-referendum  Generate all the calls needed to submit a proposal as a referendum in OpenGov
-  help               Print this message or the help of the given subcommand(s)
+  build-upgrade         Generate a single call that will upgrade a Relay Chain and all of its system parachains
+  register-system-para  Generate the calls needed to register a system parachain via Asset Hub governance
+  submit-referendum     Generate all the calls needed to submit a proposal as a referendum in OpenGov
+  help                  Print this message or the help of the given subcommand(s)
 
 Options:
   -h, --help  Print help
@@ -80,6 +81,37 @@ Options:
   -h, --help                           Print help
 ```
 
+### Register System Para
+
+The `register-system-para` subcommand takes a WASM runtime, genesis head, and parachain ID and generates all the calls needed to register a system parachain on the relay chain via Asset Hub governance.
+
+Because `force_register` includes the full WASM runtime (~1 MB+), it exceeds the 128 KB UMP message limit. The command uses the whitelist+preimage pattern: the large call is stored as a preimage on the relay chain, while Asset Hub sends a tiny XCM that whitelists and dispatches it. Asset Hub has Root on the relay chain via `LocationAsSuperuser`.
+
+```
+$ ./target/debug/opengov-cli register-system-para --help
+Generate the calls needed to register a system parachain via Asset Hub governance
+
+Usage: opengov-cli register-system-para [OPTIONS] --wasm <WASM> --genesis-head <GENESIS_HEAD> --para-id <PARA_ID> --network <NETWORK> --manager <MANAGER>
+
+Options:
+      --wasm <WASM>                Path to the WASM validation code file
+      --genesis-head <GENESIS_HEAD>  Path to the genesis head hex file (from: polkadot-omni-node export-genesis-head)
+      --para-id <PARA_ID>          Parachain ID to register
+  -n, --network <NETWORK>          Network: `polkadot` or `kusama`
+      --manager <MANAGER>          Manager account SS58 address
+      --deposit <DEPOSIT>          Deposit in plancks [default: 0]
+      --ref-time <REF_TIME>        Weight ref_time witness for dispatch_whitelisted_call [default: 60000000000]
+      --proof-size <PROOF_SIZE>    Weight proof_size witness for dispatch_whitelisted_call [default: 10000]
+      --filename <FILENAME>        Output file name for the Asset Hub proposal
+  -h, --help                       Print help
+```
+
+The genesis head can be exported with:
+
+```
+polkadot-omni-node export-genesis-head --chain <chainspec.json> > genesis-head.hex
+```
+
 ## Examples
 
 ### Build Upgrade
@@ -113,6 +145,74 @@ opengov-cli submit-referendum \
     --proposal "./upgrade-polkadot-1.0.0/polkadot-1.0.0.call" \
     --network "polkadot" --track <"root" or "whitelistedcaller">
 ```
+
+### Register a System Parachain on Polkadot
+
+First, generate the registration calls:
+
+```
+$ ./target/release/opengov-cli register-system-para \
+	--wasm ./bulletin_runtime.wasm \
+	--genesis-head ./genesis-head.hex \
+	--para-id 1010 \
+	--network polkadot \
+	--manager 5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY
+
+WASM size: 1108030 bytes
+Genesis head size: 98 bytes
+ParaId: 1010
+Manager: 5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY
+Deposit: 0
+
+force_register call:
+  Encoded size: 1108188 bytes
+  Hash: 0x9b31b2d4b51f124751ebb7d8fc37bbc9633597cc897cb646235d00441e4626ba
+  Written to: force_register_call.hex
+
+Whitelist calls (relay chain, for XCM):
+  whitelist_call: 34 bytes
+  dispatch_whitelisted_call: 46 bytes
+
+============================================================
+  REGISTER SYSTEM PARACHAIN 1010
+============================================================
+
+  STEP 1 — Submit on Relay Chain (permissionless):
+    Use force_register_call.hex (1108188 bytes) as the bytes for
+    Preimage.note_preimage in any wallet (e.g. Polkadot JS Apps).
+
+  STEP 2 — Submit as referendum:
+    register-system-para-1010.call (111 bytes)
+
+    opengov-cli submit-referendum \
+      --proposal "register-system-para-1010.call" \
+      --network "polkadot" --track whitelistedcaller
+============================================================
+```
+
+Then, pipe the proposal into `submit-referendum` to generate the Fellowship and public referendum calls:
+
+```
+$ ./target/release/opengov-cli submit-referendum \
+	--proposal "register-system-para-1010.call" \
+	--network "polkadot" --track "whitelistedcaller" \
+	--output calldata --no-batch
+
+Open a Fellowship referendum to whitelist the call:
+0x3d003e0201cc...
+
+Submit the preimage for the public referendum:
+0x0500c5014003...
+
+Open a public referendum to dispatch the call:
+0x3e003f0d02ec...
+```
+
+This produces three calls to submit (in any order):
+
+1. **Relay Chain** (permissionless): Use `force_register_call.hex` as the bytes for `Preimage.note_preimage` in any wallet. This stores the ~1.1 MB `force_register` call on-chain.
+2. **Collectives Chain** (any Fellow): Submit the Fellowship referendum call. When Fellows approve, it whitelists the Asset Hub proposal.
+3. **Asset Hub** (anyone): Submit the preimage call and the public referendum call. When the public vote passes, it dispatches a `batch_all` of two XCM messages to the relay chain that whitelist and execute the `force_register` call.
 
 ### Submit a Referendum on Kusama
 
