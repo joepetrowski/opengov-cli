@@ -618,6 +618,7 @@ fn small_register_params() -> RegisterSystemParaParams {
 		deposit: 0,
 		ref_time: 60_000_000_000,
 		proof_size: 10_000,
+		assign_core: None,
 	}
 }
 
@@ -685,6 +686,56 @@ fn register_whitelist_hash_matches_force_register_hash() {
 		hash_occurrences, 2,
 		"force_register hash should appear exactly twice in proposal (whitelist + dispatch)"
 	);
+}
+
+#[test]
+fn register_with_assign_core_has_three_expect_transact_status() {
+	let mut params = small_register_params();
+	params.assign_core = Some(67);
+	let output = build_polkadot_register_calls(params);
+
+	// With assign_core, there are 3 XCM messages: whitelist, dispatch, force_reserve.
+	// Each should have ExpectTransactStatus(Success).
+	// V5 enum variant (0x05) followed by compact(3) = 0x0c means 3 instructions per XCM.
+	let v5_three_instructions: [u8; 2] = [0x05, 0x0c];
+	let occurrences = output
+		.proposal
+		.encoded
+		.windows(2)
+		.filter(|w| *w == v5_three_instructions)
+		.count();
+	assert_eq!(
+		occurrences, 3,
+		"Each of the 3 XCM messages should have 3 instructions (UnpaidExecution + Transact + ExpectTransactStatus)"
+	);
+}
+
+#[test]
+fn register_with_assign_core_adds_xcm_to_coretime() {
+	let params = small_register_params();
+	let output_without = build_polkadot_register_calls(params);
+
+	let mut params_with_core = small_register_params();
+	params_with_core.assign_core = Some(67);
+	let output_with = build_polkadot_register_calls(params_with_core);
+
+	// The relay preimage (force_register) should be identical — assign_core goes via
+	// separate XCM to Coretime chain, not in the relay batch.
+	assert_eq!(
+		output_with.force_register_info.encoded, output_without.force_register_info.encoded,
+		"Relay preimage should be the same with or without assign_core"
+	);
+
+	// The AH proposal should be larger (extra XCM send to Coretime chain)
+	assert!(
+		output_with.proposal.length > output_without.proposal.length,
+		"AH proposal with assign_core ({}) should be larger than without ({})",
+		output_with.proposal.length,
+		output_without.proposal.length,
+	);
+
+	// Both proposals should still be valid AH calls
+	assert!(output_with.proposal.get_polkadot_asset_hub_call().is_ok());
 }
 
 #[test]
@@ -760,6 +811,44 @@ async fn register_proposal_works_with_submit_referendum() {
 			),
 		}
 	}
+}
+
+#[test]
+fn register_xcm_includes_expect_transact_status() {
+	let params = small_register_params();
+	let output = build_polkadot_register_calls(params);
+
+	// Build a proposal WITHOUT ExpectTransactStatus to compare.
+	// We verify by checking that each XCM has 3 instructions (not 2):
+	// [UnpaidExecution, Transact, ExpectTransactStatus].
+	//
+	// XCM Vec<Instruction> is SCALE-encoded with a compact length prefix.
+	// 3 instructions = compact(3) = 0x0c as the first byte of the XCM body.
+	// If ExpectTransactStatus were missing, it would be compact(2) = 0x08.
+	//
+	// The proposal is batch_all([send(xcm1), send(xcm2)]).
+	// Each send's message contains V5(Xcm(vec![...3 instructions...])).
+	// The compact(3) = 0x0c prefix should appear exactly twice.
+
+	// Count how many XCM instruction vectors have length 3 (0x0c prefix).
+	// We look for the byte pattern that represents "3 instructions in a Vec".
+	// In the SCALE encoding of Xcm(Vec<Instruction>), the vec length comes right
+	// after the V5 enum variant tag.
+	//
+	// V5 variant index in VersionedXcm is 5 (V2=0, V3=1, V4=2... but encoded as
+	// actual enum index which is 05 for V5). The pattern is:
+	// 0x05 (V5) followed by 0x0c (compact 3 = three instructions)
+	let v5_three_instructions: [u8; 2] = [0x05, 0x0c];
+	let occurrences = output
+		.proposal
+		.encoded
+		.windows(2)
+		.filter(|w| *w == v5_three_instructions)
+		.count();
+	assert_eq!(
+		occurrences, 2,
+		"Each XCM message should have 3 instructions (UnpaidExecution + Transact + ExpectTransactStatus)"
+	);
 }
 
 #[test]

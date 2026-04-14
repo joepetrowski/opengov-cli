@@ -38,12 +38,19 @@ pub(crate) struct RegisterSystemParaArgs {
 	deposit: u128,
 
 	/// Weight ref_time witness for dispatch_whitelisted_call.
-	#[clap(long = "ref-time", default_value = "60000000000")]
+	/// Default based on Polkadot benchmarks for force_register (~7.7B) with headroom.
+	#[clap(long = "ref-time", default_value = "10000000000")]
 	ref_time: u64,
 
 	/// Weight proof_size witness for dispatch_whitelisted_call.
-	#[clap(long = "proof-size", default_value = "10000")]
+	/// Default based on Polkadot benchmarks for force_register (~3697) with headroom.
+	#[clap(long = "proof-size", default_value = "5000")]
 	proof_size: u64,
+
+	/// Reserve a dedicated core for this parachain on the Coretime chain via broker.force_reserve.
+	/// Provide the core index. Sent as XCM from Asset Hub to the Coretime chain.
+	#[clap(long = "assign-core")]
+	assign_core: Option<u16>,
 
 	/// Output file name for the Asset Hub proposal.
 	#[clap(long = "filename")]
@@ -59,6 +66,8 @@ pub(crate) struct RegisterSystemParaParams {
 	pub deposit: u128,
 	pub ref_time: u64,
 	pub proof_size: u64,
+	/// If set, reserve this core index for the para via broker.force_reserve on the Coretime chain.
+	pub assign_core: Option<u16>,
 }
 
 /// Output of building registration calls.
@@ -117,7 +126,10 @@ pub(crate) fn build_polkadot_register_calls(params: RegisterSystemParaParams) ->
 	let dispatch_info =
 		CallInfo::from_runtime_call(NetworkRuntimeCall::Polkadot(dispatch_whitelisted_call));
 
-	// 3. Wrap in XCM send calls (Asset Hub → Relay)
+	// 3. Wrap in XCM send calls (Asset Hub → Relay / Coretime)
+	use polkadot_asset_hub::runtime_types::staging_xcm::v5::junction::Junction::Parachain;
+	use polkadot_asset_hub::runtime_types::staging_xcm::v5::junctions::Junctions::X1;
+
 	let relay_dest = Box::new(VersionedLocation::V5(Location {
 		parents: 1,
 		interior: Here,
@@ -155,9 +167,60 @@ pub(crate) fn build_polkadot_register_calls(params: RegisterSystemParaParams) ->
 		]))),
 	});
 
-	// 4. Batch into single proposal
+	// 4. Optionally add XCM to Coretime chain for force_reserve
+	let mut batch_calls = vec![xcm_whitelist, xcm_dispatch];
+
+	if let Some(core_index) = params.assign_core {
+		use polkadot_coretime::runtime_types::{
+			bounded_collections::bounded_vec::BoundedVec,
+			pallet_broker::pallet::Call as BrokerCall,
+			pallet_broker::types::ScheduleItem,
+			pallet_broker::core_mask::CoreMask,
+			pallet_broker::coretime_interface::CoreAssignment as CoretimeCoreAssignment,
+		};
+
+		// Encode broker.force_reserve using Coretime chain types
+		// CoreMask::complete() = all 80 bits set = 0xffffffffffffffffffff
+		let complete_mask = CoreMask([0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
+		let force_reserve_call =
+			PolkadotCoretimeRuntimeCall::Broker(BrokerCall::force_reserve {
+				workload: BoundedVec(vec![ScheduleItem {
+					mask: complete_mask,
+					assignment: CoretimeCoreAssignment::Task(params.para_id),
+				}]),
+				core: core_index,
+			});
+		let force_reserve_info =
+			CallInfo::from_runtime_call(NetworkRuntimeCall::PolkadotCoretime(force_reserve_call));
+
+		// XCM from Asset Hub → Coretime chain (sibling, Parachain 1005)
+		let coretime_dest = Box::new(VersionedLocation::V5(Location {
+			parents: 1,
+			interior: X1([Parachain(1005)]),
+		}));
+
+		let xcm_force_reserve = PolkadotAssetHubRuntimeCall::PolkadotXcm(XcmCall::send {
+			dest: coretime_dest,
+			message: Box::new(V5(Xcm(vec![
+				Instruction::UnpaidExecution {
+					weight_limit: WeightLimit::Unlimited,
+					check_origin: None,
+				},
+				Instruction::Transact {
+					origin_kind: OriginKind::Superuser,
+					fallback_max_weight: None,
+					call: DoubleEncoded { encoded: force_reserve_info.encoded },
+				},
+				Instruction::ExpectTransactStatus(MaybeErrorCode::Success),
+			]))),
+		});
+
+		batch_calls.push(xcm_force_reserve);
+	}
+
+	// 5. Batch into single proposal
 	let batch_call = PolkadotAssetHubRuntimeCall::Utility(UtilityCall::batch_all {
-		calls: vec![xcm_whitelist, xcm_dispatch],
+		calls: batch_calls,
 	});
 
 	let proposal = CallInfo::from_runtime_call(NetworkRuntimeCall::PolkadotAssetHub(batch_call));
@@ -197,6 +260,10 @@ async fn register_polkadot_system_para(args: RegisterSystemParaArgs) {
 	println!("Manager: {}", args.manager);
 	println!("Deposit: {}", args.deposit);
 
+	if let Some(core) = args.assign_core {
+		println!("Assign core: {} (via broker.force_reserve on Coretime chain)", core);
+	}
+
 	// Build calls
 	let output = build_polkadot_register_calls(RegisterSystemParaParams {
 		wasm_bytes,
@@ -206,6 +273,7 @@ async fn register_polkadot_system_para(args: RegisterSystemParaArgs) {
 		deposit: args.deposit,
 		ref_time: args.ref_time,
 		proof_size: args.proof_size,
+		assign_core: args.assign_core,
 	});
 
 	println!("\nforce_register call:");
