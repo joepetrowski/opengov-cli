@@ -165,7 +165,7 @@ Genesis head size: 98 bytes
 ParaId: 1010
 Manager: 5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY
 Deposit: 0
-Assign core: 67 (via broker.force_reserve on Coretime chain)
+Assign core: 99 (via broker.force_reserve on Coretime chain)
 
 force_register call:
   Encoded size: 1108188 bytes
@@ -205,7 +205,7 @@ Open a public referendum to dispatch the call:
 0x3e003f0d02ec...
 ```
 
-This produces three calls to submit (submissions can happen in any order, but the preimage on the relay chain must be stored before the Asset Hub referendum enacts):
+This produces three calls to submit (submissions can happen in any order). If `--delay-whitelist-dispatch-relay` is used, the relay chain preimage should be submitted **after** enactment (during the delay window) for free; otherwise it must be stored before the referendum enacts:
 
 1. **Relay Chain** (permissionless): Use `force_register_call.hex` as the bytes for `Preimage.note_preimage` in any wallet. This stores the ~1.1 MB `force_register` call on-chain.
 2. **Collectives Chain** (any Fellow): Submit the Fellowship referendum call. When Fellows approve, it whitelists the Asset Hub proposal.
