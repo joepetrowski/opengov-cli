@@ -97,11 +97,12 @@ Options:
       --wasm <WASM>                Path to the WASM validation code file
       --genesis-head <GENESIS_HEAD>  Path to the genesis head hex file (from: polkadot-omni-node export-genesis-head)
       --para-id <PARA_ID>          Parachain ID to register
-  -n, --network <NETWORK>          Network: `polkadot` or `kusama`
+  -n, --network <NETWORK>          Network. Currently only `polkadot` is supported
       --manager <MANAGER>          Manager account SS58 address
       --deposit <DEPOSIT>          Deposit in plancks [default: 0]
-      --ref-time <REF_TIME>        Weight ref_time witness for dispatch_whitelisted_call [default: 60000000000]
-      --proof-size <PROOF_SIZE>    Weight proof_size witness for dispatch_whitelisted_call [default: 10000]
+      --ref-time <REF_TIME>        Weight ref_time witness for dispatch_whitelisted_call [default: 10000000000]
+      --proof-size <PROOF_SIZE>    Weight proof_size witness for dispatch_whitelisted_call [default: 5000]
+      --assign-core <CORE>         Reserve a dedicated core via broker.force_reserve on the Coretime chain
       --filename <FILENAME>        Output file name for the Asset Hub proposal
   -h, --help                       Print help
 ```
@@ -148,7 +149,7 @@ opengov-cli submit-referendum \
 
 ### Register a System Parachain on Polkadot
 
-First, generate the registration calls:
+First, generate the registration calls. Use `--assign-core` to also reserve a dedicated core on the Coretime chain via `broker.force_reserve`:
 
 ```
 $ ./target/release/opengov-cli register-system-para \
@@ -156,22 +157,20 @@ $ ./target/release/opengov-cli register-system-para \
 	--genesis-head ./genesis-head.hex \
 	--para-id 1010 \
 	--network polkadot \
-	--manager 5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY
+	--manager 5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY \
+	--assign-core 99
 
 WASM size: 1108030 bytes
 Genesis head size: 98 bytes
 ParaId: 1010
 Manager: 5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY
 Deposit: 0
+Assign core: 67 (via broker.force_reserve on Coretime chain)
 
 force_register call:
   Encoded size: 1108188 bytes
-  Hash: 0x9b31b2d4b51f124751ebb7d8fc37bbc9633597cc897cb646235d00441e4626ba
+  Hash: 0x9b31...4626ba
   Written to: force_register_call.hex
-
-Whitelist calls (relay chain, for XCM):
-  whitelist_call: 34 bytes
-  dispatch_whitelisted_call: 46 bytes
 
 ============================================================
   REGISTER SYSTEM PARACHAIN 1010
@@ -182,8 +181,6 @@ Whitelist calls (relay chain, for XCM):
     Preimage.note_preimage in any wallet (e.g. Polkadot JS Apps).
 
   STEP 2 — Submit as referendum:
-    register-system-para-1010.call (111 bytes)
-
     opengov-cli submit-referendum \
       --proposal "register-system-para-1010.call" \
       --network "polkadot" --track whitelistedcaller
@@ -212,7 +209,10 @@ This produces three calls to submit (submissions can happen in any order, but th
 
 1. **Relay Chain** (permissionless): Use `force_register_call.hex` as the bytes for `Preimage.note_preimage` in any wallet. This stores the ~1.1 MB `force_register` call on-chain.
 2. **Collectives Chain** (any Fellow): Submit the Fellowship referendum call. When Fellows approve, it whitelists the Asset Hub proposal.
-3. **Asset Hub** (anyone): Submit the preimage call and the public referendum call. When the public vote passes, it dispatches a `batch_all` of two XCM messages to the relay chain that whitelist and execute the `force_register` call.
+3. **Asset Hub** (anyone): Submit the preimage call and the public referendum call. When the public vote passes, it dispatches a `batch_all` containing:
+   - XCM → Relay: `whitelist.whitelist_call(hash)`
+   - XCM → Relay: `whitelist.dispatch_whitelisted_call(hash)` → executes `force_register`
+   - XCM → Coretime chain: `broker.force_reserve(Task(1010), core=99)` (if `--assign-core` was used)
 
 ### Submit a Referendum on Kusama
 
