@@ -619,6 +619,7 @@ fn small_register_params() -> RegisterSystemParaParams {
 		ref_time: 60_000_000_000,
 		proof_size: 10_000,
 		assign_core: None,
+		delay_whitelist_dispatch_relay: None,
 	}
 }
 
@@ -686,6 +687,32 @@ fn register_whitelist_hash_matches_force_register_hash() {
 		hash_occurrences, 2,
 		"force_register hash should appear exactly twice in proposal (whitelist + dispatch)"
 	);
+}
+
+#[test]
+fn register_delay_whitelist_dispatch_relay_wraps_dispatch_in_scheduler() {
+	let mut params = small_register_params();
+	params.delay_whitelist_dispatch_relay = Some(100);
+	let output_delayed = build_polkadot_register_calls(params);
+
+	let output_normal = build_polkadot_register_calls(small_register_params());
+
+	// The relay preimage should be the same (force_register is unchanged)
+	assert_eq!(
+		output_delayed.force_register_info.encoded, output_normal.force_register_info.encoded,
+		"Relay preimage should be identical regardless of --free-preimage-delay"
+	);
+
+	// The AH proposal should be larger (dispatch wrapped in Scheduler.schedule_after)
+	assert!(
+		output_delayed.proposal.length > output_normal.proposal.length,
+		"Proposal with delay ({}) should be larger than without ({})",
+		output_delayed.proposal.length,
+		output_normal.proposal.length,
+	);
+
+	// Both should still be valid AH calls
+	assert!(output_delayed.proposal.get_polkadot_asset_hub_call().is_ok());
 }
 
 #[test]

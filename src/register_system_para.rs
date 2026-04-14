@@ -52,6 +52,12 @@ pub(crate) struct RegisterSystemParaArgs {
 	#[clap(long = "assign-core")]
 	assign_core: Option<u16>,
 
+	/// Delay dispatch_whitelisted_call using Scheduler.schedule_after so that the preimage
+	/// can be noted for free after whitelist_call requests it. Value is the delay in relay
+	/// chain blocks (e.g. 100 = ~10 minutes on Polkadot).
+	#[clap(long = "delay-whitelist-dispatch-relay")]
+	delay_whitelist_dispatch_relay: Option<u32>,
+
 	/// Output file name for the Asset Hub proposal.
 	#[clap(long = "filename")]
 	filename: Option<String>,
@@ -68,6 +74,9 @@ pub(crate) struct RegisterSystemParaParams {
 	pub proof_size: u64,
 	/// If set, reserve this core index for the para via broker.force_reserve on the Coretime chain.
 	pub assign_core: Option<u16>,
+	/// If set, wrap dispatch_whitelisted_call in Scheduler.schedule_after with this delay (blocks).
+	/// This allows the preimage to be noted for free after whitelist_call requests it.
+	pub delay_whitelist_dispatch_relay: Option<u32>,
 }
 
 /// Output of building registration calls.
@@ -123,8 +132,23 @@ pub(crate) fn build_polkadot_register_calls(params: RegisterSystemParaParams) ->
 				proof_size: params.proof_size,
 			},
 		});
+
+	// Optionally wrap dispatch in Scheduler.schedule_after for the free preimage path:
+	// whitelist_call runs immediately (requesting the preimage hash), then dispatch
+	// is delayed by N blocks, giving time to note the preimage for free.
+	let dispatch_relay_call = if let Some(delay) = params.delay_whitelist_dispatch_relay {
+		use polkadot_relay::runtime_types::pallet_scheduler::pallet::Call as SchedulerCall;
+		PolkadotRuntimeCall::Scheduler(SchedulerCall::schedule_after {
+			after: delay,
+			maybe_periodic: None,
+			priority: 0,
+			call: Box::new(dispatch_whitelisted_call),
+		})
+	} else {
+		dispatch_whitelisted_call
+	};
 	let dispatch_info =
-		CallInfo::from_runtime_call(NetworkRuntimeCall::Polkadot(dispatch_whitelisted_call));
+		CallInfo::from_runtime_call(NetworkRuntimeCall::Polkadot(dispatch_relay_call));
 
 	// 3. Wrap in XCM send calls (Asset Hub → Relay / Coretime)
 	use polkadot_asset_hub::runtime_types::staging_xcm::v5::junction::Junction::Parachain;
@@ -263,6 +287,9 @@ async fn register_polkadot_system_para(args: RegisterSystemParaArgs) {
 	if let Some(core) = args.assign_core {
 		println!("Assign core: {} (via broker.force_reserve on Coretime chain)", core);
 	}
+	if let Some(delay) = args.delay_whitelist_dispatch_relay {
+		println!("Free preimage: dispatch delayed by {} blocks (~{} minutes)", delay, delay * 6 / 60);
+	}
 
 	// Build calls
 	let output = build_polkadot_register_calls(RegisterSystemParaParams {
@@ -274,6 +301,7 @@ async fn register_polkadot_system_para(args: RegisterSystemParaArgs) {
 		ref_time: args.ref_time,
 		proof_size: args.proof_size,
 		assign_core: args.assign_core,
+		delay_whitelist_dispatch_relay: args.delay_whitelist_dispatch_relay,
 	});
 
 	println!("\nforce_register call:");
