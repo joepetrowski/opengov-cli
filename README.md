@@ -21,6 +21,9 @@ Commands:
   build-upgrade         Generate a single call that will upgrade a Relay Chain and all of its system parachains
   register-system-para  Generate the calls needed to register a system parachain via Asset Hub governance
   submit-referendum     Generate all the calls needed to submit a proposal as a referendum in OpenGov
+  xcm-force-register    Generate the whitelist+preimage pattern for a relay-chain force_register call
+  xcm-force-reserve     Generate an AH XCM send wrapping broker.force_reserve for the Coretime chain
+  batch-ah              Combine Asset Hub calls into a single Utility.batch_all proposal
   help                  Print this message or the help of the given subcommand(s)
 
 Options:
@@ -112,6 +115,52 @@ The genesis head can be exported with:
 ```
 polkadot-omni-node export-genesis-head --chain <chainspec.json> > genesis-head.hex
 ```
+
+### Primitives
+
+For more complex proposals (e.g. registering a parachain **and** reserving cores for other parachains in the same referendum), the registration flow is decomposed into three composable subcommands:
+
+- **`xcm-force-register`** — produces the whitelist+preimage pattern for a relay-chain `Registrar.force_register` call. Outputs `preimage.hex`, `xcm_whitelist.hex`, and `xcm_dispatch.hex`.
+- **`xcm-force-reserve`** — produces an AH XCM send wrapping `Broker.force_reserve(para_id, core)` destined for the Coretime chain.
+- **`batch-ah`** — combines multiple Asset Hub call files into a single `Utility.batch_all` proposal.
+
+`register-system-para` itself is a convenience wrapper over these primitives.
+
+#### Multi-parachain example
+
+Register Bulletin (para 1010) and additionally reserve cores for two other parachains in one referendum:
+
+```
+# 1. Generate registration artifacts for para 1010
+$ ./target/debug/opengov-cli xcm-force-register \
+    --wasm ./bulletin.wasm \
+    --genesis-head ./genesis-head.hex \
+    --para-id 1010 \
+    --manager 5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY \
+    --delay-whitelist-dispatch-relay 7200 \
+    --output reg_1010/
+# → reg_1010/preimage.hex, reg_1010/xcm_whitelist.hex, reg_1010/xcm_dispatch.hex
+
+# 2. Reserve cores for para 1010 and two additional paras
+$ ./target/debug/opengov-cli xcm-force-reserve --para-id 1010 --core 97  --output reserve_1010.hex
+$ ./target/debug/opengov-cli xcm-force-reserve --para-id 2020 --core 98 --output reserve_2020.hex
+$ ./target/debug/opengov-cli xcm-force-reserve --para-id 3030 --core 99 --output reserve_3030.hex
+
+# 3. Batch everything into a single AH proposal
+$ ./target/debug/opengov-cli batch-ah --output multi-para.call \
+    reg_1010/xcm_whitelist.hex \
+    reg_1010/xcm_dispatch.hex \
+    reserve_1010.hex \
+    reserve_2020.hex \
+    reserve_3030.hex
+
+# 4. Submit as a referendum (whitelisted-caller track)
+$ ./target/debug/opengov-cli submit-referendum \
+    --proposal multi-para.call \
+    --network polkadot --track whitelistedcaller
+```
+
+After enactment, submit `reg_1010/preimage.hex` via `Preimage.note_preimage` on the relay chain (free during the delay window, since `whitelist_call` marks the hash as requested).
 
 ## Examples
 

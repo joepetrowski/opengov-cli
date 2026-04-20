@@ -895,3 +895,71 @@ fn register_dispatch_whitelisted_has_correct_length() {
 		force_register_len, len_le,
 	);
 }
+
+// ---------------------------------------------------------------------------
+// Regression tests: register-system-para vs composed primitives
+// ---------------------------------------------------------------------------
+
+/// Verify that composing primitives (xcm-force-register + xcm-force-reserve + batch-ah)
+/// produces byte-identical output to `build_polkadot_register_calls`.
+#[test]
+fn composed_primitives_match_register_system_para() {
+	use crate::primitives::{
+		batch_all_on_ah, build_dispatch_whitelisted_call, build_force_register_call,
+		build_force_reserve_call, build_whitelist_call, wrap_in_xcm_send_from_ah,
+		ForceRegisterParams, XcmDest,
+	};
+
+	let mut params = small_register_params();
+	params.assign_core = Some(77);
+	let monolithic = build_polkadot_register_calls(RegisterSystemParaParams {
+		wasm_bytes: params.wasm_bytes.clone(),
+		genesis_head_bytes: params.genesis_head_bytes.clone(),
+		para_id: params.para_id,
+		manager_bytes: params.manager_bytes,
+		deposit: params.deposit,
+		ref_time: params.ref_time,
+		proof_size: params.proof_size,
+		assign_core: params.assign_core,
+		delay_whitelist_dispatch_relay: None,
+	});
+
+	// Compose the same proposal manually using the primitives.
+	let force_register_info = build_force_register_call(ForceRegisterParams {
+		wasm_bytes: params.wasm_bytes.clone(),
+		genesis_head_bytes: params.genesis_head_bytes.clone(),
+		para_id: params.para_id,
+		manager_bytes: params.manager_bytes,
+		deposit: params.deposit,
+	});
+	let whitelist_info = build_whitelist_call(force_register_info.hash);
+	let xcm_whitelist = wrap_in_xcm_send_from_ah(XcmDest::Relay, whitelist_info.encoded);
+
+	let dispatch_call = build_dispatch_whitelisted_call(
+		force_register_info.hash,
+		force_register_info.length,
+		params.ref_time,
+		params.proof_size,
+	);
+	let dispatch_info = CallInfo::from_runtime_call(NetworkRuntimeCall::Polkadot(dispatch_call));
+	let xcm_dispatch = wrap_in_xcm_send_from_ah(XcmDest::Relay, dispatch_info.encoded);
+
+	let fr_info = build_force_reserve_call(params.para_id, 77);
+	let xcm_reserve = wrap_in_xcm_send_from_ah(XcmDest::Sibling(1005), fr_info.encoded.clone());
+
+	let composed = batch_all_on_ah(vec![xcm_whitelist, xcm_dispatch, xcm_reserve]);
+
+	// The composed proposal must be byte-identical to the monolithic build.
+	assert_eq!(
+		composed.encoded, monolithic.proposal.encoded,
+		"composed proposal bytes must match register-system-para output"
+	);
+	assert_eq!(composed.hash, monolithic.proposal.hash);
+
+	// And the force_register preimage / force_reserve call must match too.
+	assert_eq!(force_register_info.encoded, monolithic.force_register_info.encoded);
+	assert_eq!(
+		fr_info.encoded,
+		monolithic.force_reserve_info.as_ref().expect("force_reserve_info set").encoded
+	);
+}

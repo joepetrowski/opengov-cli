@@ -83,173 +83,68 @@ pub(crate) struct RegisterSystemParaParams {
 pub(crate) struct RegisterSystemParaOutput {
 	/// The encoded force_register call (relay chain). Used as preimage content.
 	pub force_register_info: CallInfo,
-	/// The batched Asset Hub proposal (utility.batch_all with two XCM sends).
+	/// The batched Asset Hub proposal (utility.batch_all with two or three XCM sends).
 	pub proposal: CallInfo,
+	/// The encoded force_reserve call (coretime chain), if --assign-core was used.
+	pub force_reserve_info: Option<CallInfo>,
 }
 
 /// Build the registration calls from parameters (pure logic, no file I/O).
+///
+/// Composes primitives from the `primitives` module:
+/// 1. `force_register` (relay)
+/// 2. `whitelist_call(hash)` wrapped in XCM from AH → Relay
+/// 3. `dispatch_whitelisted_call(hash, len, weight)` optionally wrapped in Scheduler, then XCM
+/// 4. Optional `force_reserve(para_id, core)` wrapped in XCM from AH → Coretime
+/// 5. All AH calls batched via `Utility.batch_all`
 pub(crate) fn build_polkadot_register_calls(params: RegisterSystemParaParams) -> RegisterSystemParaOutput {
-	use polkadot_asset_hub::runtime_types::{
-		pallet_utility::pallet::Call as UtilityCall,
-		pallet_xcm::pallet::Call as XcmCall,
-		staging_xcm::v5::{junctions::Junctions::Here, location::Location, Instruction, Xcm},
-		xcm::{
-			double_encoded::DoubleEncoded, v3::MaybeErrorCode, v3::OriginKind, v3::WeightLimit,
-			VersionedLocation, VersionedXcm::V5,
-		},
-	};
-	use polkadot_relay::runtime_types::{
-		polkadot_parachain_primitives::primitives::{HeadData, Id, ValidationCode},
-		polkadot_runtime_common::paras_registrar::pallet::Call as RegistrarCall,
-		pallet_whitelist::pallet::Call as WhitelistCall,
-		sp_weights::weight_v2::Weight,
+	use crate::primitives::{
+		batch_all_on_ah, build_dispatch_whitelisted_call, build_force_register_call,
+		build_force_reserve_call, build_whitelist_call, wrap_in_relay_scheduler,
+		wrap_in_xcm_send_from_ah, ForceRegisterParams, XcmDest,
 	};
 
-	// 1. Encode force_register call (relay chain)
-	let force_register_call = PolkadotRuntimeCall::Registrar(RegistrarCall::force_register {
-		who: subxt::utils::AccountId32(params.manager_bytes),
+	// 1. Relay force_register (preimage content)
+	let force_register_info = build_force_register_call(ForceRegisterParams {
+		wasm_bytes: params.wasm_bytes,
+		genesis_head_bytes: params.genesis_head_bytes,
+		para_id: params.para_id,
+		manager_bytes: params.manager_bytes,
 		deposit: params.deposit,
-		id: Id(params.para_id),
-		genesis_head: HeadData(params.genesis_head_bytes),
-		validation_code: ValidationCode(params.wasm_bytes),
 	});
 
-	let force_register_info =
-		CallInfo::from_runtime_call(NetworkRuntimeCall::Polkadot(force_register_call));
+	// 2. whitelist_call(hash) + XCM wrap
+	let whitelist_info = build_whitelist_call(force_register_info.hash);
+	let xcm_whitelist = wrap_in_xcm_send_from_ah(XcmDest::Relay, whitelist_info.encoded);
 
-	// 2. Encode whitelist calls (relay chain, for XCM Transact)
-	let whitelist_call = PolkadotRuntimeCall::Whitelist(WhitelistCall::whitelist_call {
-		call_hash: H256(force_register_info.hash),
-	});
-	let whitelist_info = CallInfo::from_runtime_call(NetworkRuntimeCall::Polkadot(whitelist_call));
-
-	let dispatch_whitelisted_call =
-		PolkadotRuntimeCall::Whitelist(WhitelistCall::dispatch_whitelisted_call {
-			call_hash: H256(force_register_info.hash),
-			call_encoded_len: force_register_info.length,
-			call_weight_witness: Weight {
-				ref_time: params.ref_time,
-				proof_size: params.proof_size,
-			},
-		});
-
-	// Optionally wrap dispatch in Scheduler.schedule_after for the free preimage path:
-	// whitelist_call runs immediately (requesting the preimage hash), then dispatch
-	// is delayed by N blocks, giving time to note the preimage for free.
-	let dispatch_relay_call = if let Some(delay) = params.delay_whitelist_dispatch_relay {
-		use polkadot_relay::runtime_types::pallet_scheduler::pallet::Call as SchedulerCall;
-		PolkadotRuntimeCall::Scheduler(SchedulerCall::schedule_after {
-			after: delay,
-			maybe_periodic: None,
-			priority: 0,
-			call: Box::new(dispatch_whitelisted_call),
-		})
-	} else {
-		dispatch_whitelisted_call
+	// 3. dispatch_whitelisted_call(hash, len, weight), optional Scheduler wrap, then XCM wrap
+	let dispatch_call = build_dispatch_whitelisted_call(
+		force_register_info.hash,
+		force_register_info.length,
+		params.ref_time,
+		params.proof_size,
+	);
+	let dispatch_call = match params.delay_whitelist_dispatch_relay {
+		Some(delay) => wrap_in_relay_scheduler(dispatch_call, delay),
+		None => dispatch_call,
 	};
-	let dispatch_info =
-		CallInfo::from_runtime_call(NetworkRuntimeCall::Polkadot(dispatch_relay_call));
+	let dispatch_info = CallInfo::from_runtime_call(NetworkRuntimeCall::Polkadot(dispatch_call));
+	let xcm_dispatch = wrap_in_xcm_send_from_ah(XcmDest::Relay, dispatch_info.encoded);
 
-	// 3. Wrap in XCM send calls (Asset Hub → Relay / Coretime)
-	use polkadot_asset_hub::runtime_types::staging_xcm::v5::junction::Junction::Parachain;
-	use polkadot_asset_hub::runtime_types::staging_xcm::v5::junctions::Junctions::X1;
-
-	let relay_dest = Box::new(VersionedLocation::V5(Location {
-		parents: 1,
-		interior: Here,
-	}));
-
-	let xcm_whitelist = PolkadotAssetHubRuntimeCall::PolkadotXcm(XcmCall::send {
-		dest: relay_dest.clone(),
-		message: Box::new(V5(Xcm(vec![
-			Instruction::UnpaidExecution {
-				weight_limit: WeightLimit::Unlimited,
-				check_origin: None,
-			},
-			Instruction::Transact {
-				origin_kind: OriginKind::Superuser,
-				fallback_max_weight: None,
-				call: DoubleEncoded { encoded: whitelist_info.encoded },
-			},
-			Instruction::ExpectTransactStatus(MaybeErrorCode::Success),
-		]))),
-	});
-
-	let xcm_dispatch = PolkadotAssetHubRuntimeCall::PolkadotXcm(XcmCall::send {
-		dest: relay_dest,
-		message: Box::new(V5(Xcm(vec![
-			Instruction::UnpaidExecution {
-				weight_limit: WeightLimit::Unlimited,
-				check_origin: None,
-			},
-			Instruction::Transact {
-				origin_kind: OriginKind::Superuser,
-				fallback_max_weight: None,
-				call: DoubleEncoded { encoded: dispatch_info.encoded },
-			},
-			Instruction::ExpectTransactStatus(MaybeErrorCode::Success),
-		]))),
-	});
-
-	// 4. Optionally add XCM to Coretime chain for force_reserve
+	// 4. Optional force_reserve on Coretime via XCM
 	let mut batch_calls = vec![xcm_whitelist, xcm_dispatch];
-
-	if let Some(core_index) = params.assign_core {
-		use polkadot_coretime::runtime_types::{
-			bounded_collections::bounded_vec::BoundedVec,
-			pallet_broker::pallet::Call as BrokerCall,
-			pallet_broker::types::ScheduleItem,
-			pallet_broker::core_mask::CoreMask,
-			pallet_broker::coretime_interface::CoreAssignment as CoretimeCoreAssignment,
-		};
-
-		// Encode broker.force_reserve using Coretime chain types
-		// CoreMask::complete() = all 80 bits set = 0xffffffffffffffffffff
-		let complete_mask = CoreMask([0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
-		let force_reserve_call =
-			PolkadotCoretimeRuntimeCall::Broker(BrokerCall::force_reserve {
-				workload: BoundedVec(vec![ScheduleItem {
-					mask: complete_mask,
-					assignment: CoretimeCoreAssignment::Task(params.para_id),
-				}]),
-				core: core_index,
-			});
-		let force_reserve_info =
-			CallInfo::from_runtime_call(NetworkRuntimeCall::PolkadotCoretime(force_reserve_call));
-
-		// XCM from Asset Hub → Coretime chain (sibling, Parachain 1005)
-		let coretime_dest = Box::new(VersionedLocation::V5(Location {
-			parents: 1,
-			interior: X1([Parachain(1005)]),
-		}));
-
-		let xcm_force_reserve = PolkadotAssetHubRuntimeCall::PolkadotXcm(XcmCall::send {
-			dest: coretime_dest,
-			message: Box::new(V5(Xcm(vec![
-				Instruction::UnpaidExecution {
-					weight_limit: WeightLimit::Unlimited,
-					check_origin: None,
-				},
-				Instruction::Transact {
-					origin_kind: OriginKind::Superuser,
-					fallback_max_weight: None,
-					call: DoubleEncoded { encoded: force_reserve_info.encoded },
-				},
-				Instruction::ExpectTransactStatus(MaybeErrorCode::Success),
-			]))),
-		});
-
+	let force_reserve_info = params.assign_core.map(|core| {
+		let fr_info = build_force_reserve_call(params.para_id, core);
+		let xcm_force_reserve =
+			wrap_in_xcm_send_from_ah(XcmDest::Sibling(1005), fr_info.encoded.clone());
 		batch_calls.push(xcm_force_reserve);
-	}
-
-	// 5. Batch into single proposal
-	let batch_call = PolkadotAssetHubRuntimeCall::Utility(UtilityCall::batch_all {
-		calls: batch_calls,
+		fr_info
 	});
 
-	let proposal = CallInfo::from_runtime_call(NetworkRuntimeCall::PolkadotAssetHub(batch_call));
+	// 5. Batch into single Asset Hub proposal
+	let proposal = batch_all_on_ah(batch_calls);
 
-	RegisterSystemParaOutput { force_register_info, proposal }
+	RegisterSystemParaOutput { force_register_info, proposal, force_reserve_info }
 }
 
 pub(crate) async fn register_system_para(args: RegisterSystemParaArgs) {
@@ -313,6 +208,13 @@ async fn register_polkadot_system_para(args: RegisterSystemParaArgs) {
 	preimage_hex.push_str(&hex::encode(&output.force_register_info.encoded));
 	fs::write("force_register_call.hex", &preimage_hex).expect("write force_register_call.hex");
 	println!("  Written to: force_register_call.hex");
+
+	if let Some(ref fr) = output.force_reserve_info {
+		let mut fr_hex = "0x".to_owned();
+		fr_hex.push_str(&hex::encode(&fr.encoded));
+		fs::write("force_reserve_call.hex", &fr_hex).expect("write force_reserve_call.hex");
+		println!("  force_reserve call written to: force_reserve_call.hex ({} bytes)", fr.length);
+	}
 
 	println!("\nWhitelist+dispatch wrapped in XCM batch:");
 	println!("  Proposal size: {} bytes", output.proposal.length);
