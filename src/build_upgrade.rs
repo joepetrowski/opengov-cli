@@ -21,6 +21,10 @@ pub(crate) struct UpgradeArgs {
 	#[clap(long = "set-relay-directly")]
 	pub(crate) set_relay_directly: bool,
 
+	/// Skip sanity checks on the downloaded runtime blobs (e.g. their file size).
+	#[clap(long = "no-runtime-checks")]
+	pub(crate) no_runtime_checks: bool,
+
 	/// The Fellowship release version. Should be semver and correspond to the release published.
 	#[clap(long = "relay-version")]
 	pub(crate) relay_version: Option<String>,
@@ -185,6 +189,7 @@ pub(crate) fn parse_inputs(prefs: UpgradeArgs) -> UpgradeDetails {
 	};
 
 	let set_relay_directly = prefs.set_relay_directly;
+	let no_runtime_checks = prefs.no_runtime_checks;
 
 	// Get a version from one of the args. (This still feels dirty.)
 	let version = relay_version.clone().unwrap_or(asset_hub_version.unwrap_or(
@@ -211,6 +216,7 @@ pub(crate) fn parse_inputs(prefs: UpgradeArgs) -> UpgradeDetails {
 		output_file,
 		additional,
 		set_relay_directly,
+		no_runtime_checks,
 	}
 }
 
@@ -277,6 +283,27 @@ async fn download_runtimes(upgrade_details: &UpgradeDetails) {
 		assert!(status.is_success(), "Failed to download {}: HTTP {}", fname, status);
 
 		let runtime = response.bytes().await.expect("need bytes");
+
+		if !upgrade_details.no_runtime_checks {
+			// Substrate zstd-compressed blob magic (`sp_maybe_compressed_blob::ZSTD_PREFIX`).
+			const ZSTD_PREFIX: [u8; 8] = [82, 188, 83, 118, 70, 219, 142, 5];
+			assert!(
+				runtime.starts_with(&ZSTD_PREFIX),
+				"Downloaded {} is not a zstd-compressed Substrate runtime blob. \
+				 Pass --no-runtime-checks to skip.",
+				fname,
+			);
+
+			let size = runtime.len();
+			assert!(
+				(100 * 1024..=10 * 1024 * 1024).contains(&size),
+				"Downloaded {} is {} bytes; expected between 100 KiB and 10 MiB. \
+				 Pass --no-runtime-checks to skip.",
+				fname,
+				size,
+			);
+		}
+
 		// todo: we could actually just hash the file, mutate UpgradeDetails, and not write it.
 		// saving it may be more convenient anyway though, since someone needs to upload it after
 		// the referendum enacts.

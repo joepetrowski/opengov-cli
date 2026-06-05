@@ -170,6 +170,8 @@ pub(super) struct UpgradeDetails {
 	pub(super) additional: Option<CallInfo>,
 	// Call `set_code` directly on the Relay Chain.
 	pub(super) set_relay_directly: bool,
+	// Skip sanity checks on the downloaded runtime blobs.
+	pub(super) no_runtime_checks: bool,
 }
 
 // A network and the version to which it will upgrade.
