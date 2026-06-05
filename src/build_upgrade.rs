@@ -272,6 +272,10 @@ async fn download_runtimes(upgrade_details: &UpgradeDetails) {
 		let path_name = format!("{}{}", upgrade_details.directory, fname);
 		println!("Downloading... {}", fname.as_str());
 		let response = reqwest::get(download_url).await.expect("we need files to work");
+
+		let status = response.status();
+		assert!(status.is_success(), "Failed to download {}: HTTP {}", fname, status);
+
 		let runtime = response.bytes().await.expect("need bytes");
 		// todo: we could actually just hash the file, mutate UpgradeDetails, and not write it.
 		// saving it may be more convenient anyway though, since someone needs to upload it after
