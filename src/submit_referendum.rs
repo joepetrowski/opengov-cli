@@ -391,6 +391,7 @@ async fn polkadot_fellowship_for_kusama_referenda(
 		pallet_referenda::pallet::Call as ReferendaCall,
 		pallet_whitelist::pallet::Call as WhitelistCall,
 	};
+	use polkadot_collectives::runtime_types::staging_xcm::v5::junction::NetworkId;
 	use polkadot_collectives::runtime_types::{
 		bounded_collections::bounded_vec::BoundedVec as CollectivesBoundedVec,
 		collectives_polkadot_runtime::OriginCaller as CollectivesOriginCaller,
@@ -408,15 +409,10 @@ async fn polkadot_fellowship_for_kusama_referenda(
 			Instruction, Xcm,
 		},
 		xcm::{
-			double_encoded::DoubleEncoded,
-			v3::MaybeErrorCode,
-			v3::OriginKind,
-			v3::WeightLimit,
-			VersionedLocation,
-			VersionedXcm::V5,
+			double_encoded::DoubleEncoded, v3::MaybeErrorCode, v3::OriginKind, v3::WeightLimit,
+			VersionedLocation, VersionedXcm::V5,
 		},
 	};
-	use polkadot_collectives::runtime_types::staging_xcm::v5::junction::NetworkId;
 	// Fellowship is on the Polkadot Collectives chain.
 	//
 	// 1. Create a whitelist call on Kusama Asset Hub.
