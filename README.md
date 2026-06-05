@@ -53,6 +53,8 @@ Options:
           Do not print batch calls. Defaults to false
       --output <OUTPUT>
           Form of output. `AppsUiLink` or `CallData`. Defaults to Apps UI
+      --light-client
+          Use light client endpoints instead of RPC for PAPI links
   -h, --help
           Print help
 ```
@@ -114,7 +116,7 @@ opengov-cli submit-referendum \
 
 ### Submit a Referendum on Kusama
 
-As a proposal, send an [XCM to Kusama Asset Hub](https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Fkusama-rpc.dwellir.com#/extrinsics/decode/0x630001000100a10f0204060202286bee880102957f0c9b47bc84d11116aef273e61565cf893801e7db0223aeea112e53922a4a) to authorize an upgrade.
+As a proposal, send an [XCM to Kusama Asset Hub](https://dev.papi.how/extrinsics#data=0x630001000100a10f0204060202286bee880102957f0c9b47bc84d11116aef273e61565cf893801e7db0223aeea112e53922a4a&networkId=kusama&endpoint=wss%3A%2F%2Fkusama-rpc.dwellir.com) to authorize an upgrade.
 
 Call data:
 ```
@@ -130,19 +132,19 @@ $ ./target/debug/opengov-cli submit-referendum \
 	--after "10"
 
 Submit the preimage for the Fellowship referendum:
-https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Fkusama-rpc.dwellir.com#/extrinsics/decode/0x2000882c004149bf15976cd3c0c244ca0cd43d59fed76f4bb936b186cc18bd88dee6edd986
+https://dev.papi.how/extrinsics#data=0x2000882c004149bf15976cd3c0c244ca0cd43d59fed76f4bb936b186cc18bd88dee6edd986&networkId=kusama&endpoint=wss%3A%2F%2Fkusama-rpc.dwellir.com
 
 Open a Fellowship referendum to whitelist the call:
-https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Fkusama-rpc.dwellir.com#/extrinsics/decode/0x17002b0f024c02d09f7b5e4b71e357780baf8cb2d625dca6efaba2ee777516eaf72e5a14a022000000010a000000
+https://dev.papi.how/extrinsics#data=0x17002b0f024c02d09f7b5e4b71e357780baf8cb2d625dca6efaba2ee777516eaf72e5a14a022000000010a000000&networkId=kusama&endpoint=wss%3A%2F%2Fkusama-rpc.dwellir.com
 
 Submit the preimage for the public referendum:
-https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Fkusama-rpc.dwellir.com#/extrinsics/decode/0x2000d42c03630001000100a10f0204060202286bee880102957f0c9b47bc84d11116aef273e61565cf893801e7db0223aeea112e53922a4a
+https://dev.papi.how/extrinsics#data=0x2000d42c03630001000100a10f0204060202286bee880102957f0c9b47bc84d11116aef273e61565cf893801e7db0223aeea112e53922a4a&networkId=kusama&endpoint=wss%3A%2F%2Fkusama-rpc.dwellir.com
 
 Open a public referendum to dispatch the call:
-https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Fkusama-rpc.dwellir.com#/extrinsics/decode/0x15002b0d02022022c662d88f6b0f84c1771134e69b4412aff9e08a99e2a2da2794b5725fbe35000000010a000000
+https://dev.papi.how/extrinsics#data=0x15002b0d02022022c662d88f6b0f84c1771134e69b4412aff9e08a99e2a2da2794b5725fbe35000000010a000000&networkId=kusama&endpoint=wss%3A%2F%2Fkusama-rpc.dwellir.com
 
 Batch to submit on Kusama Relay Chain:
-https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Fkusama-rpc.dwellir.com#/extrinsics/decode/0x1804102000882c004149bf15976cd3c0c244ca0cd43d59fed76f4bb936b186cc18bd88dee6edd98617002b0f024c02d09f7b5e4b71e357780baf8cb2d625dca6efaba2ee777516eaf72e5a14a022000000010a0000002000d42c03630001000100a10f0204060202286bee880102957f0c9b47bc84d11116aef273e61565cf893801e7db0223aeea112e53922a4a15002b0d02022022c662d88f6b0f84c1771134e69b4412aff9e08a99e2a2da2794b5725fbe35000000010a000000
+https://dev.papi.how/extrinsics#data=0x1804102000882c004149bf15976cd3c0c244ca0cd43d59fed76f4bb936b186cc18bd88dee6edd98617002b0f024c02d09f7b5e4b71e357780baf8cb2d625dca6efaba2ee777516eaf72e5a14a022000000010a0000002000d42c03630001000100a10f0204060202286bee880102957f0c9b47bc84d11116aef273e61565cf893801e7db0223aeea112e53922a4a15002b0d02022022c662d88f6b0f84c1771134e69b4412aff9e08a99e2a2da2794b5725fbe35000000010a000000&networkId=kusama&endpoint=wss%3A%2F%2Fkusama-rpc.dwellir.com
 ```
 
 This will return either two or four calls, the latter if the origin is `WhitelistedCaller`, which will require a preimage and referendum for the Fellowship. It also returns a batch call if you want to submit them all at once (you can hide this with `--no-batch "true"`).
@@ -160,22 +162,22 @@ $ ./target/debug/opengov-cli submit-referendum \
 	--after "10"
 
 Submit the preimage for the Fellowship referendum:
-https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Fpolkadot-collectives-rpc.polkadot.io#/extrinsics/decode/0x2b00d41f0003010003082f00000603c2695e6d216f8817000363631d09c4ac33f2960d5d26b02f8ec89ac7a986c0bdab2a3a9f354acb6167
+https://dev.papi.how/extrinsics#data=0x2b00d41f0003010003082f00000603c2695e6d216f8817000363631d09c4ac33f2960d5d26b02f8ec89ac7a986c0bdab2a3a9f354acb6167&networkId=polkadot_collectives&endpoint=wss%3A%2F%2Fpolkadot-collectives-rpc.polkadot.io
 
 Open a Fellowship referendum to whitelist the call:
-https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Fpolkadot-collectives-rpc.polkadot.io#/extrinsics/decode/0x3d003e0102664da7c8fb74a75e641b8aca751297fff57c5aee8014b3570e08f1454c06a88b35000000010a000000
+https://dev.papi.how/extrinsics#data=0x3d003e0102664da7c8fb74a75e641b8aca751297fff57c5aee8014b3570e08f1454c06a88b35000000010a000000&networkId=polkadot_collectives&endpoint=wss%3A%2F%2Fpolkadot-collectives-rpc.polkadot.io
 
 Submit the preimage for the public referendum:
-https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Frpc.polkadot.io#/extrinsics/decode/0x0a007817030000645468652046656c6c6f777368697020736179732068656c6c6f
+https://dev.papi.how/extrinsics#data=0x0a007817030000645468652046656c6c6f777368697020736179732068656c6c6f&networkId=polkadot&endpoint=wss%3A%2F%2Fpolkadot-rpc.dwellir.com
 
 Open a public referendum to dispatch the call:
-https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Frpc.polkadot.io#/extrinsics/decode/0x1500160d022d1d8846a18770fc07a5b03383045d965aad65abb1077d0306142e60551813141e000000010a000000
+https://dev.papi.how/extrinsics#data=0x1500160d022d1d8846a18770fc07a5b03383045d965aad65abb1077d0306142e60551813141e000000010a000000&networkId=polkadot&endpoint=wss%3A%2F%2Fpolkadot-rpc.dwellir.com
 
 Batch to submit on Polkadot Relay Chain:
-https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Frpc.polkadot.io#/extrinsics/decode/0x1a04080a007817030000645468652046656c6c6f777368697020736179732068656c6c6f1500160d022d1d8846a18770fc07a5b03383045d965aad65abb1077d0306142e60551813141e000000010a000000
+https://dev.papi.how/extrinsics#data=0x1a04080a007817030000645468652046656c6c6f777368697020736179732068656c6c6f1500160d022d1d8846a18770fc07a5b03383045d965aad65abb1077d0306142e60551813141e000000010a000000&networkId=polkadot&endpoint=wss%3A%2F%2Fpolkadot-rpc.dwellir.com
 
 Batch to submit on Polkadot Collectives Chain:
-https://polkadot.js.org/apps/?rpc=wss%3A%2F%2Fpolkadot-collectives-rpc.polkadot.io#/extrinsics/decode/0x2804082b00d41f0003010003082f00000603c2695e6d216f8817000363631d09c4ac33f2960d5d26b02f8ec89ac7a986c0bdab2a3a9f354acb61673d003e0102664da7c8fb74a75e641b8aca751297fff57c5aee8014b3570e08f1454c06a88b35000000010a000000
+https://dev.papi.how/extrinsics#data=0x2804082b00d41f0003010003082f00000603c2695e6d216f8817000363631d09c4ac33f2960d5d26b02f8ec89ac7a986c0bdab2a3a9f354acb61673d003e0102664da7c8fb74a75e641b8aca751297fff57c5aee8014b3570e08f1454c06a88b35000000010a000000&networkId=polkadot_collectives&endpoint=wss%3A%2F%2Fpolkadot-collectives-rpc.polkadot.io
 ```
 
 ### Checking the Results
