@@ -152,6 +152,8 @@ pub(super) struct UpgradeDetails {
 	pub(super) output_file: String,
 	// An additional call to be enacted in the same batch as the system upgrade.
 	pub(super) additional: Option<CallInfo>,
+	// Skip sanity checks on the downloaded runtime blobs.
+	pub(super) no_runtime_checks: bool,
 }
 
 // A network and the version to which it will upgrade.
