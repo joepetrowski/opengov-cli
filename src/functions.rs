@@ -10,6 +10,6 @@ pub(crate) fn get_proposal_bytes(proposal: String) -> Vec<u8> {
 	} else {
 		// This is a file path
 		let contents = fs::read_to_string(proposal).expect("Should give a valid file path");
-		hex::decode(contents.as_str().trim_start_matches("0x").trim()).expect("Valid proposal")
+		hex::decode(contents.as_str().trim().trim_start_matches("0x")).expect("Valid proposal")
 	}
 }
