@@ -1,3 +1,4 @@
+use crate::functions::wall_clock_to_block_number;
 use crate::*;
 use clap::Parser as ClapParser;
 use std::fs;
@@ -21,6 +22,11 @@ pub(crate) struct ReferendumArgs {
 	/// Optional: Enact at a particular block number.
 	#[clap(long = "at")]
 	at: Option<u32>,
+
+	/// Optional: Enact at a particular wall clock time (format: YY-MM-DDThhmm, e.g. 25-05-21T0800 for 21st May 2025 at 08:00).
+	/// This will create an estimated block number based on the target block production rate. Note that as some block production slots are inevitably missed, this is the earliest time at which the referendum will enact.
+	#[clap(long = "at-date")]
+	at_date: Option<String>,
 
 	/// Optional: Enact after a given number of blocks.
 	#[clap(long = "after")]
@@ -51,7 +57,7 @@ pub(crate) struct ReferendumArgs {
 // The sub-command's "main" function.
 pub(crate) async fn submit_referendum(prefs: ReferendumArgs) {
 	// Find out what the user wants to do.
-	let proposal_details = parse_inputs(prefs);
+	let proposal_details = parse_inputs(prefs).await;
 	// Generate the calls necessary.
 	let calls = generate_calls(&proposal_details).await;
 	// Tell the user what to do.
@@ -59,7 +65,7 @@ pub(crate) async fn submit_referendum(prefs: ReferendumArgs) {
 }
 
 // Parse the CLI inputs and return a typed struct with all the details needed.
-fn parse_inputs(prefs: ReferendumArgs) -> ProposalDetails {
+async fn parse_inputs(prefs: ReferendumArgs) -> ProposalDetails {
 	use DispatchTimeWrapper::*;
 	use NetworkTrack::*;
 	use Output::*;
@@ -103,17 +109,33 @@ fn parse_inputs(prefs: ReferendumArgs) -> ProposalDetails {
 		_ => panic!("`network` must be `polkadot` or `kusama`"),
 	};
 
-	let dispatch = match (prefs.at, prefs.after) {
-		(None, None) => {
+	let dispatch = match (prefs.at, prefs.at_date, prefs.after) {
+		(None, None, None) => {
 			println!("\nNo enactment time specified. Defaulting to `After(10)`.");
-			println!("Specify an enactment time with `--at <block>` or `--after <blocks>`.\n");
+			println!("Specify an enactment time with `--at <block>`, `--at-date <time>`, or `--after <blocks>`.\n");
 			After(10)
 		},
-		(Some(_), Some(_)) => {
+		(Some(_), Some(_), _) => {
+			panic!("\nBoth `--at` and `--at-date` provided. You can only use one.\n");
+		},
+		(Some(_), _, Some(_)) | (_, Some(_), Some(_)) => {
 			panic!("\nBoth `At` and `After` dispatch times provided. You can only use one.\n");
 		},
-		(Some(at), None) => At(at),
-		(None, Some(after)) => After(after),
+		(Some(at), None, None) => At(at),
+		(None, Some(at_date), None) => {
+			let block = wall_clock_to_block_number(&at_date, &prefs.network)
+				.await
+				.expect("Failed to convert wall clock time to block number");
+			let subscan_subdomain = match prefs.network.to_ascii_lowercase().as_str() {
+				"polkadot" => "assethub-polkadot",
+				"kusama" => "assethub-kusama",
+				_ => panic!("`network` must be `polkadot` or `kusama`"),
+			};
+			println!("\nConverted wall clock time {} to estimated Asset Hub block number {}", at_date, block);
+			println!("Subscan: https://{}.subscan.io/block/{}\n", subscan_subdomain, block);
+			At(block)
+		},
+		(None, None, Some(after)) => After(after),
 	};
 
 	let output_len_limit = prefs.output_len_limit.unwrap_or(1_000);
