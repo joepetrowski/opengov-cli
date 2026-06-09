@@ -158,6 +158,7 @@ fn upgrade_args_for_only_relay() -> UpgradeArgs {
 		coretime: None,
 		filename: None,
 		additional: None,
+		no_runtime_checks: false,
 	}
 }
 
@@ -175,6 +176,7 @@ fn upgrade_args_for_only_asset_hub() -> UpgradeArgs {
 		coretime: None,
 		filename: None,
 		additional: None,
+		no_runtime_checks: false,
 	}
 }
 
@@ -192,6 +194,7 @@ fn upgrade_args_for_all() -> UpgradeArgs {
 		coretime: None,
 		filename: None,
 		additional: None,
+		no_runtime_checks: false,
 	}
 }
 
@@ -210,6 +213,7 @@ fn upgrade_args_with_additional() -> UpgradeArgs {
 		filename: None,
 		// `system.remark("test")` on Polkadot Asset Hub
 		additional: Some(String::from("0x00001074657374")),
+		no_runtime_checks: false,
 	}
 }
 
@@ -240,6 +244,18 @@ fn call_info_from_bytes_works() {
 		hex::decode(bad_remark_hash.trim_start_matches("0x")).expect("Valid hash");
 	assert_ne!(proposal_call_info.get_polkadot_call().expect("polkadot"), bad_remark);
 	assert_eq!(proposal_call_info.hash, &bad_verification[..]);
+}
+
+#[test]
+fn get_proposal_bytes_trims_file_contents() {
+	let path = std::env::temp_dir()
+		.join(format!("opengov-cli-proposal-{}-trim-test.call", std::process::id()));
+	std::fs::write(&path, "\n  0x00001074657374\n").expect("write proposal file");
+
+	let proposal_bytes = get_proposal_bytes(path.to_string_lossy().into_owned());
+	std::fs::remove_file(&path).ok();
+
+	assert_eq!(proposal_bytes, hex::decode("00001074657374").expect("hex"));
 }
 
 #[test]
