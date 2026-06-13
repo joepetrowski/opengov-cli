@@ -1,4 +1,5 @@
 use crate::*;
+use crate::chopsticks::run_chopsticks_tests;
 use clap::Parser as ClapParser;
 use std::fs;
 
@@ -38,6 +39,10 @@ pub(crate) struct ReferendumArgs {
 	#[clap(long = "output")]
 	output: Option<String>,
 
+	/// Optional: Run chopsticks test with the specified test file (.js or .mjs).
+	#[clap(long = "test")]
+	test: Option<String>,
+
 	/// Use light client endpoints instead of RPC for PAPI links.
 	#[clap(long = "light-client")]
 	light_client: bool,
@@ -51,9 +56,17 @@ pub(crate) struct ReferendumArgs {
 // The sub-command's "main" function.
 pub(crate) async fn submit_referendum(prefs: ReferendumArgs) {
 	// Find out what the user wants to do.
+	let test_file = prefs.test.clone();
 	let proposal_details = parse_inputs(prefs);
 	// Generate the calls necessary.
 	let calls = generate_calls(&proposal_details).await;
+
+	// If test file is provided, run chopsticks tests after showing output.
+	if let Some(test_file_path) = test_file {
+		// Extract what we need for chopsticks before deliver_output consumes the data.
+		run_chopsticks_tests(&proposal_details, &calls, &test_file_path).await;
+	}
+
 	// Tell the user what to do.
 	deliver_output(proposal_details, calls);
 }
