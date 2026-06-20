@@ -3,9 +3,9 @@ use crate::types::*;
 mod functions;
 use crate::functions::*;
 mod build_upgrade;
-use crate::build_upgrade::{build_upgrade, UpgradeArgs};
+use crate::build_upgrade::{UpgradeArgs, build_upgrade};
 mod submit_referendum;
-use crate::submit_referendum::{submit_referendum, ReferendumArgs};
+use crate::submit_referendum::{ReferendumArgs, submit_referendum};
 use clap::Parser as ClapParser;
 
 #[cfg(test)]
