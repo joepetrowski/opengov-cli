@@ -1,6 +1,9 @@
 use crate::get_proposal_bytes;
 use crate::polkadot_asset_hub::runtime_types::frame_system::pallet::Call as PolkadotAssetHubSystemCall;
 use crate::polkadot_relay::runtime_types::frame_system::pallet::Call as PolkadotRelaySystemCall;
+use crate::register_system_para::{
+	build_polkadot_register_calls, RegisterSystemParaParams,
+};
 use crate::{
 	build_upgrade, submit_referendum::generate_calls, CallInfo, CallOrHash,
 	KusamaAssetHubOpenGovOrigin, Network, NetworkRuntimeCall, PolkadotAssetHubOpenGovOrigin,
@@ -615,4 +618,364 @@ fn it_creates_constrained_print_output() {
 		},
 	}
 	assert_eq!(length, proposal_call_info.length);
+}
+
+// ---------------------------------------------------------------------------
+// Register System Para tests
+// ---------------------------------------------------------------------------
+
+/// Small synthetic test params (avoids needing real WASM files).
+fn small_register_params() -> RegisterSystemParaParams {
+	RegisterSystemParaParams {
+		wasm_bytes: vec![0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00, 0x00], // minimal wasm-like
+		genesis_head_bytes: vec![0x01, 0x02, 0x03, 0x04],
+		para_id: 1234,
+		manager_bytes: [0u8; 32], // zero account
+		deposit: 0,
+		ref_time: 60_000_000_000,
+		proof_size: 10_000,
+		assign_core: None,
+		delay_whitelist_dispatch_relay: None,
+	}
+}
+
+#[test]
+fn register_force_register_call_encodes_correctly() {
+	let params = small_register_params();
+	let output = build_polkadot_register_calls(params);
+
+	// force_register is a relay chain call
+	assert_eq!(output.force_register_info.network, Network::Polkadot);
+	// Encoded bytes should start with Registrar pallet + force_register call index
+	assert!(output.force_register_info.length > 0);
+	// Hash should be 32 bytes
+	assert_eq!(output.force_register_info.hash.len(), 32);
+	// Should be decodable back to a Polkadot call
+	assert!(output.force_register_info.get_polkadot_call().is_ok());
+}
+
+#[test]
+fn register_proposal_is_asset_hub_call() {
+	let params = small_register_params();
+	let output = build_polkadot_register_calls(params);
+
+	// Proposal is an Asset Hub call (batch_all)
+	assert_eq!(output.proposal.network, Network::PolkadotAssetHub);
+	// Should be decodable as a Polkadot Asset Hub call
+	assert!(output.proposal.get_polkadot_asset_hub_call().is_ok());
+}
+
+#[test]
+fn register_proposal_is_within_ump_limit() {
+	let params = small_register_params();
+	let output = build_polkadot_register_calls(params);
+
+	// The proposal must be small enough to eventually travel as an XCM UMP message.
+	// The proposal itself is a batch_all of two polkadotXcm.send calls.
+	// It should be well under 128 KB (the UMP limit).
+	assert!(
+		output.proposal.length < 1024,
+		"Proposal is {} bytes, expected < 1024 for small inputs",
+		output.proposal.length
+	);
+}
+
+#[test]
+fn register_whitelist_hash_matches_force_register_hash() {
+	let params = small_register_params();
+	let output = build_polkadot_register_calls(params);
+
+	// Verify the proposal is decodable and contains the force_register hash.
+	let _proposal_call = output.proposal.get_polkadot_asset_hub_call().expect("valid AH call");
+
+	// The proposal is batch_all([xcm_send_whitelist, xcm_send_dispatch]).
+	// We verify the force_register hash is embedded in the proposal by checking
+	// that the proposal bytes contain the force_register hash.
+	let hash_bytes = output.force_register_info.hash;
+	let proposal_bytes = &output.proposal.encoded;
+
+	// The hash should appear twice in the proposal (once in whitelist_call, once in dispatch)
+	let hash_occurrences = proposal_bytes
+		.windows(32)
+		.filter(|w| *w == hash_bytes)
+		.count();
+	assert_eq!(
+		hash_occurrences, 2,
+		"force_register hash should appear exactly twice in proposal (whitelist + dispatch)"
+	);
+}
+
+#[test]
+fn register_delay_whitelist_dispatch_relay_wraps_dispatch_in_scheduler() {
+	let mut params = small_register_params();
+	params.delay_whitelist_dispatch_relay = Some(100);
+	let output_delayed = build_polkadot_register_calls(params);
+
+	let output_normal = build_polkadot_register_calls(small_register_params());
+
+	// The relay preimage should be the same (force_register is unchanged)
+	assert_eq!(
+		output_delayed.force_register_info.encoded, output_normal.force_register_info.encoded,
+		"Relay preimage should be identical regardless of --free-preimage-delay"
+	);
+
+	// The AH proposal should be larger (dispatch wrapped in Scheduler.schedule_after)
+	assert!(
+		output_delayed.proposal.length > output_normal.proposal.length,
+		"Proposal with delay ({}) should be larger than without ({})",
+		output_delayed.proposal.length,
+		output_normal.proposal.length,
+	);
+
+	// Both should still be valid AH calls
+	assert!(output_delayed.proposal.get_polkadot_asset_hub_call().is_ok());
+}
+
+#[test]
+fn register_with_assign_core_has_three_expect_transact_status() {
+	let mut params = small_register_params();
+	params.assign_core = Some(67);
+	let output = build_polkadot_register_calls(params);
+
+	// With assign_core, there are 3 XCM messages: whitelist, dispatch, force_reserve.
+	// Each should have ExpectTransactStatus(Success).
+	// V5 enum variant (0x05) followed by compact(3) = 0x0c means 3 instructions per XCM.
+	let v5_three_instructions: [u8; 2] = [0x05, 0x0c];
+	let occurrences = output
+		.proposal
+		.encoded
+		.windows(2)
+		.filter(|w| *w == v5_three_instructions)
+		.count();
+	assert_eq!(
+		occurrences, 3,
+		"Each of the 3 XCM messages should have 3 instructions (UnpaidExecution + Transact + ExpectTransactStatus)"
+	);
+}
+
+#[test]
+fn register_with_assign_core_adds_xcm_to_coretime() {
+	let params = small_register_params();
+	let output_without = build_polkadot_register_calls(params);
+
+	let mut params_with_core = small_register_params();
+	params_with_core.assign_core = Some(67);
+	let output_with = build_polkadot_register_calls(params_with_core);
+
+	// The relay preimage (force_register) should be identical — assign_core goes via
+	// separate XCM to Coretime chain, not in the relay batch.
+	assert_eq!(
+		output_with.force_register_info.encoded, output_without.force_register_info.encoded,
+		"Relay preimage should be the same with or without assign_core"
+	);
+
+	// The AH proposal should be larger (extra XCM send to Coretime chain)
+	assert!(
+		output_with.proposal.length > output_without.proposal.length,
+		"AH proposal with assign_core ({}) should be larger than without ({})",
+		output_with.proposal.length,
+		output_without.proposal.length,
+	);
+
+	// Both proposals should still be valid AH calls
+	assert!(output_with.proposal.get_polkadot_asset_hub_call().is_ok());
+}
+
+#[test]
+fn register_deterministic_output() {
+	// Same inputs should produce identical output.
+	let output1 = build_polkadot_register_calls(small_register_params());
+	let output2 = build_polkadot_register_calls(small_register_params());
+
+	assert_eq!(output1.force_register_info.encoded, output2.force_register_info.encoded);
+	assert_eq!(output1.force_register_info.hash, output2.force_register_info.hash);
+	assert_eq!(output1.proposal.encoded, output2.proposal.encoded);
+}
+
+#[tokio::test]
+async fn register_proposal_works_with_submit_referendum() {
+	// Build the registration proposal, then feed it into submit-referendum
+	// to verify the full pipeline works.
+	let params = small_register_params();
+	let output = build_polkadot_register_calls(params);
+
+	// Create a ProposalDetails as if the user piped the proposal into submit-referendum
+	use crate::DispatchTimeWrapper::*;
+	use crate::NetworkTrack::*;
+	use crate::Output::*;
+
+	let proposal_hex = format!("0x{}", hex::encode(&output.proposal.encoded));
+
+	let proposal_details = ProposalDetails {
+		proposal: proposal_hex,
+		track: Polkadot(PolkadotAssetHubOpenGovOrigin::WhitelistedCaller),
+		dispatch: After(10),
+		output: CallData,
+		output_len_limit: 1_000,
+		print_batch: false,
+		use_light_client: false,
+		fellowship_on_polkadot: false,
+	};
+
+	let calls = generate_calls(&proposal_details).await;
+
+	// Should generate fellowship referendum (on Collectives)
+	assert!(
+		calls.fellowship_referendum_submission.is_some(),
+		"must generate fellowship referendum"
+	);
+	if let Some(ref fellowship_ref) = calls.fellowship_referendum_submission {
+		match fellowship_ref {
+			NetworkRuntimeCall::PolkadotCollectives(_) => (),
+			other => panic!(
+				"Fellowship referendum should be on PolkadotCollectives, got {:?}",
+				std::mem::discriminant(other)
+			),
+		}
+	}
+
+	// Should generate public referendum preimage (on Asset Hub)
+	assert!(
+		calls.preimage_for_public_referendum.is_some(),
+		"must generate public referendum preimage"
+	);
+
+	// Should generate public referendum (on Asset Hub)
+	assert!(
+		calls.public_referendum_submission.is_some(),
+		"must generate public referendum"
+	);
+	if let Some(ref public_ref) = calls.public_referendum_submission {
+		match public_ref {
+			NetworkRuntimeCall::PolkadotAssetHub(_) => (),
+			other => panic!(
+				"Public referendum should be on PolkadotAssetHub, got {:?}",
+				std::mem::discriminant(other)
+			),
+		}
+	}
+}
+
+#[test]
+fn register_xcm_includes_expect_transact_status() {
+	let params = small_register_params();
+	let output = build_polkadot_register_calls(params);
+
+	// Build a proposal WITHOUT ExpectTransactStatus to compare.
+	// We verify by checking that each XCM has 3 instructions (not 2):
+	// [UnpaidExecution, Transact, ExpectTransactStatus].
+	//
+	// XCM Vec<Instruction> is SCALE-encoded with a compact length prefix.
+	// 3 instructions = compact(3) = 0x0c as the first byte of the XCM body.
+	// If ExpectTransactStatus were missing, it would be compact(2) = 0x08.
+	//
+	// The proposal is batch_all([send(xcm1), send(xcm2)]).
+	// Each send's message contains V5(Xcm(vec![...3 instructions...])).
+	// The compact(3) = 0x0c prefix should appear exactly twice.
+
+	// Count how many XCM instruction vectors have length 3 (0x0c prefix).
+	// We look for the byte pattern that represents "3 instructions in a Vec".
+	// In the SCALE encoding of Xcm(Vec<Instruction>), the vec length comes right
+	// after the V5 enum variant tag.
+	//
+	// V5 variant index in VersionedXcm is 5 (V2=0, V3=1, V4=2... but encoded as
+	// actual enum index which is 05 for V5). The pattern is:
+	// 0x05 (V5) followed by 0x0c (compact 3 = three instructions)
+	let v5_three_instructions: [u8; 2] = [0x05, 0x0c];
+	let occurrences = output
+		.proposal
+		.encoded
+		.windows(2)
+		.filter(|w| *w == v5_three_instructions)
+		.count();
+	assert_eq!(
+		occurrences, 2,
+		"Each XCM message should have 3 instructions (UnpaidExecution + Transact + ExpectTransactStatus)"
+	);
+}
+
+#[test]
+fn register_dispatch_whitelisted_has_correct_length() {
+	let params = small_register_params();
+	let output = build_polkadot_register_calls(params);
+
+	// The dispatch_whitelisted_call inside the XCM should reference the correct
+	// call_encoded_len matching the force_register call length.
+	let force_register_len = output.force_register_info.length;
+
+	// call_encoded_len is a u32, SCALE-encoded as 4 bytes little-endian
+	let len_le = force_register_len.to_le_bytes();
+	assert!(
+		output.proposal.encoded.windows(4).any(|w| w == len_le),
+		"force_register length ({}, le bytes {:?}) should appear in the proposal",
+		force_register_len, len_le,
+	);
+}
+
+// ---------------------------------------------------------------------------
+// Regression tests: register-system-para vs composed primitives
+// ---------------------------------------------------------------------------
+
+/// Verify that composing primitives (xcm-force-register + xcm-force-reserve + batch-ah)
+/// produces byte-identical output to `build_polkadot_register_calls`.
+#[test]
+fn composed_primitives_match_register_system_para() {
+	use crate::primitives::{
+		batch_all_on_ah, build_dispatch_whitelisted_call, build_force_register_call,
+		build_force_reserve_call, build_whitelist_call, wrap_in_xcm_send_from_ah,
+		ForceRegisterParams, XcmDest,
+	};
+
+	let mut params = small_register_params();
+	params.assign_core = Some(77);
+	let monolithic = build_polkadot_register_calls(RegisterSystemParaParams {
+		wasm_bytes: params.wasm_bytes.clone(),
+		genesis_head_bytes: params.genesis_head_bytes.clone(),
+		para_id: params.para_id,
+		manager_bytes: params.manager_bytes,
+		deposit: params.deposit,
+		ref_time: params.ref_time,
+		proof_size: params.proof_size,
+		assign_core: params.assign_core,
+		delay_whitelist_dispatch_relay: None,
+	});
+
+	// Compose the same proposal manually using the primitives.
+	let force_register_info = build_force_register_call(ForceRegisterParams {
+		wasm_bytes: params.wasm_bytes.clone(),
+		genesis_head_bytes: params.genesis_head_bytes.clone(),
+		para_id: params.para_id,
+		manager_bytes: params.manager_bytes,
+		deposit: params.deposit,
+	});
+	let whitelist_info = build_whitelist_call(force_register_info.hash);
+	let xcm_whitelist = wrap_in_xcm_send_from_ah(XcmDest::Relay, whitelist_info.encoded);
+
+	let dispatch_call = build_dispatch_whitelisted_call(
+		force_register_info.hash,
+		force_register_info.length,
+		params.ref_time,
+		params.proof_size,
+	);
+	let dispatch_info = CallInfo::from_runtime_call(NetworkRuntimeCall::Polkadot(dispatch_call));
+	let xcm_dispatch = wrap_in_xcm_send_from_ah(XcmDest::Relay, dispatch_info.encoded);
+
+	let fr_info = build_force_reserve_call(params.para_id, 77);
+	let xcm_reserve = wrap_in_xcm_send_from_ah(XcmDest::Sibling(1005), fr_info.encoded.clone());
+
+	let composed = batch_all_on_ah(vec![xcm_whitelist, xcm_dispatch, xcm_reserve]);
+
+	// The composed proposal must be byte-identical to the monolithic build.
+	assert_eq!(
+		composed.encoded, monolithic.proposal.encoded,
+		"composed proposal bytes must match register-system-para output"
+	);
+	assert_eq!(composed.hash, monolithic.proposal.hash);
+
+	// And the force_register preimage / force_reserve call must match too.
+	assert_eq!(force_register_info.encoded, monolithic.force_register_info.encoded);
+	assert_eq!(
+		fr_info.encoded,
+		monolithic.force_reserve_info.as_ref().expect("force_reserve_info set").encoded
+	);
 }
