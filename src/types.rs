@@ -78,6 +78,10 @@ pub(super) use polkadot_people::runtime_types::people_polkadot_runtime::RuntimeC
 pub mod polkadot_coretime {}
 pub(super) use polkadot_coretime::runtime_types::coretime_polkadot_runtime::RuntimeCall as PolkadotCoretimeRuntimeCall;
 
+#[subxt::subxt(runtime_metadata_path = "metadata/polkadot_bulletin.scale")]
+pub mod polkadot_bulletin {}
+pub(super) use polkadot_bulletin::runtime_types::bulletin_polkadot_runtime::RuntimeCall as PolkadotBulletinRuntimeCall;
+
 #[derive(Clone, Debug, PartialEq)]
 pub(super) enum Network {
 	Kusama,
@@ -92,6 +96,7 @@ pub(super) enum Network {
 	PolkadotBridgeHub,
 	PolkadotPeople,
 	PolkadotCoretime,
+	PolkadotBulletin,
 }
 
 impl Network {
@@ -113,6 +118,30 @@ impl Network {
 			PolkadotCollectives => Ok(1_001),
 			PolkadotPeople => Ok(1_004),
 			PolkadotCoretime => Ok(1_005),
+			PolkadotBulletin => Ok(1_010),
+		}
+	}
+
+	/// Whether the network belongs to the Kusama family (as opposed to Polkadot).
+	pub(super) fn is_kusama(&self) -> bool {
+		use Network::*;
+		matches!(
+			self,
+			Kusama
+				| KusamaAssetHub
+				| KusamaEncointer
+				| KusamaBridgeHub
+				| KusamaPeople
+				| KusamaCoretime
+		)
+	}
+
+	/// The SS58 prefix used to display accounts of this network.
+	pub(super) fn ss58_prefix(&self) -> u16 {
+		if self.is_kusama() {
+			2
+		} else {
+			0
 		}
 	}
 }
@@ -187,6 +216,7 @@ pub(super) enum NetworkRuntimeCall {
 	PolkadotBridgeHub(PolkadotBridgeHubRuntimeCall),
 	PolkadotPeople(PolkadotPeopleRuntimeCall),
 	PolkadotCoretime(PolkadotCoretimeRuntimeCall),
+	PolkadotBulletin(PolkadotBulletinRuntimeCall),
 }
 
 // How the user would like to see the output of the program.
@@ -238,6 +268,7 @@ impl CallInfo {
 			NetworkRuntimeCall::PolkadotBridgeHub(cc) => (Network::PolkadotBridgeHub, cc.encode()),
 			NetworkRuntimeCall::PolkadotPeople(cc) => (Network::PolkadotPeople, cc.encode()),
 			NetworkRuntimeCall::PolkadotCoretime(cc) => (Network::PolkadotCoretime, cc.encode()),
+			NetworkRuntimeCall::PolkadotBulletin(cc) => (Network::PolkadotBulletin, cc.encode()),
 		};
 		let hash = blake2_256(&encoded);
 		let length: u32 = (encoded.len()).try_into().unwrap();
@@ -435,6 +466,23 @@ impl CallInfo {
 				.unwrap())
 			},
 			_ => Err("not a polkadot coretime call"),
+		}
+	}
+
+	// Strip the outer enum and return a Polkadot Bulletin `RuntimeCall`.
+	#[allow(dead_code)]
+	pub(super) fn get_polkadot_bulletin_call(
+		&self,
+	) -> Result<PolkadotBulletinRuntimeCall, &'static str> {
+		match &self.network {
+			Network::PolkadotBulletin => {
+				let bytes = &self.encoded;
+				Ok(<PolkadotBulletinRuntimeCall as parity_scale_codec::Decode>::decode(
+					&mut &bytes[..],
+				)
+				.unwrap())
+			},
+			_ => Err("not a polkadot bulletin call"),
 		}
 	}
 

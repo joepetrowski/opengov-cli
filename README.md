@@ -80,6 +80,28 @@ Options:
   -h, --help                           Print help
 ```
 
+### Add Invulnerables
+
+The `add-invulnerables` subcommand takes a system chain and a list of accounts, and constructs a proposal that adds those accounts as invulnerable collators on that chain. The proposal is meant for the `StakingAdmin` track: for any chain other than Asset Hub itself, the `collatorSelection.addInvulnerable` call(s) are wrapped in an XCM `Transact` with `OriginKind::Xcm`, which arrives on the target chain as the StakingAdmin plurality voice that every system chain's `CollatorSelectionUpdateOrigin` accepts.
+
+Note: every account must already have registered its session keys on the target chain (`session.setKeys`) by the time the referendum enacts, otherwise its `addInvulnerable` will fail with `ValidatorNotRegistered`. Multiple additions are wrapped in `utility.forceBatch`, so one failing addition does not revert the others.
+
+With `--verify-via <WSS_URL>`, the tool connects to the target chain and verifies before writing anything: the node serves the expected para id, every account has session keys registered, none is already invulnerable, and the resulting set fits `MaxInvulnerables`.
+
+```
+$ ./target/debug/opengov-cli add-invulnerables --help
+Generate a proposal that adds invulnerable collators to a system chain
+
+Usage: opengov-cli add-invulnerables [OPTIONS] --network <NETWORK> --who <WHO>...
+
+Options:
+  -n, --network <NETWORK>        The chain whose collator set should be extended, e.g. `bulletin-polkadot` or `bridge-hub-kusama`
+      --who <WHO>...             Account(s) to add as invulnerable collators, as SS58 addresses or 0x-prefixed 32-byte hex. Can be passed multiple times and/or comma-separated
+      --filename <FILENAME>      Name of the file to which to write the output. If not provided, a default will be constructed
+      --verify-via <VERIFY_VIA>  Optional: a WebSocket RPC URL of the target chain, e.g. `wss://bulletin-rpc.polkadot.io`. When provided, the tool verifies on-chain that the proposal can actually enact
+  -h, --help                     Print help (see a summary with '-h')
+```
+
 ## Examples
 
 ### Build Upgrade
@@ -112,6 +134,44 @@ To submit this as a referendum in OpenGov, run:
 opengov-cli submit-referendum \
     --proposal "./upgrade-polkadot-1.0.0/polkadot-1.0.0.call" \
     --network "polkadot" --track <"root" or "whitelistedcaller">
+```
+
+### Add Invulnerables
+
+```
+$ ./target/release/opengov-cli add-invulnerables --network bulletin-polkadot \
+    --who 155wHcqJ3fcfgtHsjqKHwNEU24pzRkkmZK865xxHeFTXMU8T \
+    --who 1sXuddoUew7f9F9XTVyns8KjCRRLvpvvUsZUyxZhqtH4RZn
+
+Call to execute on bulletin-polkadot: 0x0604081505b4b4a8fdf51911242d0a860640fa8952f4005d0c4542428b4bcfb9815fc6ec551505268a505e81484de28108b814d0ab5ea13b947d153c19ee26bd280bd886e57815
+Its hash: 0xb11be6cbe43f87b26f5b890988ce7ea73349d36233b6f436821356d2ab07f47e
+
+Reminder: every account must already have session keys registered on bulletin-polkadot (`session.setKeys`) by the time the referendum enacts, or its `addInvulnerable` will fail with `ValidatorNotRegistered`. Pass `--verify-via <WSS_URL>` to check this on-chain.
+
+Success! The proposal was written to ./add-invulnerables-bulletin-polkadot.call
+To submit this as a referendum in OpenGov, run:
+
+opengov-cli submit-referendum \
+    --proposal "./add-invulnerables-bulletin-polkadot.call" \
+    --network "polkadot" --track staking-admin
+```
+
+With on-chain verification, accounts that are not actually ready are caught before the proposal is written:
+
+```
+$ ./target/release/opengov-cli add-invulnerables --network bulletin-polkadot \
+    --who 1A1WrKowzJD4yQQcETugEV5UWoNo1o7ujuA3f1fBfpxPjZL \
+    --who 0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d \
+    --verify-via wss://bulletin-rpc.polkadot.io
+
+Verifying accounts on-chain via wss://bulletin-rpc.polkadot.io
+  ok: 1A1WrKowzJD4yQQcETugEV5UWoNo1o7ujuA3f1fBfpxPjZL has session keys 0x5e9659d151a03a5902e3135c9e361855f6d1caaea6e53a7d8613d7ad410bf507
+  FAILED: 1A1WrKowzJD4yQQcETugEV5UWoNo1o7ujuA3f1fBfpxPjZL is already invulnerable
+  FAILED: 15oF4uVJwmo4TdGW7VfQxNLavjCXviqxT9S1MgbjMNHr6Sp5 has no session keys registered (`session.setKeys` missing)
+  invulnerables: 3 on chain, 5 after this proposal, maximum 20
+
+thread 'main' panicked at src/add_invulnerables.rs:
+on-chain verification failed with 2 error(s), see above
 ```
 
 ### Submit a Referendum on Kusama
