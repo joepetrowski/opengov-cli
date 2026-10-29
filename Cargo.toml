@@ -8,6 +8,7 @@ authors = ["joepetrowski"]
 
 [dependencies]
 parity-scale-codec = "3.7.5"
+sp-crypto-hashing = { git = "https://github.com/paritytech/polkadot-sdk", branch = "master" }
 sp-core = { git = "https://github.com/paritytech/polkadot-sdk", branch = "master" }
 subxt = "0.42.0"
 hex = "0.4.3"

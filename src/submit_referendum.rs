@@ -179,12 +179,13 @@ pub(crate) async fn generate_calls(proposal_details: &ProposalDetails) -> Possib
 		NetworkTrack::Kusama(kusama_track) => {
 			match kusama_track {
 				// Whitelisted calls are special.
-				KusamaAssetHubOpenGovOrigin::WhitelistedCaller =>
+				KusamaAssetHubOpenGovOrigin::WhitelistedCaller => {
 					if proposal_details.fellowship_on_polkadot {
 						polkadot_fellowship_for_kusama_referenda(proposal_details).await
 					} else {
 						kusama_fellowship_referenda(proposal_details).await
-					},
+					}
+				},
 
 				// All other Kusama origins.
 				_ => kusama_non_fellowship_referenda(
@@ -206,8 +207,9 @@ pub(crate) async fn generate_calls(proposal_details: &ProposalDetails) -> Possib
 		// All special Polkadot origins.
 		NetworkTrack::Polkadot(polkadot_track) => {
 			match polkadot_track {
-				PolkadotAssetHubOpenGovOrigin::WhitelistedCaller =>
-					polkadot_fellowship_referenda(proposal_details).await,
+				PolkadotAssetHubOpenGovOrigin::WhitelistedCaller => {
+					polkadot_fellowship_referenda(proposal_details).await
+				},
 
 				// All other Polkadot origins.
 				_ => polkadot_non_fellowship_referenda(
