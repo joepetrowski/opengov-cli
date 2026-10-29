@@ -1,5 +1,5 @@
 pub(super) use parity_scale_codec::Encode as _;
-pub(super) use sp_core::blake2_256;
+pub(super) use sp_crypto_hashing::blake2_256;
 pub(super) use subxt::utils::H256;
 
 // Kusama Chains -----------------------------------------------------------------------------------
@@ -232,8 +232,9 @@ impl CallInfo {
 			NetworkRuntimeCall::KusamaEncointer(cc) => (Network::KusamaEncointer, cc.encode()),
 			NetworkRuntimeCall::Polkadot(cc) => (Network::Polkadot, cc.encode()),
 			NetworkRuntimeCall::PolkadotAssetHub(cc) => (Network::PolkadotAssetHub, cc.encode()),
-			NetworkRuntimeCall::PolkadotCollectives(cc) =>
-				(Network::PolkadotCollectives, cc.encode()),
+			NetworkRuntimeCall::PolkadotCollectives(cc) => {
+				(Network::PolkadotCollectives, cc.encode())
+			},
 			NetworkRuntimeCall::PolkadotBridgeHub(cc) => (Network::PolkadotBridgeHub, cc.encode()),
 			NetworkRuntimeCall::PolkadotPeople(cc) => (Network::PolkadotPeople, cc.encode()),
 			NetworkRuntimeCall::PolkadotCoretime(cc) => (Network::PolkadotCoretime, cc.encode()),
