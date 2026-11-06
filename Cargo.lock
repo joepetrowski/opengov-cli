@@ -2704,6 +2704,7 @@ name = "opengov-cli"
 version = "0.2.0"
 dependencies = [
  "clap",
+ "futures",
  "hex",
  "parity-scale-codec",
  "reqwest",

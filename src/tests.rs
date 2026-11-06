@@ -156,6 +156,7 @@ fn upgrade_args_for_only_relay() -> UpgradeArgs {
 		encointer: None,
 		people: None,
 		coretime: None,
+		bulletin: None,
 		filename: None,
 		additional: None,
 		no_runtime_checks: false,
@@ -174,6 +175,7 @@ fn upgrade_args_for_only_asset_hub() -> UpgradeArgs {
 		encointer: None,
 		people: None,
 		coretime: None,
+		bulletin: None,
 		filename: None,
 		additional: None,
 		no_runtime_checks: false,
@@ -192,6 +194,7 @@ fn upgrade_args_for_all() -> UpgradeArgs {
 		encointer: None,
 		people: None,
 		coretime: None,
+		bulletin: None,
 		filename: None,
 		additional: None,
 		no_runtime_checks: false,
@@ -210,6 +213,7 @@ fn upgrade_args_with_additional() -> UpgradeArgs {
 		encointer: None,
 		people: None,
 		coretime: None,
+		bulletin: None,
 		filename: None,
 		// `system.remark("test")` on Polkadot Asset Hub
 		additional: Some(String::from("0x00001074657374")),
@@ -569,6 +573,7 @@ fn upgrade_everything_works_with_just_relay_version() {
 		VersionedNetwork { network: Network::PolkadotBridgeHub, version: String::from("1.2.0") },
 		VersionedNetwork { network: Network::PolkadotPeople, version: String::from("1.2.0") },
 		VersionedNetwork { network: Network::PolkadotCoretime, version: String::from("1.2.0") },
+		VersionedNetwork { network: Network::PolkadotBulletin, version: String::from("1.2.0") },
 	];
 	assert_eq!(details.networks, expected_networks);
 	assert!(details.additional.is_none());
@@ -615,4 +620,85 @@ fn it_creates_constrained_print_output() {
 		},
 	}
 	assert_eq!(length, proposal_call_info.length);
+}
+
+// Add Invulnerables -------------------------------------------------------------------------------
+
+#[test]
+fn add_invulnerables_parses_and_encodes_a_single_account() {
+	use crate::add_invulnerables::{build_add_invulnerables_call, parse_accounts};
+
+	// One of the Bulletin genesis invulnerables.
+	let who = String::from("1A1WrKowzJD4yQQcETugEV5UWoNo1o7ujuA3f1fBfpxPjZL");
+	let accounts = parse_accounts(&[who], &Network::PolkadotBulletin);
+	let expected_account = "06def0ef07d9b5153276dd785525839706f4696c8cb86227a2af27fd7495ee63";
+	assert_eq!(hex::encode(accounts[0]), expected_account);
+
+	let call = build_add_invulnerables_call(&Network::PolkadotBulletin, &accounts);
+	// collatorSelection (pallet 21) . addInvulnerable (call 5) ++ account
+	assert_eq!(hex::encode(&call.encoded), format!("1505{expected_account}"));
+}
+
+#[test]
+fn add_invulnerables_batches_multiple_accounts() {
+	use crate::add_invulnerables::build_add_invulnerables_call;
+
+	let a = [1u8; 32];
+	let b = [2u8; 32];
+	let call = build_add_invulnerables_call(&Network::PolkadotBulletin, &[a, b]);
+	// utility (pallet 6) . forceBatch (call 4) ++ compact(2) ++ two addInvulnerable calls
+	let expected = format!("0604081505{}1505{}", hex::encode(a), hex::encode(b));
+	assert_eq!(hex::encode(&call.encoded), expected);
+}
+
+#[test]
+fn add_invulnerables_wraps_for_staking_admin_via_xcm() {
+	use crate::add_invulnerables::{build_add_invulnerables_call, wrap_for_governance};
+	use crate::polkadot_asset_hub::runtime_types::{
+		pallet_xcm::pallet::Call as XcmCall,
+		staging_xcm::v5::{junction::Junction::Parachain, junctions::Junctions::X1, Instruction},
+		xcm::{v3::OriginKind, VersionedLocation, VersionedXcm::V5},
+	};
+
+	let target = build_add_invulnerables_call(&Network::PolkadotBulletin, &[[1u8; 32]]);
+	let proposal = wrap_for_governance(&target);
+	assert_eq!(proposal.network, Network::PolkadotAssetHub);
+
+	let call = proposal.get_polkadot_asset_hub_call().expect("polkadot asset hub call");
+	let PolkadotAssetHubRuntimeCall::PolkadotXcm(XcmCall::send { dest, message }) = call else {
+		panic!("expected a PolkadotXcm::send call");
+	};
+	let VersionedLocation::V5(dest) = *dest else { panic!("expected a V5 location") };
+	assert_eq!(dest.parents, 1);
+	assert!(matches!(dest.interior, X1([Parachain(1010)])));
+
+	let V5(xcm) = *message else { panic!("expected a V5 message") };
+	assert_eq!(xcm.0.len(), 2);
+	assert!(matches!(&xcm.0[0], Instruction::UnpaidExecution { .. }));
+	let Instruction::Transact { origin_kind, call, .. } = &xcm.0[1] else {
+		panic!("expected a Transact instruction");
+	};
+	assert!(matches!(origin_kind, OriginKind::Xcm));
+	assert_eq!(call.encoded, target.encoded);
+}
+
+#[test]
+fn add_invulnerables_does_not_wrap_asset_hub_calls() {
+	use crate::add_invulnerables::{build_add_invulnerables_call, wrap_for_governance};
+
+	let target = build_add_invulnerables_call(&Network::PolkadotAssetHub, &[[1u8; 32]]);
+	let proposal = wrap_for_governance(&target);
+	assert_eq!(proposal.network, Network::PolkadotAssetHub);
+	assert_eq!(proposal.encoded, target.encoded);
+}
+
+#[test]
+#[should_panic(expected = "listed more than once")]
+fn add_invulnerables_rejects_duplicate_accounts() {
+	use crate::add_invulnerables::parse_accounts;
+
+	let hex_account =
+		String::from("0x0101010101010101010101010101010101010101010101010101010101010101");
+	let ss58_account = String::from("1A1WrKowzJD4yQQcETugEV5UWoNo1o7ujuA3f1fBfpxPjZL");
+	parse_accounts(&[ss58_account.clone(), hex_account, ss58_account], &Network::PolkadotBulletin);
 }
