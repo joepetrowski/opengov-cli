@@ -187,12 +187,10 @@ pub(crate) fn parse_inputs(prefs: UpgradeArgs) -> UpgradeDetails {
 			let additional_bytes = get_proposal_bytes(c.clone());
 			match relay {
 				// This match isn't as intuitive post-ahm, as these are AH calls.
-				Network::Polkadot => {
-					Some(CallInfo::from_bytes(&additional_bytes, Network::PolkadotAssetHub))
-				},
-				Network::Kusama => {
-					Some(CallInfo::from_bytes(&additional_bytes, Network::KusamaAssetHub))
-				},
+				Network::Polkadot =>
+					Some(CallInfo::from_bytes(&additional_bytes, Network::PolkadotAssetHub)),
+				Network::Kusama =>
+					Some(CallInfo::from_bytes(&additional_bytes, Network::KusamaAssetHub)),
 				_ => panic!("`network` must be `polkadot` or `kusama`"),
 			}
 		},
@@ -411,9 +409,8 @@ pub(crate) async fn construct_batch(
 	println!("\nBatching calls.");
 	match upgrade_details.relay {
 		Network::Kusama => construct_kusama_batch(calls, upgrade_details.additional.clone()).await,
-		Network::Polkadot => {
-			construct_polkadot_batch(calls, upgrade_details.additional.clone()).await
-		},
+		Network::Polkadot =>
+			construct_polkadot_batch(calls, upgrade_details.additional.clone()).await,
 		_ => panic!("Not a Relay Chain"),
 	}
 }
@@ -438,9 +435,8 @@ async fn construct_kusama_batch(calls: Vec<CallInfo>, additional: Option<CallInf
 	}
 	match &batch_calls.len() {
 		0 => panic!("no calls"),
-		1 => {
-			CallInfo::from_runtime_call(NetworkRuntimeCall::KusamaAssetHub(batch_calls[0].clone()))
-		},
+		1 =>
+			CallInfo::from_runtime_call(NetworkRuntimeCall::KusamaAssetHub(batch_calls[0].clone())),
 		_ => CallInfo::from_runtime_call(NetworkRuntimeCall::KusamaAssetHub(
 			KusamaAssetHubRuntimeCall::Utility(UtilityCall::force_batch { calls: batch_calls }),
 		)),
