@@ -5,6 +5,10 @@
 # script after runtime upgrades that change the calls this tool encodes (pallet/call indices or
 # argument types), then rebuild and run the tests.
 #
+# Each snapshot is stripped (see scripts/strip-metadata) to the calls of every pallet: storage,
+# events, errors, constants, runtime APIs and docs are removed. Codegen for 13 chains' full
+# metadata uses more memory than CI runners have.
+#
 # Requires subxt-cli: `cargo install subxt-cli`
 
 set -euo pipefail
@@ -27,11 +31,20 @@ CHAINS=(
 	"kusama_coretime|wss://kusama-coretime-rpc.polkadot.io:443"
 )
 
+cargo build --release --quiet \
+	--manifest-path scripts/strip-metadata/Cargo.toml \
+	--target-dir target/strip-metadata
+STRIP=target/strip-metadata/release/strip-metadata
+
+full="$(mktemp)"
+trap 'rm -f "${full}"' EXIT
+
 for entry in "${CHAINS[@]}"; do
 	name="${entry%%|*}"
 	url="${entry##*|}"
 	echo "Updating metadata/${name}.scale from ${url}"
-	subxt metadata --url "${url}" --version 16 --format bytes > "metadata/${name}.scale"
+	subxt metadata --url "${url}" --version 16 --format bytes > "${full}"
+	"${STRIP}" "${full}" "metadata/${name}.scale"
 done
 
 echo "Done. Rebuild and run 'cargo test' to check that the tool's calls still encode correctly."

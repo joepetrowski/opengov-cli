@@ -207,9 +207,8 @@ pub(crate) async fn generate_calls(proposal_details: &ProposalDetails) -> Possib
 		// All special Polkadot origins.
 		NetworkTrack::Polkadot(polkadot_track) => {
 			match polkadot_track {
-				PolkadotAssetHubOpenGovOrigin::WhitelistedCaller => {
-					polkadot_fellowship_referenda(proposal_details).await
-				},
+				PolkadotAssetHubOpenGovOrigin::WhitelistedCaller =>
+					polkadot_fellowship_referenda(proposal_details).await,
 
 				// All other Polkadot origins.
 				_ => polkadot_non_fellowship_referenda(

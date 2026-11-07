@@ -262,9 +262,8 @@ impl CallInfo {
 			NetworkRuntimeCall::KusamaEncointer(cc) => (Network::KusamaEncointer, cc.encode()),
 			NetworkRuntimeCall::Polkadot(cc) => (Network::Polkadot, cc.encode()),
 			NetworkRuntimeCall::PolkadotAssetHub(cc) => (Network::PolkadotAssetHub, cc.encode()),
-			NetworkRuntimeCall::PolkadotCollectives(cc) => {
-				(Network::PolkadotCollectives, cc.encode())
-			},
+			NetworkRuntimeCall::PolkadotCollectives(cc) =>
+				(Network::PolkadotCollectives, cc.encode()),
 			NetworkRuntimeCall::PolkadotBridgeHub(cc) => (Network::PolkadotBridgeHub, cc.encode()),
 			NetworkRuntimeCall::PolkadotPeople(cc) => (Network::PolkadotPeople, cc.encode()),
 			NetworkRuntimeCall::PolkadotCoretime(cc) => (Network::PolkadotCoretime, cc.encode()),
