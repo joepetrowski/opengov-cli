@@ -1,0 +1,13 @@
+[package]
+name = "strip-metadata"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[dependencies]
+codec = { package = "parity-scale-codec", version = "3.7.4" }
+frame-metadata = { version = "23.0.0", features = ["current", "unstable"] }
+scale-info = "2.11.4"
+subxt-utils-stripmetadata = "0.51.1"
