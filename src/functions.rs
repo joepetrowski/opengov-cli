@@ -1,26 +1,4 @@
 use crate::*;
-use std::fs;
-
-// Check what the user entered for the proposal. If it is just call data, return it back. Otherwise,
-// we expect a path to a file that contains the call data. Read that in and return it.
-pub(crate) fn get_proposal_bytes(proposal: String) -> Vec<u8> {
-	let proposal = proposal.as_str();
-	if proposal.starts_with("0x") {
-		// This is just call data
-		hex::decode(proposal.trim_start_matches("0x")).expect("Valid proposal")
-	} else {
-		// This is a file path
-		let contents = fs::read_to_string(proposal).expect("Should give a valid file path");
-		hex::decode(contents.as_str().trim().trim_start_matches("0x")).expect("Valid proposal")
-	}
-}
-
-// Write some call data to a file as a "0x"-prefixed hex string.
-pub(crate) fn write_call_data(fname: &str, encoded: &[u8]) {
-	let mut info_to_write = "0x".to_owned();
-	info_to_write.push_str(hex::encode(encoded).as_str());
-	fs::write(fname, info_to_write).expect("it should write");
-}
 
 // Take a call, which includes its intended destination, and wrap it in XCM instructions to `send`
 // it from Polkadot Asset Hub and have it execute on its destination with the given origin kind:

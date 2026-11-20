@@ -102,6 +102,58 @@ Options:
   -h, --help                     Print help (see a summary with '-h')
 ```
 
+## Library and WebAssembly
+
+The call construction is also available as a library, without the command line tool. The library does no I/O (no files, network or printing), and the same input always gives the same bytes, so a web app can build exactly the calls that the CLI builds and hand them to a wallet to sign.
+
+```toml
+# Cargo.toml: the library only, without the CLI's dependencies
+opengov-cli = { git = "https://github.com/joepetrowski/opengov-cli", default-features = false }
+```
+
+- `build_upgrade(UpgradeInput)` returns the proposal that `build-upgrade` writes: a `system.authorize_upgrade` per chain, sent over XCM where needed, in a `utility.force_batch`.
+- `referendum_calls(ReferendumInput)` returns every call that `submit-referendum` prints: the preimages and the referendum submissions, each with the chain it must be submitted on.
+- `runtime_file_name` and `check_and_hash_runtime` give the release file name of a chain's runtime and its code hash, with the same sanity checks the CLI applies to downloads.
+
+Invalid input is returned as an `Error`, never a panic. Calls are returned in full whatever their length: the CLI's `--output-len-limit` only affects what it prints.
+
+### JavaScript
+
+The `wasm` feature adds JavaScript bindings with TypeScript definitions:
+
+```
+$ wasm-pack build --target web --no-default-features --features wasm
+$ node scripts/wasm-smoke-test.mjs pkg
+```
+
+Bytes are `0x`-prefixed hex, networks are named as in Fellowship releases (e.g. `asset-hub-polkadot`), and errors are thrown as JavaScript errors.
+
+```js
+import init, { build_upgrade, check_and_hash_runtime, referendum_calls, runtime_file_name } from "opengov-cli";
+await init();
+
+// The app fetches each runtime itself, from the file that `runtime_file_name` names.
+const file = runtime_file_name("asset-hub-polkadot", "2.6.0");
+const code_hash = check_and_hash_runtime(new Uint8Array(await (await fetch(url(file))).arrayBuffer()), false);
+
+const upgrade = build_upgrade({
+  relay: "polkadot",
+  runtimes: [{ network: "asset-hub-polkadot", code_hash }],
+});
+// => { network: "asset-hub-polkadot", encoded: "0x…", hash: "0x…" }
+
+const calls = referendum_calls({
+  proposal: upgrade.encoded,
+  network: "polkadot",
+  track: "whitelistedcaller",
+  dispatch: { after: 10 }, // or { at: 34030500 }
+});
+// => { fellowship_preimage, fellowship_referendum, public_preimage, public_referendum,
+//      public_preimage_bytes, public_preimage_hash, public_preimage_len, whitelisted_call_hash }
+```
+
+Each GitHub release has the package attached as an npm tarball (`opengov-cli-<version>.tgz`), which a web app can pin by URL in its `package.json`.
+
 ## Examples
 
 ### Build Upgrade

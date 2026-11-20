@@ -1,0 +1,45 @@
+name: Release
+
+# Attach the wasm package to a GitHub release as an npm tarball, so that a web app can pin a
+# version of it, e.g. in package.json:
+#
+#   "opengov-cli": "https://github.com/joepetrowski/opengov-cli/releases/download/v0.2.0/opengov-cli-0.2.0.tgz"
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  # Keep in step with rust.yml.
+  WASM_PACK_VERSION: 0.15.1
+
+jobs:
+  wasm-package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check that the tag matches the crate version
+        run: |
+          version="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "opengov-cli") | .version')"
+          if [ "v${version}" != "${GITHUB_REF_NAME}" ]; then
+            echo "::error::Release tag ${GITHUB_REF_NAME} does not match crate version ${version} (expected v${version})."
+            exit 1
+          fi
+      - name: Install the wasm target and wasm-pack
+        run: |
+          rustup target add wasm32-unknown-unknown
+          cargo install wasm-pack --locked --version ${{ env.WASM_PACK_VERSION }}
+      - name: Build the wasm package
+        run: wasm-pack build --target web --no-default-features --features wasm
+      - name: Smoke test
+        run: node scripts/wasm-smoke-test.mjs pkg
+      - name: Pack
+        run: wasm-pack pack
+      - name: Attach the package to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${GITHUB_REF_NAME}" pkg/*.tgz --clobber

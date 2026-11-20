@@ -1,89 +1,125 @@
-pub(super) use parity_scale_codec::Encode as _;
-pub(super) use sp_crypto_hashing::blake2_256;
-pub(super) use subxt::utils::H256;
+use crate::Error;
+use parity_scale_codec::Decode;
+pub(crate) use parity_scale_codec::Encode as _;
+pub use sp_crypto_hashing::blake2_256;
+pub(crate) use subxt_core::utils::H256;
 
 // Kusama Chains -----------------------------------------------------------------------------------
 
-#[subxt::subxt(
+#[subxt_macro::subxt(
+	crate = "::subxt_core",
 	runtime_metadata_path = "metadata/kusama.scale",
 	derive_for_all_types = "PartialEq, Clone"
 )]
-pub mod kusama_relay {}
-pub(super) use kusama_relay::runtime_types::staging_kusama_runtime::{
+pub(crate) mod kusama_relay {}
+pub(crate) use kusama_relay::runtime_types::staging_kusama_runtime::{
 	governance::origins::pallet_custom_origins::Origin as KusamaOpenGovOrigin,
 	OriginCaller as KusamaOriginCaller, RuntimeCall as KusamaRuntimeCall,
 };
 
-#[subxt::subxt(
+#[subxt_macro::subxt(
+	crate = "::subxt_core",
 	runtime_metadata_path = "metadata/kusama_asset_hub.scale",
 	derive_for_all_types = "PartialEq, Clone"
 )]
-pub mod kusama_asset_hub {}
-pub(super) use kusama_asset_hub::runtime_types::asset_hub_kusama_runtime::{
-	governance::origins::pallet_custom_origins::Origin as KusamaAssetHubOpenGovOrigin,
+pub(crate) mod kusama_asset_hub {}
+// The generated types are internal, except for the OpenGov origins (tracks) of the Asset Hubs, which
+// `NetworkTrack` is made of.
+pub use kusama_asset_hub::runtime_types::asset_hub_kusama_runtime::governance::origins::pallet_custom_origins::Origin as KusamaAssetHubOpenGovOrigin;
+pub(crate) use kusama_asset_hub::runtime_types::asset_hub_kusama_runtime::{
 	OriginCaller as KusamaAssetHubOriginCaller, RuntimeCall as KusamaAssetHubRuntimeCall,
 };
 
-#[subxt::subxt(runtime_metadata_path = "metadata/kusama_bridge_hub.scale")]
-pub mod kusama_bridge_hub {}
-pub(super) use kusama_bridge_hub::runtime_types::bridge_hub_kusama_runtime::RuntimeCall as KusamaBridgeHubRuntimeCall;
+#[subxt_macro::subxt(
+	crate = "::subxt_core",
+	runtime_metadata_path = "metadata/kusama_bridge_hub.scale"
+)]
+pub(crate) mod kusama_bridge_hub {}
+pub(crate) use kusama_bridge_hub::runtime_types::bridge_hub_kusama_runtime::RuntimeCall as KusamaBridgeHubRuntimeCall;
 
-#[subxt::subxt(runtime_metadata_path = "metadata/kusama_encointer.scale")]
-pub mod kusama_encointer {}
-pub(super) use kusama_encointer::runtime_types::encointer_kusama_runtime::RuntimeCall as KusamaEncointerRuntimeCall;
+#[subxt_macro::subxt(
+	crate = "::subxt_core",
+	runtime_metadata_path = "metadata/kusama_encointer.scale"
+)]
+pub(crate) mod kusama_encointer {}
+pub(crate) use kusama_encointer::runtime_types::encointer_kusama_runtime::RuntimeCall as KusamaEncointerRuntimeCall;
 
-#[subxt::subxt(runtime_metadata_path = "metadata/kusama_people.scale")]
-pub mod kusama_people {}
-pub(super) use kusama_people::runtime_types::people_kusama_runtime::RuntimeCall as KusamaPeopleRuntimeCall;
+#[subxt_macro::subxt(
+	crate = "::subxt_core",
+	runtime_metadata_path = "metadata/kusama_people.scale"
+)]
+pub(crate) mod kusama_people {}
+pub(crate) use kusama_people::runtime_types::people_kusama_runtime::RuntimeCall as KusamaPeopleRuntimeCall;
 
-#[subxt::subxt(runtime_metadata_path = "metadata/kusama_coretime.scale")]
-pub mod kusama_coretime {}
-pub(super) use kusama_coretime::runtime_types::coretime_kusama_runtime::RuntimeCall as KusamaCoretimeRuntimeCall;
+#[subxt_macro::subxt(
+	crate = "::subxt_core",
+	runtime_metadata_path = "metadata/kusama_coretime.scale"
+)]
+pub(crate) mod kusama_coretime {}
+pub(crate) use kusama_coretime::runtime_types::coretime_kusama_runtime::RuntimeCall as KusamaCoretimeRuntimeCall;
 
 // Polkadot Chains ---------------------------------------------------------------------------------
 
-#[subxt::subxt(
+#[subxt_macro::subxt(
+	crate = "::subxt_core",
 	runtime_metadata_path = "metadata/polkadot.scale",
 	derive_for_all_types = "PartialEq, Clone"
 )]
-pub mod polkadot_relay {}
-pub(super) use polkadot_relay::runtime_types::polkadot_runtime::RuntimeCall as PolkadotRuntimeCall;
+pub(crate) mod polkadot_relay {}
+pub(crate) use polkadot_relay::runtime_types::polkadot_runtime::RuntimeCall as PolkadotRuntimeCall;
 
-#[subxt::subxt(
+#[subxt_macro::subxt(
+	crate = "::subxt_core",
 	runtime_metadata_path = "metadata/polkadot_asset_hub.scale",
 	derive_for_all_types = "PartialEq, Clone"
 )]
-pub mod polkadot_asset_hub {}
-pub(super) use polkadot_asset_hub::runtime_types::asset_hub_polkadot_runtime::{
-	governance::origins::pallet_custom_origins::Origin as PolkadotAssetHubOpenGovOrigin,
+pub(crate) mod polkadot_asset_hub {}
+pub use polkadot_asset_hub::runtime_types::asset_hub_polkadot_runtime::governance::origins::pallet_custom_origins::Origin as PolkadotAssetHubOpenGovOrigin;
+pub(crate) use polkadot_asset_hub::runtime_types::asset_hub_polkadot_runtime::{
 	OriginCaller as PolkadotAssetHubOriginCaller, RuntimeCall as PolkadotAssetHubRuntimeCall,
 };
 
-#[subxt::subxt(runtime_metadata_path = "metadata/polkadot_collectives.scale")]
-pub mod polkadot_collectives {}
-pub(super) use polkadot_collectives::runtime_types::collectives_polkadot_runtime::{
+#[subxt_macro::subxt(
+	crate = "::subxt_core",
+	runtime_metadata_path = "metadata/polkadot_collectives.scale"
+)]
+pub(crate) mod polkadot_collectives {}
+pub(crate) use polkadot_collectives::runtime_types::collectives_polkadot_runtime::{
 	fellowship::origins::pallet_origins::Origin as FellowshipOrigins,
 	RuntimeCall as CollectivesRuntimeCall,
 };
 
-#[subxt::subxt(runtime_metadata_path = "metadata/polkadot_bridge_hub.scale")]
-pub mod polkadot_bridge_hub {}
-pub(super) use polkadot_bridge_hub::runtime_types::bridge_hub_polkadot_runtime::RuntimeCall as PolkadotBridgeHubRuntimeCall;
+#[subxt_macro::subxt(
+	crate = "::subxt_core",
+	runtime_metadata_path = "metadata/polkadot_bridge_hub.scale"
+)]
+pub(crate) mod polkadot_bridge_hub {}
+pub(crate) use polkadot_bridge_hub::runtime_types::bridge_hub_polkadot_runtime::RuntimeCall as PolkadotBridgeHubRuntimeCall;
 
-#[subxt::subxt(runtime_metadata_path = "metadata/polkadot_people.scale")]
-pub mod polkadot_people {}
-pub(super) use polkadot_people::runtime_types::people_polkadot_runtime::RuntimeCall as PolkadotPeopleRuntimeCall;
+#[subxt_macro::subxt(
+	crate = "::subxt_core",
+	runtime_metadata_path = "metadata/polkadot_people.scale"
+)]
+pub(crate) mod polkadot_people {}
+pub(crate) use polkadot_people::runtime_types::people_polkadot_runtime::RuntimeCall as PolkadotPeopleRuntimeCall;
 
-#[subxt::subxt(runtime_metadata_path = "metadata/polkadot_coretime.scale")]
-pub mod polkadot_coretime {}
-pub(super) use polkadot_coretime::runtime_types::coretime_polkadot_runtime::RuntimeCall as PolkadotCoretimeRuntimeCall;
+#[subxt_macro::subxt(
+	crate = "::subxt_core",
+	runtime_metadata_path = "metadata/polkadot_coretime.scale"
+)]
+pub(crate) mod polkadot_coretime {}
+pub(crate) use polkadot_coretime::runtime_types::coretime_polkadot_runtime::RuntimeCall as PolkadotCoretimeRuntimeCall;
 
-#[subxt::subxt(runtime_metadata_path = "metadata/polkadot_bulletin.scale")]
-pub mod polkadot_bulletin {}
-pub(super) use polkadot_bulletin::runtime_types::bulletin_polkadot_runtime::RuntimeCall as PolkadotBulletinRuntimeCall;
+#[subxt_macro::subxt(
+	crate = "::subxt_core",
+	runtime_metadata_path = "metadata/polkadot_bulletin.scale"
+)]
+pub(crate) mod polkadot_bulletin {}
+pub(crate) use polkadot_bulletin::runtime_types::bulletin_polkadot_runtime::RuntimeCall as PolkadotBulletinRuntimeCall;
 
-#[derive(Clone, Debug, PartialEq)]
-pub(super) enum Network {
+/// The chains this crate can build calls for.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Network {
 	Kusama,
 	KusamaAssetHub,
 	KusamaEncointer,
@@ -100,8 +136,54 @@ pub(super) enum Network {
 }
 
 impl Network {
+	/// The name a Fellowship release gives this chain's runtime, e.g. `asset-hub-polkadot`. Also
+	/// the stable string id of the network.
+	pub fn runtime_name(&self) -> &'static str {
+		match self {
+			Network::Kusama => "kusama",
+			Network::KusamaAssetHub => "asset-hub-kusama",
+			Network::KusamaBridgeHub => "bridge-hub-kusama",
+			Network::KusamaPeople => "people-kusama",
+			Network::KusamaCoretime => "coretime-kusama",
+			Network::KusamaEncointer => "encointer-kusama",
+			Network::Polkadot => "polkadot",
+			Network::PolkadotAssetHub => "asset-hub-polkadot",
+			Network::PolkadotCollectives => "collectives-polkadot",
+			Network::PolkadotBridgeHub => "bridge-hub-polkadot",
+			Network::PolkadotPeople => "people-polkadot",
+			Network::PolkadotCoretime => "coretime-polkadot",
+			Network::PolkadotBulletin => "bulletin-polkadot",
+		}
+	}
+
+	/// The inverse of [`Network::runtime_name`].
+	pub fn from_runtime_name(name: &str) -> Result<Self, Error> {
+		Self::ALL
+			.iter()
+			.find(|network| network.runtime_name() == name)
+			.cloned()
+			.ok_or_else(|| Error::UnknownNetwork(name.to_string()))
+	}
+
+	/// Every supported network.
+	pub const ALL: [Network; 13] = [
+		Network::Kusama,
+		Network::KusamaAssetHub,
+		Network::KusamaEncointer,
+		Network::KusamaBridgeHub,
+		Network::KusamaPeople,
+		Network::KusamaCoretime,
+		Network::Polkadot,
+		Network::PolkadotAssetHub,
+		Network::PolkadotCollectives,
+		Network::PolkadotBridgeHub,
+		Network::PolkadotPeople,
+		Network::PolkadotCoretime,
+		Network::PolkadotBulletin,
+	];
+
 	/// Return the `ParaId` of a given network. Returns an error if the network is not a parachain.
-	pub(super) fn get_para_id(&self) -> Result<u32, &'static str> {
+	pub fn get_para_id(&self) -> Result<u32, &'static str> {
 		use Network::*;
 		match &self {
 			// Kusama
@@ -123,7 +205,7 @@ impl Network {
 	}
 
 	/// Whether the network belongs to the Kusama family (as opposed to Polkadot).
-	pub(super) fn is_kusama(&self) -> bool {
+	pub fn is_kusama(&self) -> bool {
 		use Network::*;
 		matches!(
 			self,
@@ -137,7 +219,7 @@ impl Network {
 	}
 
 	/// The SS58 prefix used to display accounts of this network.
-	pub(super) fn ss58_prefix(&self) -> u16 {
+	pub fn ss58_prefix(&self) -> u16 {
 		if self.is_kusama() {
 			2
 		} else {
@@ -146,56 +228,9 @@ impl Network {
 	}
 }
 
-// Info and preferences provided by the user for proposal submission.
-pub(super) struct ProposalDetails {
-	// The proposal, generated elsewhere and pasted here.
-	pub(super) proposal: String,
-	// The track to submit on.
-	pub(super) track: NetworkTrack,
-	// When do you want this to enact. `At(block)` or `After(blocks)`.
-	pub(super) dispatch: DispatchTimeWrapper,
-	// How you would like to view the output.
-	pub(super) output: Output,
-	// Cutoff length in bytes for printing the output. If too long, it will print the hash of the
-	// call you would need to submit so that you can verify before submission.
-	pub(super) output_len_limit: u32,
-	// Whether or not to group all calls into a batch. Uses `force_batch` in case the account does
-	// not have funds for pre-image deposits or is not a fellow.
-	pub(super) print_batch: bool,
-	// Whether to use light client endpoints in PAPI links (default true).
-	pub(super) use_light_client: bool,
-	// Whether to use the Polkadot Fellowship (on Collectives) instead of the Kusama Fellowship.
-	// Only applicable for Kusama WhitelistedCaller track.
-	pub(super) fellowship_on_polkadot: bool,
-}
-
-// Info and preferences provided by the user for runtime upgrade construction.
-pub(super) struct UpgradeDetails {
-	// The Relay Network for this upgrade, Polkadot or Kusama.
-	pub(super) relay: Network,
-	// All networks to upgrade.
-	pub(super) networks: Vec<VersionedNetwork>,
-	// The directory into which to write information needed.
-	pub(super) directory: String,
-	// The filename of the output.
-	pub(super) output_file: String,
-	// An additional call to be enacted in the same batch as the system upgrade.
-	pub(super) additional: Option<CallInfo>,
-	// Skip sanity checks on the downloaded runtime blobs.
-	pub(super) no_runtime_checks: bool,
-}
-
-// A network and the version to which it will upgrade.
-#[derive(Debug, PartialEq)]
-pub(super) struct VersionedNetwork {
-	// A network identifier.
-	pub(super) network: Network,
-	// A runtime version number (i.e. "9430", not "0.9.43").
-	pub(super) version: String,
-}
-
-// The network and OpenGov track this proposal should be voted on.
-pub(super) enum NetworkTrack {
+/// The network and OpenGov track a proposal should be voted on.
+#[derive(Clone)]
+pub enum NetworkTrack {
 	KusamaRoot,
 	Kusama(KusamaAssetHubOpenGovOrigin),
 	PolkadotRoot,
@@ -203,7 +238,7 @@ pub(super) enum NetworkTrack {
 }
 
 // A runtime call wrapped in the network it should execute on.
-pub(super) enum NetworkRuntimeCall {
+pub(crate) enum NetworkRuntimeCall {
 	Kusama(KusamaRuntimeCall),
 	KusamaAssetHub(KusamaAssetHubRuntimeCall),
 	KusamaBridgeHub(KusamaBridgeHubRuntimeCall),
@@ -219,40 +254,44 @@ pub(super) enum NetworkRuntimeCall {
 	PolkadotBulletin(PolkadotBulletinRuntimeCall),
 }
 
-// How the user would like to see the output of the program.
-pub(super) enum Output {
-	// Print just the call data (e.g. 0x1234).
-	CallData,
-	// Print a clickable link to view the decoded call on Polkadot JS Apps UI.
-	AppsUiLink,
-}
-
-// Local concrete type to use in each runtime's `DispatchTime`
-pub(super) enum DispatchTimeWrapper {
+/// When a referendum should enact once approved: at a block number or after a number of blocks.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DispatchTimeWrapper {
 	At(u32),
 	After(u32),
 }
 
-// A call or a hash. Used for printing (or rather, to avoid printing large calls).
-// The Hash variant is only used when calls exceed the output length limit, which is rare.
-#[allow(clippy::large_enum_variant)]
-pub(super) enum CallOrHash {
-	Call(NetworkRuntimeCall),
-	Hash([u8; 32]),
+/// A call together with the chain it must be submitted to or executed on.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CallInfo {
+	/// The chain whose `RuntimeCall` this is.
+	pub network: Network,
+	/// The SCALE-encoded `RuntimeCall`.
+	pub encoded: Vec<u8>,
+	/// `blake2_256(encoded)`.
+	pub hash: [u8; 32],
+	/// The length of `encoded` in bytes.
+	pub length: u32,
 }
 
-// All the info associated with a call in the forms you may need it in.
-#[derive(Clone)]
-pub(super) struct CallInfo {
-	pub(super) network: Network,
-	pub(super) encoded: Vec<u8>,
-	pub(super) hash: [u8; 32],
-	pub(super) length: u32,
+// Define a method that decodes a `CallInfo` as the `RuntimeCall` of the network it is for.
+macro_rules! call_getter {
+	($name:ident, $network:ident, $call:ty) => {
+		#[allow(dead_code)]
+		pub(crate) fn $name(&self) -> Result<$call, Error> {
+			match &self.network {
+				Network::$network => <$call as Decode>::decode(&mut &self.encoded[..])
+					.map_err(|_| Error::UndecodableCall(Network::$network)),
+				other =>
+					Err(Error::WrongNetwork { expected: Network::$network, found: other.clone() }),
+			}
+		}
+	};
 }
 
 impl CallInfo {
 	// Construct `Self` from a `NetworkRuntimeCall`.
-	pub(super) fn from_runtime_call(call: NetworkRuntimeCall) -> Self {
+	pub(crate) fn from_runtime_call(call: NetworkRuntimeCall) -> Self {
 		let (network, encoded) = match &call {
 			NetworkRuntimeCall::Kusama(cc) => (Network::Kusama, cc.encode()),
 			NetworkRuntimeCall::KusamaAssetHub(cc) => (Network::KusamaAssetHub, cc.encode()),
@@ -274,282 +313,89 @@ impl CallInfo {
 		Self { network, encoded: encoded.to_vec(), hash, length }
 	}
 
-	// Construct `Self` for some `network` given some `encoded` bytes.
-	pub(super) fn from_bytes(encoded: &[u8], network: Network) -> Self {
+	/// Construct `Self` for some `network` given some `encoded` bytes.
+	pub fn from_bytes(encoded: &[u8], network: Network) -> Self {
 		let hash = blake2_256(encoded);
 		let length = (encoded.len()).try_into().unwrap();
 		Self { network, encoded: encoded.to_vec(), hash, length }
 	}
 
-	// Strip the outer enum and return a Kusama Relay `RuntimeCall`.
-	pub(super) fn get_kusama_call(&self) -> Result<KusamaRuntimeCall, &'static str> {
-		match &self.network {
-			Network::Kusama => {
-				let bytes = &self.encoded;
-				Ok(<KusamaRuntimeCall as parity_scale_codec::Decode>::decode(&mut &bytes[..])
-					.unwrap())
-			},
-			_ => Err("not a kusama call"),
-		}
-	}
-
-	// Strip the outer enum and return a Kusama Asset Hub `RuntimeCall`.
-	#[allow(dead_code)]
-	pub(super) fn get_kusama_asset_hub_call(
-		&self,
-	) -> Result<KusamaAssetHubRuntimeCall, &'static str> {
-		match &self.network {
-			Network::KusamaAssetHub => {
-				let bytes = &self.encoded;
-				Ok(<KusamaAssetHubRuntimeCall as parity_scale_codec::Decode>::decode(
-					&mut &bytes[..],
-				)
-				.unwrap())
-			},
-			_ => Err("not a kusama asset hub call"),
-		}
-	}
-
-	// Strip the outer enum and return a Kusama Bridge Hub `RuntimeCall`.
-	#[allow(dead_code)]
-	pub(super) fn get_kusama_bridge_hub_call(
-		&self,
-	) -> Result<KusamaBridgeHubRuntimeCall, &'static str> {
-		match &self.network {
-			Network::KusamaBridgeHub => {
-				let bytes = &self.encoded;
-				Ok(<KusamaBridgeHubRuntimeCall as parity_scale_codec::Decode>::decode(
-					&mut &bytes[..],
-				)
-				.unwrap())
-			},
-			_ => Err("not a kusama bridge hub call"),
-		}
-	}
-
-	// Strip the outer enum and return a Kusama Encointer `RuntimeCall`.
-	#[allow(dead_code)]
-	pub(super) fn get_kusama_encointer_call(
-		&self,
-	) -> Result<KusamaEncointerRuntimeCall, &'static str> {
-		match &self.network {
-			Network::KusamaEncointer => {
-				let bytes = &self.encoded;
-				Ok(<KusamaEncointerRuntimeCall as parity_scale_codec::Decode>::decode(
-					&mut &bytes[..],
-				)
-				.unwrap())
-			},
-			_ => Err("not a kusama encointer call"),
-		}
-	}
-
-	// Strip the outer enum and return a Kusama People `RuntimeCall`.
-	#[allow(dead_code)]
-	pub(super) fn get_kusama_people_call(&self) -> Result<KusamaPeopleRuntimeCall, &'static str> {
-		match &self.network {
-			Network::KusamaPeople => {
-				let bytes = &self.encoded;
-				Ok(<KusamaPeopleRuntimeCall as parity_scale_codec::Decode>::decode(&mut &bytes[..])
-					.unwrap())
-			},
-			_ => Err("not a kusama people call"),
-		}
-	}
-
-	// Strip the outer enum and return a Kusama Coretime `RuntimeCall`.
-	#[allow(dead_code)]
-	pub(super) fn get_kusama_coretime_call(
-		&self,
-	) -> Result<KusamaCoretimeRuntimeCall, &'static str> {
-		match &self.network {
-			Network::KusamaCoretime => {
-				let bytes = &self.encoded;
-				Ok(<KusamaCoretimeRuntimeCall as parity_scale_codec::Decode>::decode(
-					&mut &bytes[..],
-				)
-				.unwrap())
-			},
-			_ => Err("not a kusama coretime call"),
-		}
-	}
-
-	// Strip the outer enum and return a Polkadot Relay `RuntimeCall`.
-	pub(super) fn get_polkadot_call(&self) -> Result<PolkadotRuntimeCall, &'static str> {
-		match &self.network {
-			Network::Polkadot => {
-				let bytes = &self.encoded;
-				Ok(<PolkadotRuntimeCall as parity_scale_codec::Decode>::decode(&mut &bytes[..])
-					.unwrap())
-			},
-			_ => Err("not a polkadot call"),
-		}
-	}
-
-	// Strip the outer enum and return a Polkadot Asset Hub `RuntimeCall`.
-	#[allow(dead_code)]
-	pub(super) fn get_polkadot_asset_hub_call(
-		&self,
-	) -> Result<PolkadotAssetHubRuntimeCall, &'static str> {
-		match &self.network {
-			Network::PolkadotAssetHub => {
-				let bytes = &self.encoded;
-				Ok(<PolkadotAssetHubRuntimeCall as parity_scale_codec::Decode>::decode(
-					&mut &bytes[..],
-				)
-				.unwrap())
-			},
-			_ => Err("not a polkadot asset hub call"),
-		}
-	}
-
-	// Strip the outer enum and return a Polkadot Collectives `RuntimeCall`.
-	pub(super) fn get_polkadot_collectives_call(
-		&self,
-	) -> Result<CollectivesRuntimeCall, &'static str> {
-		match &self.network {
-			Network::PolkadotCollectives => {
-				let bytes = &self.encoded;
-				Ok(<CollectivesRuntimeCall as parity_scale_codec::Decode>::decode(&mut &bytes[..])
-					.unwrap())
-			},
-			_ => Err("not a polkadot collectives call"),
-		}
-	}
-
-	// Strip the outer enum and return a Polkadot Bridge Hub `RuntimeCall`.
-	#[allow(dead_code)]
-	pub(super) fn get_polkadot_bridge_hub_call(
-		&self,
-	) -> Result<PolkadotBridgeHubRuntimeCall, &'static str> {
-		match &self.network {
-			Network::PolkadotBridgeHub => {
-				let bytes = &self.encoded;
-				Ok(<PolkadotBridgeHubRuntimeCall as parity_scale_codec::Decode>::decode(
-					&mut &bytes[..],
-				)
-				.unwrap())
-			},
-			_ => Err("not a polkadot bridge hub call"),
-		}
-	}
-
-	// Strip the outer enum and return a Polkadot People `RuntimeCall`.
-	#[allow(dead_code)]
-	pub(super) fn get_polkadot_people_call(
-		&self,
-	) -> Result<PolkadotPeopleRuntimeCall, &'static str> {
-		match &self.network {
-			Network::PolkadotPeople => {
-				let bytes = &self.encoded;
-				Ok(<PolkadotPeopleRuntimeCall as parity_scale_codec::Decode>::decode(
-					&mut &bytes[..],
-				)
-				.unwrap())
-			},
-			_ => Err("not a polkadot people call"),
-		}
-	}
-
-	// Strip the outer enum and return a Polkadot Coretime `RuntimeCall`.
-	#[allow(dead_code)]
-	pub(super) fn get_polkadot_coretime_call(
-		&self,
-	) -> Result<PolkadotCoretimeRuntimeCall, &'static str> {
-		match &self.network {
-			Network::PolkadotCoretime => {
-				let bytes = &self.encoded;
-				Ok(<PolkadotCoretimeRuntimeCall as parity_scale_codec::Decode>::decode(
-					&mut &bytes[..],
-				)
-				.unwrap())
-			},
-			_ => Err("not a polkadot coretime call"),
-		}
-	}
-
-	// Strip the outer enum and return a Polkadot Bulletin `RuntimeCall`.
-	#[allow(dead_code)]
-	pub(super) fn get_polkadot_bulletin_call(
-		&self,
-	) -> Result<PolkadotBulletinRuntimeCall, &'static str> {
-		match &self.network {
-			Network::PolkadotBulletin => {
-				let bytes = &self.encoded;
-				Ok(<PolkadotBulletinRuntimeCall as parity_scale_codec::Decode>::decode(
-					&mut &bytes[..],
-				)
-				.unwrap())
-			},
-			_ => Err("not a polkadot bulletin call"),
-		}
-	}
-
-	// Take `Self` and a length limit as input. If the call length exceeds the limit, just return
-	// its hash. Call length is recomputed and will be 2 bytes longer than the actual preimage
-	// length. This is because the call is `preimage.note_preimage(call)`, so the outer pallet/call
-	// indices have a length of 2 bytes.
-	pub(super) fn create_print_output(&self, length_limit: u32) -> (CallOrHash, u32) {
-		let print_output = if self.length > length_limit {
-			CallOrHash::Hash(self.hash)
-		} else {
-			match &self.network {
-				Network::Kusama => {
-					let kusama_call = self.get_kusama_call().expect("kusama");
-					CallOrHash::Call(NetworkRuntimeCall::Kusama(kusama_call))
-				},
-				Network::KusamaAssetHub => {
-					let kusama_asset_hub_call =
-						self.get_kusama_asset_hub_call().expect("kusama asset hub");
-					CallOrHash::Call(NetworkRuntimeCall::KusamaAssetHub(kusama_asset_hub_call))
-				},
-				Network::Polkadot => {
-					let polkadot_call = self.get_polkadot_call().expect("polkadot");
-					CallOrHash::Call(NetworkRuntimeCall::Polkadot(polkadot_call))
-				},
-				Network::PolkadotAssetHub => {
-					let polkadot_asset_hub_call =
-						self.get_polkadot_asset_hub_call().expect("polkadot asset hub");
-					CallOrHash::Call(NetworkRuntimeCall::PolkadotAssetHub(polkadot_asset_hub_call))
-				},
-				Network::PolkadotCollectives => {
-					let collectives_call =
-						self.get_polkadot_collectives_call().expect("collectives");
-					CallOrHash::Call(NetworkRuntimeCall::PolkadotCollectives(collectives_call))
-				},
-				_ => panic!("to do"),
-			}
-		};
-		(print_output, self.length)
-	}
-}
-
-// The set of calls that some user will need to sign and submit to initiate a referendum.
-pub(super) struct PossibleCallsToSubmit {
-	// `Some` if using the Fellowship to Whitelist a call. The second value is the length of the
-	// call, which may be relevant to the print output.
-	//
-	// ```
-	// preimage.note(whitelist.whitelist_call(hash(proposal)));
-	// ```
-	pub(super) preimage_for_whitelist_call: Option<(CallOrHash, u32)>,
-	// The preimage for the public referendum. Should always be `Some`. When not using the
-	// Whitelist, this will just be the proposal itself. When using the Whitelist, it will be the
-	// proposal nested in a call to dispatch via Whitelist. The second value is the length of the
-	// call, which may be relevant to the print output.
-	//
-	// ```
-	// // Without Fellowship
-	// preimage.note(proposal);
-	//
-	// // With Fellowship
-	// preimage.note(whitelist.dispatch_whitelisted_call_with_preimage(proposal));
-	// ```
-	pub(super) preimage_for_public_referendum: Option<(CallOrHash, u32)>,
-	// The actual submission of the Fellowship referendum to Whitelist a call. `None` when not using
-	// Whitelist.
-	pub(super) fellowship_referendum_submission: Option<NetworkRuntimeCall>,
-	// The actual submission of the public referendum. The `proposal` is the proposal itself when
-	// not using the Whitelist, or the dispatch call with nested proposal when using the Whitelist.
-	pub(super) public_referendum_submission: Option<NetworkRuntimeCall>,
+	call_getter!(
+		// Decode as a Kusama Relay Chain `RuntimeCall`.
+		get_kusama_call,
+		Kusama,
+		KusamaRuntimeCall
+	);
+	call_getter!(
+		// Decode as a Kusama Asset Hub `RuntimeCall`.
+		get_kusama_asset_hub_call,
+		KusamaAssetHub,
+		KusamaAssetHubRuntimeCall
+	);
+	call_getter!(
+		// Decode as a Kusama Bridge Hub `RuntimeCall`.
+		get_kusama_bridge_hub_call,
+		KusamaBridgeHub,
+		KusamaBridgeHubRuntimeCall
+	);
+	call_getter!(
+		// Decode as a Kusama Encointer `RuntimeCall`.
+		get_kusama_encointer_call,
+		KusamaEncointer,
+		KusamaEncointerRuntimeCall
+	);
+	call_getter!(
+		// Decode as a Kusama People `RuntimeCall`.
+		get_kusama_people_call,
+		KusamaPeople,
+		KusamaPeopleRuntimeCall
+	);
+	call_getter!(
+		// Decode as a Kusama Coretime `RuntimeCall`.
+		get_kusama_coretime_call,
+		KusamaCoretime,
+		KusamaCoretimeRuntimeCall
+	);
+	call_getter!(
+		// Decode as a Polkadot Relay Chain `RuntimeCall`.
+		get_polkadot_call,
+		Polkadot,
+		PolkadotRuntimeCall
+	);
+	call_getter!(
+		// Decode as a Polkadot Asset Hub `RuntimeCall`.
+		get_polkadot_asset_hub_call,
+		PolkadotAssetHub,
+		PolkadotAssetHubRuntimeCall
+	);
+	call_getter!(
+		// Decode as a Polkadot Collectives `RuntimeCall`.
+		get_polkadot_collectives_call,
+		PolkadotCollectives,
+		CollectivesRuntimeCall
+	);
+	call_getter!(
+		// Decode as a Polkadot Bridge Hub `RuntimeCall`.
+		get_polkadot_bridge_hub_call,
+		PolkadotBridgeHub,
+		PolkadotBridgeHubRuntimeCall
+	);
+	call_getter!(
+		// Decode as a Polkadot People `RuntimeCall`.
+		get_polkadot_people_call,
+		PolkadotPeople,
+		PolkadotPeopleRuntimeCall
+	);
+	call_getter!(
+		// Decode as a Polkadot Coretime `RuntimeCall`.
+		get_polkadot_coretime_call,
+		PolkadotCoretime,
+		PolkadotCoretimeRuntimeCall
+	);
+	call_getter!(
+		// Decode as a Polkadot Bulletin `RuntimeCall`.
+		get_polkadot_bulletin_call,
+		PolkadotBulletin,
+		PolkadotBulletinRuntimeCall
+	);
 }

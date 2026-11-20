@@ -1,3 +1,4 @@
+use crate::cli::*;
 use crate::*;
 use clap::Parser as ClapParser;
 use sp_core::crypto::{AccountId32 as SpAccountId32, Ss58Codec};
