@@ -12,6 +12,11 @@ pub enum Error {
 	UnsupportedTrack,
 	/// The version is not of the form `major.minor.patch`.
 	NotSemver,
+	/// A minor or patch version of 1000 or more (or a major version too large to be a number),
+	/// which cannot be written as a runtime version.
+	VersionOutOfRange,
+	/// The proposal is empty.
+	EmptyProposal,
 	/// The string is not valid hex.
 	InvalidHex(String),
 	/// A hash that is not 32 bytes long.
@@ -48,6 +53,9 @@ impl fmt::Display for Error {
 				"Unsupported track! Tracks should be in the form `general-admin` or `generaladmin`."
 			),
 			Error::NotSemver => write!(f, "not semver"),
+			Error::VersionOutOfRange =>
+				write!(f, "the minor and patch versions must each be below 1000"),
+			Error::EmptyProposal => write!(f, "the proposal is empty"),
 			Error::InvalidHex(input) => write!(f, "`{input}` is not valid hex"),
 			Error::InvalidHashLength(len) => write!(f, "expected a 32 byte hash, got {len} bytes"),
 			Error::BothAtAndAfter => write!(

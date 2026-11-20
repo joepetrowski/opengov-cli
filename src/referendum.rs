@@ -121,6 +121,11 @@ impl DispatchTimeWrapper {
 /// Generate all the calls needed to put `input.proposal` to referendum.
 pub fn referendum_calls(input: ReferendumInput) -> Result<ReferendumCalls, Error> {
 	input.track.check_fellowship(input.fellowship_on_polkadot)?;
+	// A proposal is only decoded when it has to be wrapped in a whitelist call, so on other tracks
+	// this is the one check on its content. No call encodes to nothing.
+	if input.proposal.is_empty() {
+		return Err(Error::EmptyProposal);
+	}
 	match &input.track {
 		// Kusama Root Origin. Since the Root origin is not part of `OpenGovOrigin`, we match it
 		// specially.

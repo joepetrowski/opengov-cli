@@ -39,7 +39,9 @@ jobs:
         run: node scripts/wasm-smoke-test.mjs pkg
       - name: Pack
         run: wasm-pack pack
+      # No `--clobber`: a rerun must not replace a tarball that lockfiles may already have pinned by
+      # hash. If the asset exists, this step fails and the published one stays as it is.
       - name: Attach the package to the release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${GITHUB_REF_NAME}" pkg/*.tgz --clobber
+        run: gh release upload "${GITHUB_REF_NAME}" pkg/*.tgz

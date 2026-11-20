@@ -24,7 +24,7 @@ default = ["cli"]
 cli = ["dep:clap", "dep:futures", "dep:reqwest", "dep:sp-core", "dep:subxt", "dep:tokio"]
 # JavaScript bindings for the library. Build with
 # `wasm-pack build --target web --no-default-features --features wasm`.
-wasm = ["dep:serde", "dep:serde-wasm-bindgen", "dep:wasm-bindgen"]
+wasm = ["dep:getrandom", "dep:serde", "dep:serde-wasm-bindgen", "dep:wasm-bindgen"]
 
 [dependencies]
 # Library
@@ -52,5 +52,7 @@ serde_json = "1"
 
 [target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
 # Nothing in this crate uses randomness, but `rand` is in the dependency tree of `subxt-core`, and
-# `getrandom` does not compile for the browser unless told to use the browser's source.
-getrandom = { version = "0.2", features = ["js"] }
+# `getrandom` does not compile for this target unless told where randomness comes from. The `wasm`
+# feature is for JavaScript hosts, so it selects the browser's source. Without that feature the
+# choice is left to whoever builds for this target.
+getrandom = { version = "0.2", features = ["js"], optional = true }

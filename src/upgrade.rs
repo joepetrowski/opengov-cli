@@ -42,20 +42,31 @@ fn asset_hub_of(relay: &Network) -> Result<Network, Error> {
 }
 
 /// Convert a semver version (e.g. "1.2.3") to an integer runtime version (e.g. 1002003).
+///
+/// The version must be exactly three numbers separated by dots. The minor and patch versions
+/// must be below 1000, since each gets three digits of the runtime version.
 pub fn semver_to_intver(semver: &str) -> Result<String, Error> {
 	// M.m.p => M_mmm_ppp
-	let points =
-		semver.bytes().enumerate().filter(|(_, b)| *b == b'.').map(|(i, _)| i).collect::<Vec<_>>();
-
-	if points.len() != 2 {
+	let parts = semver.split('.').collect::<Vec<_>>();
+	let [major, minor, patch] = parts[..] else {
+		return Err(Error::NotSemver);
+	};
+	let is_number = |part: &str| !part.is_empty() && part.bytes().all(|b| b.is_ascii_digit());
+	if !(is_number(major) && is_number(minor) && is_number(patch)) {
 		return Err(Error::NotSemver);
 	}
+	// Leading zeros do not make a number larger, so the length is checked without them.
+	let digits = |part: &str| part.trim_start_matches('0').len();
+	if digits(minor) > 3 || digits(patch) > 3 {
+		return Err(Error::VersionOutOfRange);
+	}
+	let (major, minor, patch) = (
+		major.parse::<u32>().map_err(|_| Error::VersionOutOfRange)?,
+		minor.parse::<u32>().map_err(|_| Error::VersionOutOfRange)?,
+		patch.parse::<u32>().map_err(|_| Error::VersionOutOfRange)?,
+	);
 
-	let major = &semver[..points[0]];
-	let minor = &semver[points[0] + 1..points[1]];
-	let patch = &semver[points[1] + 1..];
-
-	Ok(format!("{major}{minor:0>3}{patch:0>3}"))
+	Ok(format!("{major}{minor:03}{patch:03}"))
 }
 
 /// The file name of a chain's runtime blob in a Fellowship release, e.g.

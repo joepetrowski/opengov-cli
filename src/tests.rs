@@ -1414,6 +1414,47 @@ fn library_names_networks_and_runtime_files() {
 	assert_eq!(crate::runtime_file_name(&Network::Polkadot, "2.6"), Err(Error::NotSemver));
 }
 
+#[test]
+fn library_validates_versions() {
+	use crate::semver_to_intver;
+	assert_eq!(semver_to_intver("2.6.0").as_deref(), Ok("2006000"));
+	assert_eq!(semver_to_intver("1.999.999").as_deref(), Ok("1999999"));
+	// Leading zeros are not significant.
+	assert_eq!(semver_to_intver("1.02.003").as_deref(), Ok("1002003"));
+	assert_eq!(semver_to_intver("01.0002.3").as_deref(), Ok("1002003"));
+
+	for not_semver in
+		["", "1", "1.2", "1.2.3.4", "1.x.3", "x.2.3", "1.2.x", "1..3", ".2.3", "1.2.", "1.2.3-rc1"]
+	{
+		assert_eq!(semver_to_intver(not_semver), Err(Error::NotSemver), "{not_semver}");
+	}
+	for too_large in ["1.1000.0", "1.0.1000", "1.12345.0", "99999999999.0.0"] {
+		assert_eq!(semver_to_intver(too_large), Err(Error::VersionOutOfRange), "{too_large}");
+	}
+	// The leading `v` of a release tag is only accepted where a file name is asked for.
+	assert_eq!(semver_to_intver("v2.6.0"), Err(Error::NotSemver));
+}
+
+#[test]
+fn library_rejects_an_empty_proposal_on_every_track() {
+	for (network, track) in [
+		("polkadot", "root"),
+		("polkadot", "whitelistedcaller"),
+		("polkadot", "staking-admin"),
+		("kusama", "root"),
+		("kusama", "whitelistedcaller"),
+		("kusama", "treasurer"),
+	] {
+		let calls = referendum_calls(ReferendumInput {
+			proposal: Vec::new(),
+			track: NetworkTrack::parse(network, track).expect("valid track"),
+			dispatch: DispatchTimeWrapper::After(10),
+			fellowship_on_polkadot: false,
+		});
+		assert_eq!(calls, Err(Error::EmptyProposal), "{network} {track}");
+	}
+}
+
 // Expected encodings ------------------------------------------------------------------------------
 
 const EXPECTED_UPGRADE_POLKADOT_ALL: &str =
