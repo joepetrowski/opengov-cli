@@ -1,5 +1,5 @@
 [package]
-name = "opengov-cli"
+name = "opengov"
 version = "0.2.0"
 edition = "2021"
 authors = ["joepetrowski"]
@@ -14,6 +14,7 @@ license = "Apache-2.0"
 crate-type = ["cdylib", "rlib"]
 
 [[bin]]
+# The command keeps its name; only the package and library are called `opengov`.
 name = "opengov-cli"
 path = "src/main.rs"
 required-features = ["cli"]

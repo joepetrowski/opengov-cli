@@ -104,11 +104,11 @@ Options:
 
 ## Library and WebAssembly
 
-The call construction is also available as a library, without the command line tool. The library does no I/O (no files, network or printing), and the same input always gives the same bytes, so a web app can build exactly the calls that the CLI builds and hand them to a wallet to sign.
+The call construction is also available as a library, the `opengov` crate, without the command line tool. The library does no I/O (no files, network or printing), and the same input always gives the same bytes, so a web app can build exactly the calls that the CLI builds and hand them to a wallet to sign.
 
 ```toml
 # Cargo.toml: the library only, without the CLI's dependencies
-opengov-cli = { git = "https://github.com/joepetrowski/opengov-cli", default-features = false }
+opengov = { git = "https://github.com/joepetrowski/opengov-cli", default-features = false }
 ```
 
 - `build_upgrade(UpgradeInput)` returns the proposal that `build-upgrade` writes: a `system.authorize_upgrade` per chain, sent over XCM where needed, in a `utility.force_batch`.
@@ -129,7 +129,7 @@ $ node scripts/wasm-smoke-test.mjs pkg
 Bytes are `0x`-prefixed hex, networks are named as in Fellowship releases (e.g. `asset-hub-polkadot`), and errors are thrown as JavaScript errors.
 
 ```js
-import init, { build_upgrade, check_and_hash_runtime, referendum_calls, runtime_file_name } from "opengov-cli";
+import init, { build_upgrade, check_and_hash_runtime, referendum_calls, runtime_file_name } from "opengov";
 await init();
 
 // The app fetches each runtime itself, from the file that `runtime_file_name` names.
@@ -152,7 +152,7 @@ const calls = referendum_calls({
 //      public_preimage_bytes, public_preimage_hash, public_preimage_len, whitelisted_call_hash }
 ```
 
-Each GitHub release has the package attached as an npm tarball (`opengov-cli-<version>.tgz`), which a web app can pin by URL in its `package.json`.
+Each GitHub release has the package attached as an npm tarball (`opengov-<version>.tgz`), which a web app can pin by URL in its `package.json`.
 
 ## Examples
 

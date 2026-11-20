@@ -3,7 +3,7 @@ name: Release
 # Attach the wasm package to a GitHub release as an npm tarball, so that a web app can pin a
 # version of it, e.g. in package.json:
 #
-#   "opengov-cli": "https://github.com/joepetrowski/opengov-cli/releases/download/v0.2.0/opengov-cli-0.2.0.tgz"
+#   "opengov": "https://github.com/joepetrowski/opengov-cli/releases/download/v0.2.0/opengov-0.2.0.tgz"
 
 on:
   release:
@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Check that the tag matches the crate version
         run: |
-          version="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "opengov-cli") | .version')"
+          version="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "opengov") | .version')"
           if [ "v${version}" != "${GITHUB_REF_NAME}" ]; then
             echo "::error::Release tag ${GITHUB_REF_NAME} does not match crate version ${version} (expected v${version})."
             exit 1

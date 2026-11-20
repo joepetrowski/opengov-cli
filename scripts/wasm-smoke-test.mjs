@@ -8,8 +8,8 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const pkg = resolve(process.argv[2] ?? 'pkg');
-const wasm = await import(pathToFileURL(join(pkg, 'opengov_cli.js')));
-await wasm.default({ module_or_path: readFileSync(join(pkg, 'opengov_cli_bg.wasm')) });
+const wasm = await import(pathToFileURL(join(pkg, 'opengov.js')));
+await wasm.default({ module_or_path: readFileSync(join(pkg, 'opengov_bg.wasm')) });
 
 // build-upgrade: a Bulletin-only upgrade with a stand-in runtime.
 assert.equal(
