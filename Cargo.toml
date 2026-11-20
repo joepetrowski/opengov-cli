@@ -1,18 +1,59 @@
 [package]
-name = "opengov-cli"
+name = "opengov"
 version = "0.2.0"
 edition = "2021"
 authors = ["joepetrowski"]
+description = "Build the calls for Polkadot and Kusama runtime upgrades and OpenGov referenda"
+repository = "https://github.com/joepetrowski/opengov-cli"
+license = "Apache-2.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[lib]
+# `cdylib` is what `wasm-pack` packages, `rlib` is what the binary and other Rust crates link to.
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+# The command keeps its name; only the package and library are called `opengov`.
+name = "opengov-cli"
+path = "src/main.rs"
+required-features = ["cli"]
+
+[features]
+default = ["cli"]
+# The command line tool: argument parsing, downloads, files and printing.
+cli = ["dep:clap", "dep:futures", "dep:reqwest", "dep:sp-core", "dep:subxt", "dep:tokio"]
+# JavaScript bindings for the library. Build with
+# `wasm-pack build --target web --no-default-features --features wasm`.
+wasm = ["dep:getrandom", "dep:serde", "dep:serde-wasm-bindgen", "dep:wasm-bindgen"]
+
 [dependencies]
-parity-scale-codec = "3.7.5"
-sp-crypto-hashing = { git = "https://github.com/paritytech/polkadot-sdk", branch = "master" }
-sp-core = { git = "https://github.com/paritytech/polkadot-sdk", branch = "master" }
-subxt = "0.42.0"
-futures = "0.3"
+# Library
 hex = "0.4.3"
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
-clap = { version = "4.4.18", features = ["derive", "cargo"] }
-reqwest = "0.12.3"
+parity-scale-codec = "3.7.5"
+sp-crypto-hashing = "0.1.0"
+subxt-core = "0.42.1"
+subxt-macro = "0.42.1"
+
+# CLI
+clap = { version = "4.4.18", features = ["derive", "cargo"], optional = true }
+futures = { version = "0.3", optional = true }
+reqwest = { version = "0.12.3", optional = true }
+sp-core = { version = "43.0.0", optional = true }
+subxt = { version = "0.42.1", optional = true }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"], optional = true }
+
+# Wasm
+serde = { version = "1", features = ["derive"], optional = true }
+serde-wasm-bindgen = { version = "0.6.5", optional = true }
+wasm-bindgen = { version = "0.2", optional = true }
+
+[dev-dependencies]
+serde_json = "1"
+
+[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
+# Nothing in this crate uses randomness, but `rand` is in the dependency tree of `subxt-core`, and
+# `getrandom` does not compile for this target unless told where randomness comes from. The `wasm`
+# feature is for JavaScript hosts, so it selects the browser's source. Without that feature the
+# choice is left to whoever builds for this target.
+getrandom = { version = "0.2", features = ["js"], optional = true }

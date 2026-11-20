@@ -1,17 +1,21 @@
-use crate::get_proposal_bytes;
+use crate::cli::get_proposal_bytes;
 use crate::polkadot_asset_hub::runtime_types::frame_system::pallet::Call as PolkadotAssetHubSystemCall;
 use crate::polkadot_relay::runtime_types::frame_system::pallet::Call as PolkadotRelaySystemCall;
 use crate::{
-	blake2_256, build_upgrade, submit_referendum::generate_calls, CallInfo, CallOrHash,
-	KusamaAssetHubOpenGovOrigin, KusamaAssetHubRuntimeCall, Network, NetworkRuntimeCall,
+	blake2_256,
+	cli::{
+		build_upgrade::{self, UpgradeArgs},
+		submit_referendum::generate_calls,
+		CallOrHash, ProposalDetails, VersionedNetwork,
+	},
+	CallInfo, KusamaAssetHubOpenGovOrigin, KusamaAssetHubRuntimeCall, Network, NetworkRuntimeCall,
 	PolkadotAssetHubOpenGovOrigin, PolkadotAssetHubRuntimeCall, PolkadotRuntimeCall,
-	ProposalDetails, UpgradeArgs, VersionedNetwork,
 };
 
 fn polkadot_whitelist_remark_user_input() -> ProposalDetails {
+	use crate::cli::Output::*;
 	use crate::DispatchTimeWrapper::*;
 	use crate::NetworkTrack::*;
-	use crate::Output::*;
 	ProposalDetails {
 		// `system.remark("opengov-submit test")`
 		proposal: String::from("0x00004c6f70656e676f762d7375626d69742074657374"),
@@ -26,9 +30,9 @@ fn polkadot_whitelist_remark_user_input() -> ProposalDetails {
 }
 
 fn polkadot_staking_validator_user_input() -> ProposalDetails {
+	use crate::cli::Output::*;
 	use crate::DispatchTimeWrapper::*;
 	use crate::NetworkTrack::*;
-	use crate::Output::*;
 	ProposalDetails {
 		// `staking.increase_validator_count(50)`
 		proposal: String::from("0x070ac8"),
@@ -43,9 +47,9 @@ fn polkadot_staking_validator_user_input() -> ProposalDetails {
 }
 
 fn polkadot_root_remark_user_input() -> ProposalDetails {
+	use crate::cli::Output::*;
 	use crate::DispatchTimeWrapper::*;
 	use crate::NetworkTrack::*;
-	use crate::Output::*;
 	ProposalDetails {
 		// `system.remark("opengov-submit test")`
 		proposal: String::from("0x00004c6f70656e676f762d7375626d69742074657374"),
@@ -60,9 +64,9 @@ fn polkadot_root_remark_user_input() -> ProposalDetails {
 }
 
 fn kusama_whitelist_remark_user_input() -> ProposalDetails {
+	use crate::cli::Output::*;
 	use crate::DispatchTimeWrapper::*;
 	use crate::NetworkTrack::*;
-	use crate::Output::*;
 	ProposalDetails {
 		// `system.remark("opengov-submit test")`
 		proposal: String::from("0x00004c6f70656e676f762d7375626d69742074657374"),
@@ -77,9 +81,9 @@ fn kusama_whitelist_remark_user_input() -> ProposalDetails {
 }
 
 fn kusama_whitelist_polkadot_fellowship_user_input() -> ProposalDetails {
+	use crate::cli::Output::*;
 	use crate::DispatchTimeWrapper::*;
 	use crate::NetworkTrack::*;
-	use crate::Output::*;
 	ProposalDetails {
 		// `system.remark("opengov-submit test")`
 		proposal: String::from("0x00004c6f70656e676f762d7375626d69742074657374"),
@@ -94,9 +98,9 @@ fn kusama_whitelist_polkadot_fellowship_user_input() -> ProposalDetails {
 }
 
 fn kusama_staking_validator_user_input() -> ProposalDetails {
+	use crate::cli::Output::*;
 	use crate::DispatchTimeWrapper::*;
 	use crate::NetworkTrack::*;
-	use crate::Output::*;
 	ProposalDetails {
 		// `staking.increase_validator_count(50)`
 		proposal: String::from("0x060ac8"),
@@ -111,9 +115,9 @@ fn kusama_staking_validator_user_input() -> ProposalDetails {
 }
 
 fn kusama_root_remark_user_input() -> ProposalDetails {
+	use crate::cli::Output::*;
 	use crate::DispatchTimeWrapper::*;
 	use crate::NetworkTrack::*;
-	use crate::Output::*;
 	ProposalDetails {
 		// `system.remark("opengov-submit test")`
 		proposal: String::from("0x00004c6f70656e676f762d7375626d69742074657374"),
@@ -128,9 +132,9 @@ fn kusama_root_remark_user_input() -> ProposalDetails {
 }
 
 fn limited_length_user_input() -> ProposalDetails {
+	use crate::cli::Output::*;
 	use crate::DispatchTimeWrapper::*;
 	use crate::NetworkTrack::*;
-	use crate::Output::*;
 	ProposalDetails {
 		// `system.remark("opengov-submit test")`
 		proposal: String::from("0x00004c6f70656e676f762d7375626d69742074657374"),
@@ -626,7 +630,7 @@ fn it_creates_constrained_print_output() {
 
 #[test]
 fn add_invulnerables_parses_and_encodes_a_single_account() {
-	use crate::add_invulnerables::{build_add_invulnerables_call, parse_accounts};
+	use crate::cli::add_invulnerables::{build_add_invulnerables_call, parse_accounts};
 
 	// One of the Bulletin genesis invulnerables.
 	let who = String::from("1A1WrKowzJD4yQQcETugEV5UWoNo1o7ujuA3f1fBfpxPjZL");
@@ -641,7 +645,7 @@ fn add_invulnerables_parses_and_encodes_a_single_account() {
 
 #[test]
 fn add_invulnerables_batches_multiple_accounts() {
-	use crate::add_invulnerables::build_add_invulnerables_call;
+	use crate::cli::add_invulnerables::build_add_invulnerables_call;
 
 	let a = [1u8; 32];
 	let b = [2u8; 32];
@@ -653,7 +657,7 @@ fn add_invulnerables_batches_multiple_accounts() {
 
 #[test]
 fn add_invulnerables_wraps_for_staking_admin_via_xcm() {
-	use crate::add_invulnerables::{build_add_invulnerables_call, wrap_for_governance};
+	use crate::cli::add_invulnerables::{build_add_invulnerables_call, wrap_for_governance};
 	use crate::polkadot_asset_hub::runtime_types::{
 		pallet_xcm::pallet::Call as XcmCall,
 		staging_xcm::v5::{junction::Junction::Parachain, junctions::Junctions::X1, Instruction},
@@ -684,7 +688,7 @@ fn add_invulnerables_wraps_for_staking_admin_via_xcm() {
 
 #[test]
 fn add_invulnerables_does_not_wrap_asset_hub_calls() {
-	use crate::add_invulnerables::{build_add_invulnerables_call, wrap_for_governance};
+	use crate::cli::add_invulnerables::{build_add_invulnerables_call, wrap_for_governance};
 
 	let target = build_add_invulnerables_call(&Network::PolkadotAssetHub, &[[1u8; 32]]);
 	let proposal = wrap_for_governance(&target);
@@ -695,7 +699,7 @@ fn add_invulnerables_does_not_wrap_asset_hub_calls() {
 #[test]
 #[should_panic(expected = "listed more than once")]
 fn add_invulnerables_rejects_duplicate_accounts() {
-	use crate::add_invulnerables::parse_accounts;
+	use crate::cli::add_invulnerables::parse_accounts;
 
 	let hex_account =
 		String::from("0x0101010101010101010101010101010101010101010101010101010101010101");
@@ -739,11 +743,12 @@ async fn upgrade_proposal_with_stand_in_runtimes(args: UpgradeArgs) -> String {
 		.networks
 		.iter()
 		.map(|chain| {
-			let runtime = format!("fake runtime {}", build_upgrade::runtime_name(&chain.network));
-			build_upgrade::authorize_upgrade_call(&chain.network, blake2_256(runtime.as_bytes()))
+			let runtime = format!("fake runtime {}", chain.network.runtime_name());
+			crate::authorize_upgrade_call(&chain.network, blake2_256(runtime.as_bytes()))
 		})
 		.collect();
-	let proposal = build_upgrade::construct_batch(&details, calls).await;
+	let proposal = crate::upgrade::batch_calls(&details.relay, calls, details.additional.clone())
+		.expect("valid batch");
 	format!("0x{}", hex::encode(proposal.encoded))
 }
 
@@ -766,7 +771,7 @@ fn authorize_upgrade_encodes_correctly_on_every_chain() {
 		PolkadotCoretime,
 		PolkadotBulletin,
 	] {
-		let call = build_upgrade::authorize_upgrade_call(&network, code_hash);
+		let call = crate::authorize_upgrade_call(&network, code_hash);
 		assert_eq!(call.network, network);
 		// system (pallet 0) . authorize_upgrade (call 9) ++ code hash
 		assert_eq!(call.encoded, [&[0u8, 9][..], &code_hash[..]].concat(), "{network:?}");
@@ -850,9 +855,11 @@ async fn kusama_upgrade_sends_authorizations_as_superuser() {
 		.networks
 		.iter()
 		.enumerate()
-		.map(|(i, chain)| build_upgrade::authorize_upgrade_call(&chain.network, [i as u8; 32]))
+		.map(|(i, chain)| crate::authorize_upgrade_call(&chain.network, [i as u8; 32]))
 		.collect();
-	let proposal = build_upgrade::construct_batch(&details, calls.clone()).await;
+	let proposal =
+		crate::upgrade::batch_calls(&details.relay, calls.clone(), details.additional.clone())
+			.expect("valid batch");
 
 	let batch = proposal.get_kusama_asset_hub_call().expect("kusama asset hub call");
 	let KusamaAssetHubRuntimeCall::Utility(UtilityCall::force_batch { calls: batch }) = batch
@@ -927,7 +934,7 @@ fn only_bulletin_strips_v_prefix() {
 
 #[test]
 fn semver_converts_to_runtime_version() {
-	use build_upgrade::semver_to_intver;
+	let semver_to_intver = |semver| crate::semver_to_intver(semver).expect("semver");
 	assert_eq!(semver_to_intver("2.5.3"), "2005003");
 	assert_eq!(semver_to_intver("1.10.0"), "1010000");
 	assert_eq!(semver_to_intver("1.0.0"), "1000000");
@@ -937,7 +944,7 @@ fn semver_converts_to_runtime_version() {
 #[test]
 #[should_panic(expected = "not semver")]
 fn semver_conversion_rejects_non_semver() {
-	build_upgrade::semver_to_intver("1.2");
+	crate::semver_to_intver("1.2").unwrap_or_else(|e| panic!("{e}"));
 }
 
 #[test]
@@ -961,7 +968,7 @@ fn runtime_file_names_match_fellowship_releases() {
 
 #[test]
 fn add_invulnerable_encodes_correctly_on_every_chain() {
-	use crate::add_invulnerables::{build_add_invulnerables_call, parse_network};
+	use crate::cli::add_invulnerables::{build_add_invulnerables_call, parse_network};
 	let who = [1u8; 32];
 	for (name, _) in EXPECTED_ADD_INVULNERABLES_BATCHES {
 		let call = build_add_invulnerables_call(&parse_network(name), &[who]);
@@ -972,7 +979,7 @@ fn add_invulnerable_encodes_correctly_on_every_chain() {
 
 #[test]
 fn add_invulnerables_proposals_encode_correctly_on_every_chain() {
-	use crate::add_invulnerables::{
+	use crate::cli::add_invulnerables::{
 		build_add_invulnerables_call, parse_network, wrap_for_governance,
 	};
 	for (name, expected) in EXPECTED_ADD_INVULNERABLES_BATCHES {
@@ -985,18 +992,18 @@ fn add_invulnerables_proposals_encode_correctly_on_every_chain() {
 #[test]
 #[should_panic(expected = "Encointer's collator selection")]
 fn add_invulnerables_rejects_encointer() {
-	crate::add_invulnerables::parse_network("encointer-kusama");
+	crate::cli::add_invulnerables::parse_network("encointer-kusama");
 }
 
 #[test]
 #[should_panic(expected = "Relay chains do not have collator selection")]
 fn add_invulnerables_rejects_relay_chains() {
-	crate::add_invulnerables::parse_network("polkadot");
+	crate::cli::add_invulnerables::parse_network("polkadot");
 }
 
 #[test]
 fn add_invulnerables_parses_kusama_addresses() {
-	use crate::add_invulnerables::parse_accounts;
+	use crate::cli::add_invulnerables::parse_accounts;
 
 	// Alice, with the Kusama SS58 prefix (2) and with the generic Polkadot one (0).
 	let alice = "d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d";
@@ -1005,6 +1012,447 @@ fn add_invulnerables_parses_kusama_addresses() {
 	// A mismatched prefix only warns: the public key is what matters on chain.
 	let inputs = [String::from("15oF4uVJwmo4TdGW7VfQxNLavjCXviqxT9S1MgbjMNHr6Sp5")];
 	assert_eq!(hex::encode(parse_accounts(&inputs, &Network::KusamaPeople)[0]), alice);
+}
+
+// Library -----------------------------------------------------------------------------------------
+
+// The library must return the same bytes as the command line tool. The expected upgrade proposals
+// are the ones that `build-upgrade --local` produced (see above), and referenda are compared with
+// both the calls that `submit-referendum` prints and the encodings asserted in the tests above.
+
+use crate::{
+	build_upgrade as library_build_upgrade, referendum_calls, DispatchTimeWrapper, Error,
+	NetworkTrack, ReferendumInput, UpgradeInput,
+};
+
+// Stand-in code hashes for `networks`, matching `upgrade_proposal_with_stand_in_runtimes`.
+fn stand_in_runtimes(networks: &[Network]) -> Vec<(Network, [u8; 32])> {
+	networks
+		.iter()
+		.map(|network| {
+			let runtime = format!("fake runtime {}", network.runtime_name());
+			(network.clone(), blake2_256(runtime.as_bytes()))
+		})
+		.collect()
+}
+
+const ALL_POLKADOT_CHAINS: [Network; 7] = [
+	Network::Polkadot,
+	Network::PolkadotAssetHub,
+	Network::PolkadotCollectives,
+	Network::PolkadotBridgeHub,
+	Network::PolkadotPeople,
+	Network::PolkadotCoretime,
+	Network::PolkadotBulletin,
+];
+
+const ALL_KUSAMA_CHAINS: [Network; 6] = [
+	Network::Kusama,
+	Network::KusamaAssetHub,
+	Network::KusamaEncointer,
+	Network::KusamaBridgeHub,
+	Network::KusamaPeople,
+	Network::KusamaCoretime,
+];
+
+fn library_upgrade(relay: Network, networks: &[Network], additional: Option<&str>) -> String {
+	let proposal = library_build_upgrade(UpgradeInput {
+		relay: relay.clone(),
+		runtimes: stand_in_runtimes(networks),
+		additional: additional.map(|a| hex::decode(a.trim_start_matches("0x")).expect("hex")),
+	})
+	.expect("valid upgrade");
+	let asset_hub = if relay == Network::Polkadot {
+		Network::PolkadotAssetHub
+	} else {
+		Network::KusamaAssetHub
+	};
+	assert_eq!(proposal.network, asset_hub, "the proposal executes on Asset Hub");
+	assert_eq!(proposal.hash, blake2_256(&proposal.encoded));
+	assert_eq!(proposal.length as usize, proposal.encoded.len());
+	format!("0x{}", hex::encode(proposal.encoded))
+}
+
+#[test]
+fn library_builds_the_full_polkadot_upgrade() {
+	assert_eq!(
+		library_upgrade(Network::Polkadot, &ALL_POLKADOT_CHAINS, None),
+		EXPECTED_UPGRADE_POLKADOT_ALL
+	);
+}
+
+#[test]
+fn library_builds_the_polkadot_upgrade_with_an_additional_call() {
+	assert_eq!(
+		library_upgrade(Network::Polkadot, &ALL_POLKADOT_CHAINS, Some("0x00001074657374")),
+		EXPECTED_UPGRADE_POLKADOT_ALL_WITH_ADDITIONAL
+	);
+}
+
+#[test]
+fn library_builds_a_single_chain_upgrade() {
+	assert_eq!(
+		library_upgrade(Network::Polkadot, &[Network::PolkadotBulletin], None),
+		EXPECTED_UPGRADE_POLKADOT_ONLY_BULLETIN
+	);
+	assert_eq!(
+		library_upgrade(Network::Kusama, &[Network::KusamaEncointer], None),
+		EXPECTED_UPGRADE_KUSAMA_ONLY_ENCOINTER
+	);
+}
+
+#[test]
+fn library_builds_the_full_kusama_upgrade() {
+	assert_eq!(
+		library_upgrade(Network::Kusama, &ALL_KUSAMA_CHAINS, None),
+		EXPECTED_UPGRADE_KUSAMA_ALL
+	);
+	assert_eq!(
+		library_upgrade(Network::Kusama, &ALL_KUSAMA_CHAINS, Some("0x00001074657374")),
+		EXPECTED_UPGRADE_KUSAMA_ALL_WITH_ADDITIONAL
+	);
+}
+
+#[test]
+fn library_upgrade_rejects_invalid_input() {
+	let upgrade = |relay, networks: &[Network], additional: Option<Vec<u8>>| {
+		library_build_upgrade(UpgradeInput {
+			relay,
+			runtimes: stand_in_runtimes(networks),
+			additional,
+		})
+	};
+	assert_eq!(
+		upgrade(Network::PolkadotAssetHub, &[Network::PolkadotAssetHub], None),
+		Err(Error::NotARelayChain)
+	);
+	assert_eq!(
+		upgrade(Network::Polkadot, &[Network::Polkadot, Network::KusamaAssetHub], None),
+		Err(Error::NotInRelayFamily { relay: Network::Polkadot, network: Network::KusamaAssetHub })
+	);
+	assert_eq!(upgrade(Network::Polkadot, &[], None), Err(Error::NoCalls));
+	assert_eq!(
+		upgrade(Network::Polkadot, &[Network::Polkadot], Some(vec![0xff, 0xff, 0xff])),
+		Err(Error::UndecodableCall(Network::PolkadotAssetHub))
+	);
+}
+
+// Check that the library and the command line path produce the same calls for some input.
+async fn assert_library_matches_cli(proposal_details: ProposalDetails) {
+	let library = referendum_calls(ReferendumInput {
+		proposal: get_proposal_bytes(proposal_details.proposal.clone()),
+		track: proposal_details.track.clone(),
+		dispatch: proposal_details.dispatch,
+		fellowship_on_polkadot: proposal_details.fellowship_on_polkadot,
+	})
+	.expect("valid referendum");
+	let cli = generate_calls(&proposal_details).await;
+
+	let cli_call = |call: Option<(CallOrHash, u32)>| match call {
+		Some((CallOrHash::Call(call), _)) => Some(CallInfo::from_runtime_call(call)),
+		Some((CallOrHash::Hash(_), _)) => panic!("call length within the limit"),
+		None => None,
+	};
+	assert_eq!(library.fellowship_preimage, cli_call(cli.preimage_for_whitelist_call));
+	assert_eq!(
+		library.fellowship_referendum,
+		cli.fellowship_referendum_submission.map(CallInfo::from_runtime_call)
+	);
+	assert_eq!(Some(library.public_preimage.clone()), cli_call(cli.preimage_for_public_referendum));
+	assert_eq!(
+		Some(library.public_referendum.clone()),
+		cli.public_referendum_submission.map(CallInfo::from_runtime_call)
+	);
+
+	// The values that describe the preimage are consistent with the calls.
+	assert_eq!(library.public_preimage_hash, blake2_256(&library.public_preimage_bytes));
+	assert_eq!(library.public_preimage_len as usize, library.public_preimage_bytes.len());
+	assert!(library.public_preimage.encoded.ends_with(&library.public_preimage_bytes));
+	assert_eq!(library.whitelisted_call_hash.is_some(), library.fellowship_referendum.is_some());
+}
+
+#[tokio::test]
+async fn library_referendum_calls_match_the_cli() {
+	assert_library_matches_cli(polkadot_whitelist_remark_user_input()).await;
+	assert_library_matches_cli(polkadot_staking_validator_user_input()).await;
+	assert_library_matches_cli(polkadot_root_remark_user_input()).await;
+	assert_library_matches_cli(kusama_whitelist_remark_user_input()).await;
+	assert_library_matches_cli(kusama_whitelist_polkadot_fellowship_user_input()).await;
+	assert_library_matches_cli(kusama_staking_validator_user_input()).await;
+	assert_library_matches_cli(kusama_root_remark_user_input()).await;
+}
+
+#[test]
+fn library_builds_a_polkadot_whitelisted_caller_referendum() {
+	// `system.remark("opengov-submit test")`
+	let proposal = hex::decode("00004c6f70656e676f762d7375626d69742074657374").expect("hex");
+	let calls = referendum_calls(ReferendumInput {
+		proposal: proposal.clone(),
+		track: NetworkTrack::parse("polkadot", "whitelistedcaller").expect("valid track"),
+		dispatch: DispatchTimeWrapper::After(10),
+		fellowship_on_polkadot: false,
+	})
+	.expect("valid referendum");
+
+	// The same encodings as `it_starts_polkadot_fellowship_referenda_correctly`.
+	assert_eq!(calls.fellowship_preimage, None, "the Fellowship proposal is inlined");
+	let fellowship_referendum = calls.fellowship_referendum.expect("whitelisting needs one");
+	assert_eq!(fellowship_referendum.network, Network::PolkadotCollectives);
+	assert_eq!(
+		hex::encode(&fellowship_referendum.encoded),
+		"3d003e0201cc1f0005010100a10f05082f00000603008840008821e8db19b8e34b62ee8bc618a5ed3eecb9761d7d81349b00aa5ce5dfca2534010a000000"
+	);
+	assert_eq!(calls.public_preimage.network, Network::PolkadotAssetHub);
+	assert_eq!(
+		hex::encode(&calls.public_preimage.encoded),
+		"050060400300004c6f70656e676f762d7375626d69742074657374"
+	);
+	assert_eq!(calls.public_referendum.network, Network::PolkadotAssetHub);
+	assert_eq!(
+		hex::encode(&calls.public_referendum.encoded),
+		"3e003f0d02a322f65fd03ba368587f997b14e306211f6fb3c30b06a5be472f2f96b3b27e1e18000000010a000000"
+	);
+
+	// The public referendum looks up `whitelist.dispatch_whitelisted_call_with_preimage(proposal)`.
+	assert_eq!(
+		hex::encode(&calls.public_preimage_bytes),
+		"400300004c6f70656e676f762d7375626d69742074657374"
+	);
+	assert_eq!(
+		hex::encode(calls.public_preimage_hash),
+		"a322f65fd03ba368587f997b14e306211f6fb3c30b06a5be472f2f96b3b27e1e"
+	);
+	assert_eq!(calls.public_preimage_len, 24);
+	// The Fellowship whitelists the hash of the proposal itself.
+	assert_eq!(calls.whitelisted_call_hash, Some(blake2_256(&proposal)));
+	assert_eq!(
+		hex::encode(blake2_256(&proposal)),
+		"8821e8db19b8e34b62ee8bc618a5ed3eecb9761d7d81349b00aa5ce5dfca2534"
+	);
+}
+
+#[tokio::test]
+async fn library_builds_a_polkadot_root_referendum() {
+	// `system.remark("opengov-submit test")`
+	let proposal = hex::decode("00004c6f70656e676f762d7375626d69742074657374").expect("hex");
+	let calls = referendum_calls(ReferendumInput {
+		proposal: proposal.clone(),
+		track: NetworkTrack::parse("Polkadot", "Root").expect("valid track"),
+		dispatch: DispatchTimeWrapper::After(10),
+		fellowship_on_polkadot: false,
+	})
+	.expect("valid referendum");
+
+	assert_eq!(calls.fellowship_preimage, None);
+	assert_eq!(calls.fellowship_referendum, None);
+	assert_eq!(calls.whitelisted_call_hash, None);
+	assert_eq!(calls.public_preimage_bytes, proposal);
+	assert_eq!(calls.public_preimage_hash, blake2_256(&proposal));
+	assert_eq!(calls.public_preimage_len, 22);
+	assert_eq!(
+		hex::encode(&calls.public_preimage.encoded),
+		"05005800004c6f70656e676f762d7375626d69742074657374"
+	);
+
+	// The same calls as the command line tool gives, which
+	// `it_starts_polkadot_root_referenda_correctly` checks the encoding of.
+	let cli = generate_calls(&polkadot_root_remark_user_input()).await;
+	assert_eq!(
+		Some(calls.public_referendum),
+		cli.public_referendum_submission.map(CallInfo::from_runtime_call)
+	);
+}
+
+#[test]
+fn library_inlines_short_fellowship_proposals_and_looks_up_long_ones() {
+	use crate::polkadot_collectives::runtime_types::frame_system::pallet::Call as SystemCall;
+	use crate::referendum::polkadot_fellowship_proposal;
+	use crate::CollectivesRuntimeCall;
+
+	// A Collectives call of exactly `length` bytes: `system.remark` has two bytes of indices and,
+	// at these sizes, a two byte length prefix.
+	let call_of_length = |length: usize| {
+		let call = CallInfo::from_runtime_call(NetworkRuntimeCall::PolkadotCollectives(
+			CollectivesRuntimeCall::System(SystemCall::remark { remark: vec![7u8; length - 4] }),
+		));
+		assert_eq!(call.length as usize, length);
+		call
+	};
+
+	// At the limit of 128 bytes the proposal is inlined: `Bounded::Inline` is variant 1.
+	let short = call_of_length(128);
+	let (referendum, preimage) = polkadot_fellowship_proposal(short.clone());
+	assert_eq!(preimage, None);
+	assert_eq!(referendum.network, Network::PolkadotCollectives);
+	let mut expected = hex::decode("3d003e0201").expect("hex");
+	expected.extend([0x01, 0x02]); // compact(128)
+	expected.extend(&short.encoded);
+	expected.extend(hex::decode("010a000000").expect("hex")); // After(10)
+	assert_eq!(referendum.encoded, expected);
+
+	// One byte more and it is noted as a preimage and looked up: `Bounded::Lookup` is variant 2.
+	let long = call_of_length(129);
+	let (referendum, preimage) = polkadot_fellowship_proposal(long.clone());
+	let preimage = preimage.expect("a long proposal needs a preimage");
+	assert_eq!(preimage.network, Network::PolkadotCollectives);
+	let mut expected = hex::decode("2b00").expect("hex"); // preimage.note_preimage
+	expected.extend([0x05, 0x02]); // compact(129)
+	expected.extend(&long.encoded);
+	assert_eq!(preimage.encoded, expected);
+	let mut expected = hex::decode("3d003e0202").expect("hex");
+	expected.extend(long.hash);
+	expected.extend(129u32.to_le_bytes());
+	expected.extend(hex::decode("010a000000").expect("hex")); // After(10)
+	assert_eq!(referendum.encoded, expected);
+}
+
+#[test]
+fn library_returns_full_calls_whatever_their_length() {
+	// The command line tool prints a hash for this input, because of its output length limit.
+	let proposal_details = limited_length_user_input();
+	let calls = referendum_calls(ReferendumInput {
+		proposal: get_proposal_bytes(proposal_details.proposal),
+		track: proposal_details.track,
+		dispatch: proposal_details.dispatch,
+		fellowship_on_polkadot: false,
+	})
+	.expect("valid referendum");
+	assert!(calls.public_preimage.length > proposal_details.output_len_limit);
+	assert_eq!(
+		hex::encode(&calls.public_preimage.encoded),
+		"05005800004c6f70656e676f762d7375626d69742074657374"
+	);
+}
+
+#[test]
+fn library_referendum_rejects_invalid_input() {
+	let referendum = |proposal: &[u8], network, track, fellowship_on_polkadot| {
+		referendum_calls(ReferendumInput {
+			proposal: proposal.to_vec(),
+			track: NetworkTrack::parse(network, track).expect("valid track"),
+			dispatch: DispatchTimeWrapper::After(10),
+			fellowship_on_polkadot,
+		})
+	};
+	// A proposal that has to be wrapped in a whitelist call must decode.
+	assert_eq!(
+		referendum(&[0xff, 0xff, 0xff], "polkadot", "whitelistedcaller", false),
+		Err(Error::UndecodableCall(Network::PolkadotAssetHub))
+	);
+	assert_eq!(
+		referendum(&[0xff, 0xff, 0xff], "kusama", "whitelistedcaller", false),
+		Err(Error::UndecodableCall(Network::KusamaAssetHub))
+	);
+	// The Polkadot Fellowship is only an option for Kusama whitelisted calls.
+	assert_eq!(
+		referendum(&[0, 0, 0], "polkadot", "whitelistedcaller", true),
+		Err(Error::FellowshipNotSupported)
+	);
+	assert_eq!(referendum(&[0, 0, 0], "kusama", "root", true), Err(Error::FellowshipNotSupported));
+	assert!(referendum(&[0, 0, 0], "kusama", "whitelistedcaller", true).is_ok());
+
+	assert!(matches!(NetworkTrack::parse("polkadot", "nonsense"), Err(Error::UnsupportedTrack)));
+	assert!(matches!(NetworkTrack::parse("westend", "root"), Err(Error::NotARelayChain)));
+	assert!(matches!(
+		NetworkTrack::parse("kusama", "General-Admin"),
+		Ok(NetworkTrack::Kusama(KusamaAssetHubOpenGovOrigin::GeneralAdmin))
+	));
+
+	use DispatchTimeWrapper::{After, At};
+	assert_eq!(DispatchTimeWrapper::from_at_after(None, None), Ok(None));
+	assert_eq!(DispatchTimeWrapper::from_at_after(Some(5), None), Ok(Some(At(5))));
+	assert_eq!(DispatchTimeWrapper::from_at_after(None, Some(6)), Ok(Some(After(6))));
+	assert_eq!(DispatchTimeWrapper::from_at_after(Some(5), Some(6)), Err(Error::BothAtAndAfter));
+}
+
+#[test]
+fn library_checks_and_hashes_runtimes() {
+	use crate::check_and_hash_runtime;
+	const ZSTD_PREFIX: [u8; 8] = [82, 188, 83, 118, 70, 219, 142, 5];
+	let blob_of_size = |size: usize| {
+		let mut blob = ZSTD_PREFIX.to_vec();
+		blob.resize(size, 0);
+		blob
+	};
+
+	let runtime = blob_of_size(100 * 1024);
+	assert_eq!(check_and_hash_runtime(&runtime, false), Ok(blake2_256(&runtime)));
+	assert_eq!(
+		check_and_hash_runtime(&blob_of_size(100 * 1024 - 1), false),
+		Err(Error::RuntimeSize(100 * 1024 - 1))
+	);
+	assert_eq!(
+		check_and_hash_runtime(&blob_of_size(10 * 1024 * 1024 + 1), false),
+		Err(Error::RuntimeSize(10 * 1024 * 1024 + 1))
+	);
+	let not_compressed = vec![0u8; 200 * 1024];
+	assert_eq!(check_and_hash_runtime(&not_compressed, false), Err(Error::RuntimeNotCompressed));
+	// With the checks skipped, anything is hashed.
+	assert_eq!(check_and_hash_runtime(&not_compressed, true), Ok(blake2_256(&not_compressed)));
+	assert_eq!(check_and_hash_runtime(b"tiny", true), Ok(blake2_256(b"tiny")));
+}
+
+#[test]
+fn library_names_networks_and_runtime_files() {
+	for network in Network::ALL {
+		assert_eq!(Network::from_runtime_name(network.runtime_name()), Ok(network));
+	}
+	assert_eq!(
+		Network::from_runtime_name("westend"),
+		Err(Error::UnknownNetwork(String::from("westend")))
+	);
+
+	assert_eq!(
+		crate::runtime_file_name(&Network::PolkadotAssetHub, "2.6.0").as_deref(),
+		Ok("asset-hub-polkadot_runtime-v2006000.compact.compressed.wasm")
+	);
+	// A leading `v`, as in the release's tag, is accepted.
+	assert_eq!(
+		crate::runtime_file_name(&Network::Kusama, "v1.10.3").as_deref(),
+		Ok("kusama_runtime-v1010003.compact.compressed.wasm")
+	);
+	assert_eq!(crate::runtime_file_name(&Network::Polkadot, "2.6"), Err(Error::NotSemver));
+}
+
+#[test]
+fn library_validates_versions() {
+	use crate::semver_to_intver;
+	assert_eq!(semver_to_intver("2.6.0").as_deref(), Ok("2006000"));
+	assert_eq!(semver_to_intver("1.999.999").as_deref(), Ok("1999999"));
+	// Leading zeros are not significant.
+	assert_eq!(semver_to_intver("1.02.003").as_deref(), Ok("1002003"));
+	assert_eq!(semver_to_intver("01.0002.3").as_deref(), Ok("1002003"));
+
+	for not_semver in
+		["", "1", "1.2", "1.2.3.4", "1.x.3", "x.2.3", "1.2.x", "1..3", ".2.3", "1.2.", "1.2.3-rc1"]
+	{
+		assert_eq!(semver_to_intver(not_semver), Err(Error::NotSemver), "{not_semver}");
+	}
+	for too_large in ["1.1000.0", "1.0.1000", "1.12345.0", "99999999999.0.0"] {
+		assert_eq!(semver_to_intver(too_large), Err(Error::VersionOutOfRange), "{too_large}");
+	}
+	// The leading `v` of a release tag is only accepted where a file name is asked for.
+	assert_eq!(semver_to_intver("v2.6.0"), Err(Error::NotSemver));
+}
+
+#[test]
+fn library_rejects_an_empty_proposal_on_every_track() {
+	for (network, track) in [
+		("polkadot", "root"),
+		("polkadot", "whitelistedcaller"),
+		("polkadot", "staking-admin"),
+		("kusama", "root"),
+		("kusama", "whitelistedcaller"),
+		("kusama", "treasurer"),
+	] {
+		let calls = referendum_calls(ReferendumInput {
+			proposal: Vec::new(),
+			track: NetworkTrack::parse(network, track).expect("valid track"),
+			dispatch: DispatchTimeWrapper::After(10),
+			fellowship_on_polkadot: false,
+		});
+		assert_eq!(calls, Err(Error::EmptyProposal), "{network} {track}");
+	}
 }
 
 // Expected encodings ------------------------------------------------------------------------------

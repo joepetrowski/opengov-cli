@@ -14,6 +14,9 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  # Used by the `wasm` job and by release.yml, so that the published package is built by the same
+  # version that CI tests.
+  WASM_PACK_VERSION: 0.15.1
   # Nightly is needed for the unstable options in rustfmt.toml.
   TOOLCHAIN_LINT: nightly-2026-10-29
 
@@ -66,7 +69,14 @@ jobs:
       - name: Fmt
         run: cargo +${{ env.TOOLCHAIN_LINT }} fmt --all -- --check
 
-      - name: Clippy
+      # The library and its test build each take about 10 GB to compile. Checking the library first
+      # keeps the two from compiling at the same time, which needs more memory than a runner has.
+      - name: Clippy (library and binary)
+        env:
+          SKIP_WASM_BUILD: 1
+        run: cargo +${{ env.TOOLCHAIN_LINT }} clippy --all-features -- -D warnings
+
+      - name: Clippy (all targets)
         env:
           SKIP_WASM_BUILD: 1
         run: cargo +${{ env.TOOLCHAIN_LINT }} clippy --all-targets --all-features -- -D warnings
@@ -75,5 +85,30 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # Build the library before its tests, so that the two do not compile at the same time (see the
+      # lint job).
+      - name: Build
+        run: cargo build --all-features --verbose
       - name: Run tests
-        run: cargo test --verbose
+        run: cargo test --all-features --verbose
+
+  # Build the library for the browser and check that the package works from JavaScript.
+  wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the wasm target and wasm-pack
+        run: |
+          rustup target add wasm32-unknown-unknown
+          cargo install wasm-pack --locked --version ${{ env.WASM_PACK_VERSION }}
+      - name: Build the wasm package
+        run: wasm-pack build --target web --no-default-features --features wasm
+      - name: Smoke test
+        run: node scripts/wasm-smoke-test.mjs pkg
+      - name: Pack
+        run: wasm-pack pack
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wasm-package
+          path: pkg/*.tgz
+          if-no-files-found: error
